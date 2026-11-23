@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OptiLab 2.0 高级光电实验演示与数据分析系统，覆盖本科四年实验课程。">
+  <title>OptiLab 2.0 | 光电实验高级演示系统</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="advanced.css">
+</head>
+<body class="advanced-body">
+  <div class="app-shell">
+    <aside class="sidebar advanced-sidebar">
+      <a class="brand" href="#top" aria-label="返回顶部">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="5"></circle>
+            <path d="M24 4v10M24 34v10M4 24h10M34 24h10M9.9 9.9l7.1 7.1M31 31l7.1 7.1M38.1 9.9 31 17M17 31l-7.1 7.1"></path>
+          </svg>
+        </span>
+        <span>
+          <strong>OptiLab</strong>
+          <small>ADVANCED 2.0</small>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="主要功能">
+        <button class="nav-item active" data-target="overview">
+          <span class="nav-icon">01</span>
+          <span>培养全景</span>
+        </button>
+        <button class="nav-item" data-target="catalog-section">
+          <span class="nav-icon">02</span>
+          <span>四年实验图谱</span>
+        </button>
+        <button class="nav-item" data-target="lab-section">
+          <span class="nav-icon">03</span>
+          <span>高级演示台</span>
+        </button>
+        <button class="nav-item" data-target="data-section">
+          <span class="nav-icon">04</span>
+          <span>数据分析</span>
+        </button>
+        <button class="nav-item" data-target="literature-section">
+          <span class="nav-icon">05</span>
+          <span>文献与引用</span>
+        </button>
+        <button class="nav-item" data-target="report-section">
+          <span class="nav-icon">06</span>
+          <span>报告版本库</span>
+        </button>
+        <button class="nav-item" data-target="paper-section">
+          <span class="nav-icon">07</span>
+          <span>论文工作台</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-progress">
+        <div class="sidebar-progress-head">
+          <span>课程覆盖</span>
+          <strong>100%</strong>
+        </div>
+        <div class="progress-track"><i></i></div>
+        <p id="sidebar-catalog-summary">正在读取课程图谱</p>
+      </div>
+
+      <div class="sidebar-note">
+        <span class="status-dot"></span>
+        <div>
+          <strong>本地高级版</strong>
+          <p>数据与历史报告保存在浏览器</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content advanced-main" id="top">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">OPTICAL & ELECTRONIC INFORMATION LAB SYSTEM</span>
+          <h1>本科四年实验高级演示系统</h1>
+        </div>
+        <div class="top-status">
+          <span class="live-pill"><i></i> 系统在线</span>
+          <span class="version-pill">v2.0</span>
+          <span id="clock" class="clock">--:--</span>
+        </div>
+      </header>
+
+      <section class="advanced-hero" id="overview">
+        <div class="advanced-hero-copy">
+          <span class="hero-kicker">通用四年图谱 + 华中科技大学 2025 级培养方案</span>
+          <h2>一套系统，贯穿<br>四年的实验训练。</h2>
+          <p>既覆盖从基础物理、波动光学、模拟与数字电路到智能光电系统的通用实验，也单独收录华中科技大学光电信息科学与工程 2025 级培养方案中的必修实验课程。</p>
+          <div class="hero-actions">
+            <button class="primary-button" id="browse-catalog">浏览实验图谱</button>
+            <button class="ghost-button" id="launch-current">启动当前演示</button>
+          </div>
+          <div class="hero-stat-row">
+            <div><strong id="hero-experiment-count">--</strong><span>实验模块</span></div>
+            <div><strong id="hero-course-count">--</strong><span>实验课程 / 学期节点</span></div>
+            <div><strong id="hero-report-count">0</strong><span>已生成数据报告</span></div>
+          </div>
+        </div>
+        <div class="advanced-hero-visual" aria-hidden="true">
+          <div class="system-orbit orbit-a"></div>
+          <div class="system-orbit orbit-b"></div>
+          <div class="system-center">
+            <span>OPTICAL</span>
+            <strong>LAB</strong>
+            <small>4 YEAR SYSTEM</small>
+          </div>
+          <div class="system-node node-1"><i></i><span>物理光学</span></div>
+          <div class="system-node node-2"><i></i><span>模拟电路</span></div>
+          <div class="system-node node-3"><i></i><span>数字信号</span></div>
+          <div class="system-node node-4"><i></i><span>光电子学</span></div>
+          <div class="system-node node-5"><i></i><span>通信系统</span></div>
+          <div class="system-node node-6"><i></i><span>智能检测</span></div>
+          <svg viewBox="0 0 520 440" class="system-lines">
+            <circle cx="260" cy="220" r="150"></circle>
+            <circle cx="260" cy="220" r="90"></circle>
+            <path d="M260 70 390 145 390 295 260 370 130 295 130 145Z"></path>
+            <path d="M260 70v70M260 300v70M110 220h80M330 220h80M154 141l58 42M366 257l-58-42M366 141l-58 42M154 299l58-42"></path>
+          </svg>
+        </div>
+      </section>
+
+      <section class="curriculum-overview">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">CURRICULUM MAP</span>
+            <h2>四年培养路径</h2>
+          </div>
+          <p>从测量与电路基本功，逐层进入光学、信号、光电系统和综合创新。</p>
+        </div>
+        <div class="year-overview-grid" id="year-overview"></div>
+      </section>
+
+      <section class="catalog-section" id="catalog-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">EXPERIMENT ATLAS</span>
+            <h2>四年实验图谱</h2>
+          </div>
+          <p id="catalog-count">共 64 个实验模块</p>
+        </div>
+        <div class="catalog-toolbar">
+          <label class="catalog-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m16 16 5 5"></path>
+            </svg>
+            <input id="catalog-search" type="search" placeholder="搜索实验、原理或工具..." autocomplete="off">
+          </label>
+          <div class="year-filter" role="tablist" aria-label="按年级筛选">
+            <button class="active" data-year="all">全部</button>
+            <button data-year="1">大一</button>
+            <button data-year="2">大二</button>
+            <button data-year="3">大三</button>
+            <button data-year="4">大四</button>
+            <button data-year="hust">华科必修</button>
+          </div>
+          <button class="catalog-expand" id="catalog-expand">展开全部</button>
+        </div>
+        <a class="official-source-banner" href="https://oei.hust.edu.cn/info/1041/9935.htm" target="_blank" rel="noopener noreferrer">
+          <span>HUST · 2025</span>
+          <div>
+            <strong>华中科技大学 2025 级光电信息科学与工程专业培养方案</strong>
+            <p>已映射 11 门必修实验/实践课程，共 64 个华科扩展实验模块。具体实验项目以学院当年实验教学安排为准。</p>
+          </div>
+          <i>查看官方来源 ↗</i>
+        </a>
+        <div id="semester-list" class="semester-list"></div>
+      </section>
+
+      <section class="lab-section" id="lab-section">
+        <div class="lab-section-heading">
+          <div>
+            <span class="eyebrow">ADVANCED DEMO</span>
+            <div class="lab-title-line">
+              <h2 id="lab-title">迈克尔逊干涉</h2>
+              <span class="lab-year-tag" id="lab-year-tag">大二 · 上</span>
+            </div>
+            <p id="lab-subtitle">光学干涉 · 高级交互演示</p>
+          </div>
+          <div class="lab-heading-actions">
+            <button class="secondary-button" id="reset-lab">恢复默认参数</button>
+            <button class="primary-button compact" id="fullscreen-lab">全屏演示</button>
+          </div>
+        </div>
+
+        <div class="advanced-lab-grid" id="lab-stage-card">
+          <article class="lab-stage-panel">
+            <div class="lab-stage-topbar">
+              <div class="lab-tabs">
+                <button class="active" data-lab-mode="model">实时模型</button>
+                <button data-lab-mode="principle">原理图</button>
+                <button data-lab-mode="measure">测量视图</button>
+              </div>
+              <div class="lab-live-status">
+                <span><i></i> 实时示意模型</span>
+                <button id="sim-speed" title="切换动画速度">1.0×</button>
+                <button id="annotation-toggle" class="active" title="显示或隐藏场景标注">标注</button>
+                <button id="lab-pause">暂停</button>
+              </div>
+            </div>
+            <div class="advanced-canvas-wrap">
+              <canvas id="lab-canvas" aria-label="高级实验交互演示"></canvas>
+              <div class="canvas-meta meta-top-left" id="lab-badge">INTERFEROMETER</div>
+              <div class="canvas-meta meta-top-right" id="lab-readout">λ = 632 nm</div>
+              <div class="canvas-legend" id="lab-legend">
+                <span><i class="legend-green"></i> 相干光</span>
+                <span><i class="legend-amber"></i> 测量信号</span>
+              </div>
+            </div>
+            <div class="simulation-story">
+              <div>
+                <span><i>01</i> 此刻发生</span>
+                <strong id="sim-action">激光经分束镜分为两束相干光</strong>
+              </div>
+              <div>
+                <span><i>02</i> 观察重点</span>
+                <strong id="sim-attention">同心条纹随光程差产生明暗变化</strong>
+              </div>
+              <div>
+                <span><i>03</i> 参数影响</span>
+                <strong id="sim-effect">镜面位移增加时条纹向外或向内吞吐</strong>
+              </div>
+            </div>
+            <div class="advanced-controls">
+              <label>
+                <span><b id="primary-label">波长</b><strong id="primary-value">632 nm</strong></span>
+                <input type="range" id="primary-control" min="400" max="750" step="1" value="632">
+              </label>
+              <label>
+                <span><b id="secondary-label">镜面位移</b><strong id="secondary-value">1.60 μm</strong></span>
+                <input type="range" id="secondary-control" min="0" max="4" step="0.01" value="1.6">
+              </label>
+              <div class="scan-control">
+                <span>自动扫描</span>
+                <button id="auto-scan" aria-pressed="false"><i></i></button>
+              </div>
+            </div>
+            <div class="lab-preset-row">
+              <span>快速场景</span>
+              <button data-preset="typical">典型参数</button>
+              <button data-preset="contrast">高对比度</button>
+              <button data-preset="extreme">极限条件</button>
+            </div>
+          </article>
+
+          <aside class="lab-info-panel">
+            <div class="lab-info-block">
+              <span class="info-kicker">MODEL SUMMARY</span>
+              <h3>实验模型说明</h3>
+              <p id="lab-description"></p>
+            </div>
+            <div class="lab-formula">
+              <span>理论关系</span>
+              <strong id="lab-formula">Δd = Nλ / 2</strong>
+            </div>
+            <div class="lab-info-block">
+              <span class="info-kicker">LEARNING OBJECTIVES</span>
+              <h3>本次演示目标</h3>
+              <ul id="lab-objectives"></ul>
+            </div>
+            <div class="lab-info-block">
+              <span class="info-kicker">DATA PLAN</span>
+              <h3>建议记录量</h3>
+              <div class="record-grid">
+                <div><span>横轴变量</span><strong id="record-x">输入参数</strong></div>
+                <div><span>纵轴响应</span><strong id="record-y">测量结果</strong></div>
+                <div><span>建议点数</span><strong>30–60</strong></div>
+                <div><span>推荐重复</span><strong>3 次</strong></div>
+              </div>
+            </div>
+            <div class="live-derived">
+              <span>当前参数解读</span>
+              <strong id="derived-reading">等待模型计算</strong>
+              <small id="derived-note">调整参数后实时更新</small>
+            </div>
+            <button class="secondary-button full-width" id="jump-to-data">用这个实验生成报告</button>
+          </aside>
+        </div>
+
+        <section class="principle-dossier" aria-labelledby="principle-title">
+          <div class="principle-dossier-heading">
+            <div>
+              <span class="eyebrow">PRINCIPLE DOSSIER</span>
+              <h3 id="principle-title">实验原理与操作档案</h3>
+              <p id="principle-subtitle">每个实验模块均配置独立原理说明</p>
+            </div>
+            <span class="dossier-status">64 / 64 已建档</span>
+          </div>
+          <div class="principle-grid">
+            <article class="principle-card principle-lead">
+              <span class="principle-index">01 · 原理概述</span>
+              <h4 id="principle-intro-title">迈克尔逊干涉</h4>
+              <p id="principle-intro"></p>
+            </article>
+            <article class="principle-card principle-theory-card">
+              <span class="principle-index">02 · 理论模型</span>
+              <div class="principle-formula">
+                <span>核心关系</span>
+                <strong id="principle-formula">Δd = Nλ / 2</strong>
+              </div>
+              <p id="principle-theory"></p>
+            </article>
+            <article class="principle-card">
+              <span class="principle-index">03 · 公式变量</span>
+              <p id="principle-variables"></p>
+            </article>
+            <article class="principle-card">
+              <span class="principle-index">04 · 仪器与器材</span>
+              <p id="principle-apparatus"></p>
+            </article>
+            <article class="principle-card principle-steps-card">
+              <span class="principle-index">05 · 推荐实验步骤</span>
+              <ol id="principle-steps"></ol>
+            </article>
+            <article class="principle-card principle-caution-card">
+              <span class="principle-index">06 · 操作注意</span>
+              <p id="principle-caution"></p>
+            </article>
+            <article class="principle-card">
+              <span class="principle-index">07 · 观察与判读</span>
+              <p id="principle-observations"></p>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="data-section" id="data-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">DATA INTAKE</span>
+            <h2>导入本次实验数据</h2>
+          </div>
+          <p>上传或粘贴 CSV。每次成功导入都会立即生成一个独立报告版本。</p>
+        </div>
+
+        <div class="data-layout">
+          <div class="data-card panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">DATA</span>
+                <h3>实验数据文件</h3>
+              </div>
+              <button class="text-button" id="load-smart-sample">生成示例数据</button>
+            </div>
+            <label class="advanced-drop" id="data-drop">
+              <input type="file" id="data-file" accept=".csv,.txt,text/csv">
+              <span class="drop-symbol">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 16V4M8 8l4-4 4 4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path>
+                </svg>
+              </span>
+              <span>
+                <strong>拖放或选择 CSV 数据</strong>
+                <small>支持多列数值，导入后自动推荐坐标轴</small>
+              </span>
+            </label>
+            <details class="advanced-paste">
+              <summary>直接粘贴数据</summary>
+              <textarea id="data-text" rows="7" spellcheck="false" placeholder="时间_ms,电压_V&#10;0,0.02&#10;10,0.35&#10;20,0.82"></textarea>
+              <button class="secondary-button small" id="parse-data">解析并生成报告</button>
+            </details>
+            <div class="mapping-row">
+              <label>
+                <span>横轴列</span>
+                <select id="x-column-select" disabled><option>等待数据</option></select>
+              </label>
+              <label>
+                <span>纵轴列</span>
+                <select id="y-column-select" disabled><option>等待数据</option></select>
+              </label>
+            </div>
+            <div class="batch-row">
+              <label>
+                <span>批次名称</span>
+                <input id="batch-name" type="text" placeholder="例如：第1次测量" maxlength="40">
+              </label>
+              <button class="primary-button" id="new-report">用当前数据新建版本</button>
+            </div>
+            <p class="local-note"><span class="status-dot"></span> 文件仅在本机浏览器中解析，不会上传服务器。</p>
+          </div>
+
+          <div class="data-summary-card panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">ANALYSIS</span>
+                <h3>数据体检与统计</h3>
+              </div>
+              <span class="panel-tag success" id="record-count">尚未导入</span>
+            </div>
+            <div class="data-quality">
+              <div class="quality-ring" id="quality-ring" style="--score:0">
+                <span id="quality-score">—</span>
+              </div>
+              <div>
+                <strong id="quality-label">等待数据</strong>
+                <p id="quality-note">导入数据后计算有效点、异常值和拟合表现。</p>
+              </div>
+            </div>
+            <div class="advanced-metrics">
+              <div><span>平均值</span><strong id="metric-mean">—</strong></div>
+              <div><span>最大值</span><strong id="metric-max">—</strong></div>
+              <div><span>最小值</span><strong id="metric-min">—</strong></div>
+              <div><span>标准差</span><strong id="metric-std">—</strong></div>
+              <div><span>线性 R²</span><strong id="metric-r2">—</strong></div>
+              <div><span>异常点</span><strong id="metric-outliers">—</strong></div>
+            </div>
+            <div class="advanced-chart-wrap">
+              <canvas id="advanced-chart" aria-label="导入数据的高级分析图"></canvas>
+              <div class="chart-empty" id="advanced-chart-empty">
+                <strong>等待实验数据</strong>
+                <span>点击“生成示例数据”可立即体验完整流程</span>
+              </div>
+            </div>
+            <div class="chart-axis-labels">
+              <span id="chart-x-label">横轴变量</span>
+              <span id="chart-y-label">响应值</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="support-cards">
+          <article class="support-card">
+            <span class="support-index">+</span>
+            <div>
+              <h3>实验照片质量检查</h3>
+              <p>检查装置或条纹照片的亮度、尺寸与清晰度，结果会加入报告附录。</p>
+              <label class="mini-upload">
+                <input type="file" id="photo-input" accept="image/*">
+                选择照片
+              </label>
+              <span id="photo-result">未选择照片</span>
+            </div>
+          </article>
+          <article class="support-card">
+            <span class="support-index">i</span>
+            <div>
+              <h3>数据规范</h3>
+              <p>首行为列名，至少包含两组数值。建议使用统一单位，并在批次名称中标记测量条件。</p>
+            </div>
+          </article>
+          <article class="support-card">
+            <span class="support-index">↻</span>
+            <div>
+              <h3>版本规则</h3>
+              <p>即使重复导入同一文件，也会依据导入时间生成新的报告编号，方便比较不同批次。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="literature-section" id="literature-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">LITERATURE & CITATION</span>
+            <h2>学术文献检索与引用</h2>
+          </div>
+          <p>检索 OpenAlex 与 Crossref 元数据，支持 Nature、Science、PRL、Optics Express 等期刊。</p>
+        </div>
+
+        <div class="literature-layout">
+          <article class="literature-search-panel">
+            <div class="literature-panel-heading">
+              <div>
+                <span class="panel-index">SEARCH</span>
+                <h3>发现文献</h3>
+              </div>
+              <span class="api-status" id="literature-api-status"><i></i> API 就绪</span>
+            </div>
+            <form id="literature-form" class="literature-form">
+              <label class="literature-query">
+                <span>研究主题、实验名称或关键词</span>
+                <div>
+                  <input id="literature-query" type="search" placeholder="例如：Michelson interferometry precision measurement" autocomplete="off">
+                  <button type="submit">检索</button>
+                </div>
+              </label>
+              <div class="literature-filters">
+                <label>
+                  <span>数据源</span>
+                  <select id="literature-source">
+                    <option value="crossref">Crossref（推荐）</option>
+                    <option value="all">OpenAlex + Crossref</option>
+                    <option value="openalex">OpenAlex（摘要与引用次数）</option>
+                  </select>
+                </label>
+                <label>
+                  <span>期刊筛选</span>
+                  <select id="literature-journal">
+                    <option value="">全部期刊</option>
+                    <option value="nature">Nature</option>
+                    <option value="nature-photonics">Nature Photonics</option>
+                    <option value="science">Science</option>
+                    <option value="prl">Physical Review Letters</option>
+                    <option value="optics-express">Optics Express</option>
+                    <option value="science-advances">Science Advances</option>
+                  </select>
+                </label>
+                <label>
+                  <span>起始年份</span>
+                  <input id="literature-from-year" type="number" min="1900" max="2026" value="2010">
+                </label>
+                <label>
+                  <span>结果排序</span>
+                  <select id="literature-sort">
+                    <option value="relevance">相关度</option>
+                    <option value="citations">引用次数</option>
+                    <option value="newest">最新发表</option>
+                  </select>
+                </label>
+              </div>
+            </form>
+            <div class="topic-chips">
+              <span>快捷主题</span>
+              <button data-literature-topic="Michelson interferometry precision measurement">精密干涉</button>
+              <button data-literature-topic="photoelectric effect work function measurement">光电效应</button>
+              <button data-literature-topic="optical fiber sensing strain temperature">光纤传感</button>
+              <button data-literature-topic="laser beam characterization Gaussian optics">激光光束</button>
+              <button data-literature-topic="machine vision optical metrology defect detection">机器视觉</button>
+            </div>
+            <p class="literature-disclaimer">文献检索使用公开元数据 API，不自动下载论文全文。引用前请核对 DOI、作者、期刊和正式出版信息。</p>
+          </article>
+
+          <aside class="citation-library-panel">
+            <div class="citation-library-heading">
+              <div>
+                <span class="eyebrow">CITATION LIBRARY</span>
+                <h3>我的引用库</h3>
+              </div>
+              <span id="citation-count">0</span>
+            </div>
+            <div id="citation-library" class="citation-library">
+              <div class="library-empty">
+                <strong>尚未添加文献</strong>
+                <span>从右侧搜索结果中加入引用</span>
+              </div>
+            </div>
+            <div class="citation-library-actions">
+              <button class="secondary-button small" id="copy-bibtex">复制 BibTeX</button>
+              <button class="secondary-button small" id="download-bibtex">下载 .bib</button>
+            </div>
+          </aside>
+        </div>
+
+        <div class="literature-results-wrap">
+          <div class="literature-results-heading">
+            <div>
+              <span class="eyebrow">SEARCH RESULTS</span>
+              <h3>检索结果</h3>
+            </div>
+            <span id="literature-result-count">等待检索</span>
+          </div>
+          <div id="literature-results" class="literature-results">
+            <div class="results-placeholder">
+              <span>⌕</span>
+              <strong>输入关键词开始检索</strong>
+              <p>结果包含题名、作者、期刊、年份、被引次数与 DOI。Nature 等期刊可以通过期刊筛选快速定位。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section advanced-report-section" id="report-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">REPORT STUDIO</span>
+            <h2>报告生成与历史版本</h2>
+          </div>
+          <p>每份报告绑定实验、批次、数据统计和生成时间，可单独复制与下载。</p>
+        </div>
+        <div class="report-studio">
+          <article class="advanced-report-panel">
+            <div class="report-toolbar">
+              <div class="report-meta-line">
+                <span id="active-report-id">等待生成报告</span>
+                <span id="active-report-time">—</span>
+              </div>
+              <div class="report-actions">
+                <button class="icon-button" id="copy-advanced-report">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+                  </svg>
+                  复制
+                </button>
+                <button class="primary-button compact" id="download-advanced-report">下载 .md</button>
+              </div>
+            </div>
+            <pre id="advanced-report-preview" tabindex="0"></pre>
+          </article>
+          <aside class="report-history-panel">
+            <div class="history-heading">
+              <div>
+                <span class="eyebrow">VERSION HISTORY</span>
+                <h3>历史报告</h3>
+              </div>
+              <span id="history-count">0</span>
+            </div>
+            <div id="report-history-list" class="report-history-list">
+              <div class="history-empty">
+                <strong>还没有报告版本</strong>
+                <span>导入数据后会自动保存到这里</span>
+              </div>
+            </div>
+            <p class="history-note">历史记录保存在当前浏览器中，最多保留 30 份报告。</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="paper-section" id="paper-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">PAPER STUDIO</span>
+            <h2>实验报告与文献生成论文初稿</h2>
+          </div>
+          <p>组合一份实验报告和引用库中的文献，生成可继续修改的中英文论文框架。</p>
+        </div>
+
+        <div class="paper-layout">
+          <aside class="paper-config-panel">
+            <div class="paper-config-heading">
+              <span class="panel-index">CONFIG</span>
+              <h3>论文生成设置</h3>
+            </div>
+            <label>
+              <span>论文题目</span>
+              <input id="paper-title" type="text" placeholder="系统会根据实验自动生成">
+            </label>
+            <label>
+              <span>选择实验报告</span>
+              <select id="paper-report-select">
+                <option value="">等待报告</option>
+              </select>
+            </label>
+            <label>
+              <span>论文类型</span>
+              <select id="paper-type">
+                <option value="research">实验研究论文</option>
+                <option value="course">课程论文 / 实验论文</option>
+                <option value="review">文献综述型初稿</option>
+              </select>
+            </label>
+            <label>
+              <span>引用格式</span>
+              <select id="paper-citation-style">
+                <option value="numeric">数字编号（Nature 风格）</option>
+                <option value="gbt">GB/T 7714</option>
+                <option value="apa">APA 7</option>
+              </select>
+            </label>
+            <label>
+              <span>详细程度</span>
+              <select id="paper-depth">
+                <option value="standard">标准草稿</option>
+                <option value="extended">扩展详细版</option>
+              </select>
+            </label>
+            <div class="paper-source-summary">
+              <div><span>报告</span><strong id="paper-report-count">0</strong></div>
+              <div><span>引用文献</span><strong id="paper-citation-count">0</strong></div>
+            </div>
+            <button class="primary-button paper-generate-button" id="generate-paper">生成论文初稿</button>
+            <p class="paper-config-note">生成结果是结构化学术初稿，不会虚构实验结果。参考文献的结论表述需要你阅读原文后进一步核实与改写。</p>
+          </aside>
+
+          <article class="paper-preview-panel">
+            <div class="paper-toolbar">
+              <div>
+                <span class="eyebrow">MANUSCRIPT PREVIEW</span>
+                <strong id="paper-word-count">0 字</strong>
+              </div>
+              <div class="report-actions">
+                <button class="icon-button" id="copy-paper">复制</button>
+                <button class="primary-button compact" id="download-paper">下载 .md</button>
+              </div>
+            </div>
+            <pre id="paper-preview" tabindex="0"># 论文工作台
+
+1. 先导入实验数据并生成详细报告；
+2. 在“文献与引用”中检索并加入相关论文；
+3. 选择报告、论文类型和引用格式；
+4. 点击“生成论文初稿”。
+
+论文将包含摘要、引言、实验方法、结果分析、讨论、结论和参考文献。系统仅使用已导入数据和已选择的文献元数据。</pre>
+          </article>
+        </div>
+      </section>
+
+      <footer class="advanced-footer">
+        <span>OptiLab 2.0 · 光学与电子信息本科实验高级演示系统</span>
+        <span>课程图谱为典型培养方案框架，可继续增补本校正式实验清单</span>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="catalog.js"></script>
+  <script src="principles.js"></script>
+  <script src="hust.js"></script>
+  <script src="advanced.js"></script>
+  <script src="research.js"></script>
+</body>
+</html>
