@@ -2197,6 +2197,284 @@
   }
 }
 
+/* Motion layer */
+@property --score {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@keyframes motion-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes story-refresh-in {
+  0% {
+    opacity: 0.55;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes metric-glow {
+  0%, 100% {
+    color: #eee9df;
+    text-shadow: none;
+  }
+  42% {
+    color: #e2b873;
+    text-shadow: 0 0 16px rgba(218, 170, 97, 0.24);
+  }
+}
+
+@keyframes chart-refresh-in {
+  0% {
+    opacity: 0.45;
+    filter: brightness(1.45);
+    transform: scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes paper-refresh-in {
+  0% {
+    opacity: 0.5;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes result-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes search-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes button-shine {
+  0% {
+    transform: translateX(-130%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(230%) skewX(-20deg);
+  }
+}
+
+@keyframes status-breathe {
+  to {
+    box-shadow: 0 0 0 6px rgba(218, 177, 105, 0.08), 0 0 15px rgba(218, 177, 105, 0.3);
+  }
+}
+
+@keyframes paper-generate-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes nav-icon-glow {
+  50% {
+    box-shadow: 0 0 16px rgba(216, 173, 101, 0.15);
+  }
+}
+
+.advanced-body .motion-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 520ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.25, 1);
+}
+
+.advanced-body .motion-reveal.motion-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.advanced-body .advanced-hero {
+  animation: motion-reveal-in 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.advanced-body .advanced-hero::before {
+  animation: hero-grid-drift 18s linear infinite;
+}
+
+@keyframes hero-grid-drift {
+  to {
+    background-position: 38px 38px, 38px 38px;
+  }
+}
+
+.advanced-body .live-pill i {
+  animation: status-breathe 1.8s ease-in-out infinite alternate;
+}
+
+.advanced-body .nav-item.active .nav-icon {
+  animation: nav-icon-glow 2.8s ease-in-out infinite;
+}
+
+.advanced-body .primary-button,
+.advanced-body .catalog-expand {
+  position: relative;
+  overflow: hidden;
+}
+
+.advanced-body .primary-button::after,
+.advanced-body .catalog-expand::after {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% -45%;
+  width: 36%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+  transform: translateX(-130%) skewX(-20deg);
+}
+
+.advanced-body .primary-button:hover::after,
+.advanced-body .catalog-expand:hover::after {
+  animation: button-shine 720ms ease;
+}
+
+.advanced-body .experiment-card,
+.advanced-body .literature-result-card,
+.advanced-body .year-overview-card {
+  will-change: transform;
+}
+
+.advanced-body .experiment-card:active {
+  transform: translateY(0) scale(0.988);
+}
+
+.advanced-body .group-toggle,
+.advanced-body .report-tab,
+.advanced-body .lab-tabs button,
+.advanced-body .year-filter button {
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.advanced-body .group-toggle:active,
+.advanced-body .report-tab:active,
+.advanced-body .lab-tabs button:active {
+  transform: scale(0.96);
+}
+
+.advanced-body .simulation-story.story-refresh > div {
+  animation: story-refresh-in 350ms ease both;
+}
+
+.advanced-body .simulation-story.story-refresh > div:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.advanced-body .simulation-story.story-refresh > div:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.advanced-body .metric-animating {
+  animation: metric-glow 650ms ease both;
+}
+
+.advanced-body .chart-refresh #advanced-chart {
+  animation: chart-refresh-in 480ms ease both;
+}
+
+.advanced-body #advanced-report-preview.paper-refresh {
+  animation: paper-refresh-in 300ms ease both;
+}
+
+.advanced-body .literal-result-card,
+.advanced-body .literature-result-card {
+  animation: result-card-in 380ms ease both;
+  animation-delay: calc(var(--result-index, 0) * 26ms);
+}
+
+.advanced-body .search-loading {
+  position: relative;
+}
+
+.advanced-body .search-loading::before {
+  content: "";
+  width: 30px;
+  height: 30px;
+  margin-bottom: 6px;
+  border: 2px solid rgba(219, 183, 119, 0.16);
+  border-top-color: #d7ae70;
+  border-radius: 50%;
+  animation: search-orbit 800ms linear infinite;
+}
+
+.advanced-body #paper-preview.paper-generated {
+  animation: paper-generate-in 460ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+}
+
+.advanced-body .paper-generate-button.button-confirmed {
+  box-shadow: 0 0 0 4px rgba(205, 158, 87, 0.1), 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.advanced-body .quality-ring {
+  transition: background 420ms ease, box-shadow 420ms ease;
+}
+
+.advanced-body .quality-ring:has(+ div) {
+  box-shadow: 0 0 24px rgba(191, 148, 86, 0.08);
+}
+
+.advanced-body .semester-group {
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.advanced-body .semester-group:hover {
+  border-color: #4a453a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advanced-body .motion-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .advanced-body *,
+  .advanced-body *::before,
+  .advanced-body *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 @media (max-width: 480px) {
   .experiment-card-grid {
     grid-template-columns: 1fr;

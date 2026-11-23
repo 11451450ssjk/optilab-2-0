@@ -498,6 +498,84 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2400);
 }
 
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let motionObserver = null;
+
+function refreshMotionTargets() {
+  if (!motionObserver) return;
+  const selector = [
+    ".section-heading",
+    ".year-overview-card",
+    ".semester-group",
+    ".lab-stage-panel",
+    ".lab-info-panel",
+    ".principle-dossier",
+    ".data-card",
+    ".data-summary-card",
+    ".literature-search-panel",
+    ".citation-library-panel",
+    ".literature-results-wrap",
+    ".advanced-report-panel",
+    ".report-history-panel",
+    ".paper-config-panel",
+    ".paper-preview-panel"
+  ].join(",");
+  document.querySelectorAll(selector).forEach((element) => {
+    if (element.dataset.motionRegistered) return;
+    element.dataset.motionRegistered = "true";
+    element.classList.add("motion-reveal");
+    motionObserver.observe(element);
+  });
+}
+
+function setupMotionObserver() {
+  if (reducedMotion) return;
+  motionObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("motion-visible");
+        motionObserver.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -35px 0px"
+  });
+  refreshMotionTargets();
+}
+
+function pulseMotion(element, className) {
+  if (!element || reducedMotion) return;
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+  window.setTimeout(() => element.classList.remove(className), 520);
+}
+
+function animateMetric(element, target, formatter = (value) => compactNumber(value), duration = 650) {
+  if (!element) return;
+  if (element._metricFrame) cancelAnimationFrame(element._metricFrame);
+  if (reducedMotion) {
+    element.textContent = formatter(target);
+    return;
+  }
+  const start = performance.now();
+  element.classList.add("metric-animating");
+  const tick = (now) => {
+    const progress = clamp((now - start) / duration, 0, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = formatter(target * eased);
+    if (progress < 1) {
+      element._metricFrame = requestAnimationFrame(tick);
+    } else {
+      element.textContent = formatter(target);
+      element.classList.remove("metric-animating");
+      element._metricFrame = null;
+    }
+  };
+  element._metricFrame = requestAnimationFrame(tick);
+}
+
 function currentExperiment() {
   return EXPERIMENTS.find((experiment) => experiment.id === state.experimentId) || EXPERIMENTS[0];
 }
@@ -532,6 +610,7 @@ function updateSimulationStory() {
   document.getElementById("sim-action").textContent = guide.action;
   document.getElementById("sim-attention").textContent = guide.attention;
   document.getElementById("sim-effect").textContent = `${guide.effect}。当前：${derived.value}`;
+  pulseMotion(document.querySelector(".simulation-story"), "story-refresh");
 }
 
 function controlConfig(experiment = currentExperiment()) {
@@ -2406,6 +2485,7 @@ function renderCatalog() {
   });
   document.getElementById("catalog-expand").textContent =
     container.querySelector(".experiment-card-grid.collapsed") ? "展开全部" : "收起全部";
+  refreshMotionTargets();
 }
 
 function selectExperiment(experimentId, scrollToLab = false) {
@@ -2772,20 +2852,22 @@ function updateAnalysisUI() {
   if (!state.data) return;
   const { analysis, xHeader, yHeader } = state.data;
   document.getElementById("record-count").textContent = `${analysis.n} 条记录`;
-  document.getElementById("metric-mean").textContent = compactNumber(analysis.mean);
-  document.getElementById("metric-max").textContent = compactNumber(analysis.max);
-  document.getElementById("metric-min").textContent = compactNumber(analysis.min);
-  document.getElementById("metric-std").textContent = compactNumber(analysis.std);
-  document.getElementById("metric-r2").textContent = formatNumber(analysis.r2, 3);
-  document.getElementById("metric-outliers").textContent = String(analysis.outliers.length);
+  animateMetric(document.getElementById("metric-mean"), analysis.mean);
+  animateMetric(document.getElementById("metric-max"), analysis.max);
+  animateMetric(document.getElementById("metric-min"), analysis.min);
+  animateMetric(document.getElementById("metric-std"), analysis.std);
+  animateMetric(document.getElementById("metric-r2"), analysis.r2, (value) => formatNumber(value, 3));
+  animateMetric(document.getElementById("metric-outliers"), analysis.outliers.length, (value) => String(Math.round(value)), 420);
   document.getElementById("quality-ring").style.setProperty("--score", analysis.qualityScore);
-  document.getElementById("quality-score").textContent = analysis.qualityScore;
+  animateMetric(document.getElementById("quality-score"), analysis.qualityScore, (value) => String(Math.round(value)), 720);
   document.getElementById("quality-label").textContent = analysis.qualityLabel;
   document.getElementById("quality-note").textContent =
     `${analysis.n} 个有效点；95% 均值区间 ±${compactNumber(analysis.confidence95)}；${analysis.peaks.length} 个局部峰值。`;
   document.getElementById("chart-x-label").textContent = xHeader;
   document.getElementById("chart-y-label").textContent = yHeader;
   document.getElementById("advanced-chart-empty").classList.add("hidden");
+  const chartWrap = document.querySelector(".advanced-chart-wrap");
+  pulseMotion(chartWrap, "chart-refresh");
 }
 
 function drawAdvancedChart() {
@@ -3331,6 +3413,7 @@ function renderReportHistory() {
       }
     });
   });
+  refreshMotionTargets();
 }
 
 function showReportRecord(record) {
@@ -3339,6 +3422,7 @@ function showReportRecord(record) {
   document.getElementById("active-report-id").textContent = record.id;
   document.getElementById("active-report-time").textContent =
     new Date(record.createdAt).toLocaleString("zh-CN", { hour12: false });
+  pulseMotion(reportPreview, "paper-refresh");
 }
 
 function activeReport() {
@@ -3647,6 +3731,7 @@ function initialize() {
   setupControls();
   setupDataControls();
   setupReportControls();
+  setupMotionObserver();
   updateClock();
   window.setInterval(updateClock, 15000);
   drawAdvancedChart();

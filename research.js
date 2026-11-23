@@ -312,7 +312,7 @@
       const abstract = item.abstract
         ? escapeHtml(item.abstract.slice(0, 420))
         : "公开元数据未提供摘要。请通过 DOI 进入出版页核对全文与结论。";
-      return `<article class="literature-result-card ${added ? "added" : ""}">
+      return `<article class="literature-result-card ${added ? "added" : ""}" style="--result-index:${Math.min(index, 12)}">
         <div class="result-source-row">
           <span class="result-source">${escapeHtml(item.source)}</span>
           <span class="result-cites">被引 ${Number(item.citations || 0).toLocaleString("zh-CN")} 次</span>
@@ -688,8 +688,15 @@ ${citations.map((citation) => citation.reference).join("\n\n")}
 > OptiLab 学术写作辅助仅生成结构化初稿。实验事实、数据处理、文献结论和最终文字由作者负责。`;
     state.lastPaper = paper;
     state.lastPaperTitle = title;
-    document.getElementById("paper-preview").textContent = paper;
+    const preview = document.getElementById("paper-preview");
+    preview.textContent = paper;
+    preview.classList.remove("paper-generated");
+    void preview.offsetWidth;
+    preview.classList.add("paper-generated");
     document.getElementById("paper-word-count").textContent = `${paper.replace(/\s/g, "").length} 字`;
+    const generateButton = document.getElementById("generate-paper");
+    generateButton.classList.add("button-confirmed");
+    window.setTimeout(() => generateButton.classList.remove("button-confirmed"), 700);
     bridge.showToast("论文初稿已生成");
   }
 
