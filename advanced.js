@@ -872,6 +872,55 @@ function drawLabFrame(time) {
     drawPrincipleCanvasOverlay(width, height);
   }
   drawCanvasVignette(labContext, width, height);
+  drawTechnicalOverlay(width, height, time);
+}
+
+function drawTechnicalOverlay(width, height, time) {
+  labContext.save();
+  labContext.strokeStyle = "rgba(218, 181, 117, 0.43)";
+  labContext.lineWidth = 1;
+  const inset = 12;
+  const length = 18;
+  const corners = [
+    [inset, inset, 1, 1],
+    [width - inset, inset, -1, 1],
+    [inset, height - inset, 1, -1],
+    [width - inset, height - inset, -1, -1]
+  ];
+  corners.forEach(([x, y, dx, dy]) => {
+    labContext.beginPath();
+    labContext.moveTo(x + dx * length, y);
+    labContext.lineTo(x, y);
+    labContext.lineTo(x, y + dy * length);
+    labContext.stroke();
+  });
+  const scanY = 62 + ((Math.sin(time * 0.00034) + 1) / 2) * (height - 110);
+  const scan = labContext.createLinearGradient(0, scanY - 20, 0, scanY + 20);
+  scan.addColorStop(0, "rgba(201, 160, 96, 0)");
+  scan.addColorStop(0.48, "rgba(201, 160, 96, 0.045)");
+  scan.addColorStop(0.5, "rgba(226, 190, 127, 0.12)");
+  scan.addColorStop(0.52, "rgba(201, 160, 96, 0.045)");
+  scan.addColorStop(1, "rgba(201, 160, 96, 0)");
+  labContext.fillStyle = scan;
+  labContext.fillRect(20, scanY - 20, width - 40, 40);
+  if (state.annotations) {
+    const scaleX = width - 108;
+    const scaleY = height - 19;
+    labContext.strokeStyle = "rgba(198, 230, 213, 0.34)";
+    labContext.beginPath();
+    labContext.moveTo(scaleX, scaleY);
+    labContext.lineTo(scaleX + 58, scaleY);
+    for (let index = 0; index <= 4; index += 1) {
+      const x = scaleX + index * 14.5;
+      labContext.moveTo(x, scaleY - 3);
+      labContext.lineTo(x, scaleY + 2);
+    }
+    labContext.stroke();
+    labContext.fillStyle = "rgba(198, 230, 213, 0.34)";
+    labContext.font = '8px "Cascadia Code", Consolas, monospace';
+    labContext.fillText("CAL", scaleX + 61, scaleY + 3);
+  }
+  labContext.restore();
 }
 
 function drawPerspectiveBench(context, width, height, time) {
@@ -1001,12 +1050,35 @@ function drawCircuitModel(width, height, time) {
   const top = height * 0.26;
   const bottom = height * 0.7;
   labContext.save();
-  labContext.fillStyle = "rgba(9, 24, 16, 0.35)";
-  labContext.strokeStyle = "rgba(214, 242, 220, 0.13)";
+  const board = labContext.createLinearGradient(left - 40, top - 30, right + 50, bottom + 50);
+  board.addColorStop(0, "rgba(15, 45, 35, 0.72)");
+  board.addColorStop(0.5, "rgba(10, 34, 26, 0.84)");
+  board.addColorStop(1, "rgba(8, 24, 20, 0.9)");
+  labContext.fillStyle = board;
+  labContext.strokeStyle = "rgba(218, 184, 115, 0.2)";
   labContext.beginPath();
   labContext.roundRect(left - 35, top - 28, right - left + 82, bottom - top + 75, 12);
   labContext.fill();
   labContext.stroke();
+  labContext.strokeStyle = "rgba(193, 153, 85, 0.14)";
+  labContext.lineWidth = 1;
+  for (let offset = 0; offset < 5; offset += 1) {
+    labContext.beginPath();
+    labContext.moveTo(left - 18, top + 18 + offset * 17);
+    labContext.lineTo(left + 18, top + 18 + offset * 17);
+    labContext.lineTo(left + 45, top + 45 + offset * 17);
+    labContext.stroke();
+  }
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = 0; column < 10; column += 1) {
+      const viaX = right - 30 - column * 15;
+      const viaY = bottom - 18 - row * 13;
+      labContext.fillStyle = "rgba(207, 168, 102, 0.16)";
+      labContext.beginPath();
+      labContext.arc(viaX, viaY, 2.2, 0, Math.PI * 2);
+      labContext.fill();
+    }
+  }
   labContext.strokeStyle = "rgba(214, 242, 220, 0.72)";
   labContext.lineWidth = 2.5;
   labContext.shadowColor = "rgba(0, 0, 0, 0.45)";
@@ -1203,10 +1275,43 @@ function drawRCModel(width, height, time) {
 }
 
 function drawSemiconductorModel(width, height, time) {
-  const axes = drawCanvasAxes(labContext, width, height);
+  const axes = drawCanvasAxes(labContext, width, height, {
+    left: width * 0.5,
+    right: width * 0.93,
+    top: height * 0.16,
+    bottom: height * 0.82
+  });
   const color = signalColor();
   const temperature = 300 / Math.max(250, state.secondary);
   const exponent = 18 * temperature;
+  labContext.save();
+  const deviceX = width * 0.08;
+  const deviceY = height * 0.3;
+  const deviceW = width * 0.28;
+  const deviceH = height * 0.31;
+  const pRegion = labContext.createLinearGradient(deviceX, 0, deviceX + deviceW / 2, 0);
+  pRegion.addColorStop(0, "rgba(198, 128, 91, 0.62)");
+  pRegion.addColorStop(1, "rgba(154, 89, 67, 0.78)");
+  labContext.fillStyle = pRegion;
+  labContext.fillRect(deviceX, deviceY, deviceW / 2, deviceH);
+  const nRegion = labContext.createLinearGradient(deviceX + deviceW / 2, 0, deviceX + deviceW, 0);
+  nRegion.addColorStop(0, "rgba(85, 145, 156, 0.76)");
+  nRegion.addColorStop(1, "rgba(52, 111, 126, 0.6)");
+  labContext.fillStyle = nRegion;
+  labContext.fillRect(deviceX + deviceW / 2, deviceY, deviceW / 2, deviceH);
+  labContext.fillStyle = "rgba(236, 219, 176, 0.21)";
+  labContext.fillRect(deviceX + deviceW / 2 - 8, deviceY, 16, deviceH);
+  labContext.strokeStyle = "rgba(221, 235, 226, 0.35)";
+  labContext.strokeRect(deviceX, deviceY, deviceW, deviceH);
+  labContext.strokeStyle = "#b6c8c0";
+  labContext.lineWidth = 3;
+  labContext.beginPath();
+  labContext.moveTo(deviceX + deviceW * 0.2, deviceY - 24);
+  labContext.lineTo(deviceX + deviceW * 0.2, deviceY);
+  labContext.moveTo(deviceX + deviceW * 0.8, deviceY - 24);
+  labContext.lineTo(deviceX + deviceW * 0.8, deviceY);
+  labContext.stroke();
+  labContext.restore();
   labContext.save();
   labContext.beginPath();
   for (let index = 0; index <= 140; index += 1) {
@@ -1222,8 +1327,12 @@ function drawSemiconductorModel(width, height, time) {
   labContext.lineWidth = 2.3;
   labContext.stroke();
   labContext.restore();
+  drawAnalogMeter(width * 0.23, height * 0.73, 24, clamp((state.primary / 1.2), 0, 1), "偏置 / V");
   drawLabel(labContext, "PN结非线性伏安特性", axes.left, 18);
   drawLabel(labContext, `温度 ${formatNumber(state.secondary, 0)} K`, axes.right, 18, rgba(color, 1), "right");
+  drawLabel(labContext, "P 区", deviceX + deviceW * 0.2, deviceY + 18, "rgba(240, 205, 178, 0.74)", "center");
+  drawLabel(labContext, "N 区", deviceX + deviceW * 0.8, deviceY + 18, "rgba(185, 229, 235, 0.78)", "center");
+  drawLabel(labContext, "耗尽层", deviceX + deviceW / 2, deviceY + deviceH + 17, "rgba(232, 224, 190, 0.58)", "center");
   drawLabel(labContext, "偏置电压 / V", (axes.left + axes.right) / 2, height - 14, undefined, "center");
 }
 
@@ -1728,6 +1837,29 @@ function drawFrequencyModel(width, height, time) {
   const axes = drawCanvasAxes(labContext, width, height);
   const fc = state.primary * 1000;
   labContext.save();
+  labContext.fillStyle = "rgba(5, 18, 12, 0.5)";
+  labContext.strokeStyle = "rgba(210, 236, 220, 0.17)";
+  labContext.beginPath();
+  labContext.roundRect(axes.left - 5, axes.top - 12, axes.right - axes.left + 10, axes.bottom - axes.top + 25, 8);
+  labContext.fill();
+  labContext.stroke();
+  labContext.beginPath();
+  labContext.moveTo(axes.left, axes.bottom);
+  for (let index = 0; index <= 150; index += 1) {
+    const progress = index / 150;
+    const frequency = 10 * Math.pow(100000, progress);
+    const gain = -10 * Math.log10(1 + Math.pow(frequency / fc, 2 * Math.round(state.secondary)));
+    const x = axes.left + progress * (axes.right - axes.left);
+    const y = axes.top + clamp((-gain) / 80, 0, 1) * (axes.bottom - axes.top);
+    labContext.lineTo(x, y);
+  }
+  labContext.lineTo(axes.right, axes.bottom);
+  labContext.closePath();
+  const area = labContext.createLinearGradient(0, axes.top, 0, axes.bottom);
+  area.addColorStop(0, "rgba(207, 165, 98, 0.17)");
+  area.addColorStop(1, "rgba(207, 165, 98, 0.01)");
+  labContext.fillStyle = area;
+  labContext.fill();
   labContext.beginPath();
   for (let index = 0; index <= 150; index += 1) {
     const progress = index / 150;
@@ -1741,8 +1873,34 @@ function drawFrequencyModel(width, height, time) {
   labContext.strokeStyle = rgba(signalColor(), 0.95);
   labContext.lineWidth = 2.4;
   labContext.stroke();
+  labContext.beginPath();
+  for (let index = 0; index <= 150; index += 1) {
+    const progress = index / 150;
+    const frequency = 10 * Math.pow(100000, progress);
+    const phase = -Math.round(state.secondary) * Math.atan(frequency / fc) * 180 / Math.PI;
+    const x = axes.left + progress * (axes.right - axes.left);
+    const y = axes.bottom - clamp(-phase / 360, 0, 1) * (axes.bottom - axes.top) * 0.8;
+    if (index === 0) labContext.moveTo(x, y);
+    else labContext.lineTo(x, y);
+  }
+  labContext.strokeStyle = "rgba(110, 176, 168, 0.62)";
+  labContext.lineWidth = 1.4;
+  labContext.setLineDash([5, 5]);
+  labContext.stroke();
+  labContext.restore();
+  const cutoffProgress = clamp(Math.log10(fc / 10) / 5, 0, 1);
+  const cutoffX = axes.left + cutoffProgress * (axes.right - axes.left);
+  labContext.save();
+  labContext.strokeStyle = "rgba(224, 181, 111, 0.66)";
+  labContext.setLineDash([3, 4]);
+  labContext.beginPath();
+  labContext.moveTo(cutoffX, axes.top);
+  labContext.lineTo(cutoffX, axes.bottom);
+  labContext.stroke();
   labContext.restore();
   drawLabel(labContext, `截止频率 ${formatNumber(state.primary, 0)} kHz`, axes.left, 18, rgba(signalColor(), 1));
+  drawLabel(labContext, "-3 dB", cutoffX + 7, axes.top + 16, "rgba(224, 181, 111, 0.76)");
+  drawLabel(labContext, "相位", axes.right, axes.top + 16, "rgba(110, 176, 168, 0.74)", "right");
   drawLabel(labContext, "对数频率", (axes.left + axes.right) / 2, height - 14, undefined, "center");
 }
 
@@ -1774,6 +1932,18 @@ function drawDigitalModel(width, height, time) {
   const color = signalColor();
   const channels = 4;
   const rowHeight = (axes.bottom - axes.top) / channels;
+  labContext.save();
+  labContext.strokeStyle = "rgba(116, 176, 165, 0.1)";
+  labContext.setLineDash([2, 6]);
+  for (let index = 0; index <= 10; index += 1) {
+    const x = axes.left + ((axes.right - axes.left) * index) / 10;
+    labContext.beginPath();
+    labContext.moveTo(x, axes.top);
+    labContext.lineTo(x, axes.bottom);
+    labContext.stroke();
+    drawLabel(labContext, `${index}`, x - 2, axes.bottom + 15, "rgba(147, 181, 171, 0.26)");
+  }
+  labContext.restore();
   for (let channel = 0; channel < channels; channel += 1) {
     const baseline = axes.top + rowHeight * (channel + 0.75);
     labContext.save();
@@ -1976,9 +2146,55 @@ function drawPhotoelectricModel(width, height, time) {
 }
 
 function drawDeviceIVModel(width, height, time) {
-  const axes = drawCanvasAxes(labContext, width, height);
+  const axes = drawCanvasAxes(labContext, width, height, {
+    left: width * 0.5,
+    right: width * 0.93,
+    top: height * 0.16,
+    bottom: height * 0.82
+  });
   const color = signalColor();
   const isSolar = currentExperiment().sim === "solar";
+  labContext.save();
+  const panelX = width * 0.09;
+  const panelY = height * 0.2;
+  const panelW = width * 0.29;
+  const panelH = height * 0.46;
+  const panelFill = labContext.createLinearGradient(panelX, panelY, panelX + panelW, panelY + panelH);
+  panelFill.addColorStop(0, isSolar ? "rgba(48, 79, 102, 0.82)" : "rgba(30, 66, 71, 0.82)");
+  panelFill.addColorStop(1, isSolar ? "rgba(18, 35, 55, 0.92)" : "rgba(17, 37, 38, 0.94)");
+  labContext.fillStyle = panelFill;
+  labContext.strokeStyle = "rgba(211, 225, 215, 0.4)";
+  labContext.lineWidth = 1.5;
+  labContext.beginPath();
+  labContext.roundRect(panelX, panelY, panelW, panelH, 8);
+  labContext.fill();
+  labContext.stroke();
+  labContext.strokeStyle = isSolar ? "rgba(184, 211, 232, 0.2)" : "rgba(115, 196, 181, 0.24)";
+  labContext.lineWidth = 1;
+  for (let index = 1; index < 4; index += 1) {
+    labContext.beginPath();
+    labContext.moveTo(panelX + panelW * index / 4, panelY);
+    labContext.lineTo(panelX + panelW * index / 4, panelY + panelH);
+    labContext.stroke();
+  }
+  for (let index = 1; index < 3; index += 1) {
+    labContext.beginPath();
+    labContext.moveTo(panelX, panelY + panelH * index / 3);
+    labContext.lineTo(panelX + panelW, panelY + panelH * index / 3);
+    labContext.stroke();
+  }
+  if (isSolar) {
+    for (let index = 0; index < 7; index += 1) {
+      const rayX = panelX + panelW * (0.12 + index * 0.13);
+      drawBeam(labContext, rayX - 35, panelY - 24, rayX, panelY, [244, 199, 102], time + index * 40, 0.42);
+    }
+  } else {
+    labContext.fillStyle = "rgba(147, 229, 211, 0.12)";
+    labContext.beginPath();
+    labContext.arc(panelX + panelW / 2, panelY + panelH / 2, 34, 0, Math.PI * 2);
+    labContext.fill();
+  }
+  labContext.restore();
   labContext.save();
   labContext.beginPath();
   for (let index = 0; index <= 150; index += 1) {
@@ -1999,7 +2215,9 @@ function drawDeviceIVModel(width, height, time) {
   labContext.lineWidth = 2.3;
   labContext.stroke();
   labContext.restore();
+  drawGlow(labContext, panelX + panelW / 2, panelY + panelH / 2, 30, color, 0.09);
   drawLabel(labContext, isSolar ? "太阳能电池 I–V 曲线" : "光电二极管响应曲线", axes.left, 18);
+  drawLabel(labContext, isSolar ? "光伏电池板" : "光电二极管封装", panelX + panelW / 2, panelY + panelH + 20, undefined, "center");
   drawLabel(labContext, isSolar ? `温度 ${formatNumber(state.secondary, 0)} °C` : `反向偏压 ${formatNumber(state.primary, 1)} V`, axes.right, 18, rgba(color, 1), "right");
   drawLabel(labContext, "输出电压 / V", (axes.left + axes.right) / 2, height - 14, undefined, "center");
 }
@@ -2253,6 +2471,10 @@ function drawHolographyModel(width, height, time) {
   const centerX = width / 2;
   const centerY = height / 2;
   const angle = (state.secondary * Math.PI) / 180;
+  const colorCss = rgba(color, 0.55);
+  drawBeam(labContext, width * 0.03, height * 0.24, width * 0.13, height * 0.34, color, time, 0.52);
+  drawBeam(labContext, width * 0.95, height * 0.08, width * 0.84, height * 0.2, color, time, 0.38);
+  drawGlow(labContext, width * 0.12, height * 0.32, 26, color, 0.17);
   labContext.save();
   labContext.fillStyle = "rgba(3, 11, 7, 0.68)";
   labContext.fillRect(width * 0.12, height * 0.1, width * 0.76, height * 0.8);
@@ -2269,8 +2491,19 @@ function drawHolographyModel(width, height, time) {
       }
     }
   }
+  labContext.strokeStyle = "rgba(210, 237, 221, 0.23)";
+  labContext.lineWidth = 1.5;
+  labContext.strokeRect(width * 0.12, height * 0.1, width * 0.76, height * 0.8);
+  labContext.fillStyle = "rgba(219, 238, 226, 0.26)";
+  [[0.12, 0.1], [0.88, 0.1], [0.12, 0.9], [0.88, 0.9]].forEach(([nx, ny]) => {
+    labContext.beginPath();
+    labContext.arc(width * nx, height * ny, 2.5, 0, Math.PI * 2);
+    labContext.fill();
+  });
   labContext.restore();
   drawLabel(labContext, "物光与参考光干涉记录", width * 0.12, height * 0.075, rgba(color, 0.9));
+  drawLabel(labContext, "参考光", width * 0.77, height * 0.065, colorCss, "right");
+  drawLabel(labContext, "物光", width * 0.1, height * 0.34, colorCss);
   drawLabel(labContext, `${formatNumber(state.secondary, 0)}° 参考光夹角`, width * 0.88, height * 0.93, rgba(color, 0.85), "right");
 }
 
@@ -2301,23 +2534,38 @@ function drawEmbeddedModel(width, height, time) {
 
 function drawCommunicationModel(width, height, time) {
   const color = signalColor();
-  const centerX = width * 0.5;
   const centerY = height * 0.48;
-  for (let trace = -3; trace <= 3; trace += 1) {
-    const offset = trace * 11;
+  const rail = 47 - Math.min(24, state.secondary * 0.82);
+  for (let trace = -4; trace <= 4; trace += 1) {
     labContext.save();
-    labContext.strokeStyle = rgba(color, 0.18 + Math.abs(trace) * 0.03);
+    labContext.strokeStyle = rgba(color, 0.13 + (4 - Math.abs(trace)) * 0.035);
     labContext.lineWidth = 1.1;
     labContext.beginPath();
-    for (let x = width * 0.12; x <= width * 0.88; x += 2) {
+    for (let x = width * 0.12; x <= width * 0.88; x += 1.5) {
       const progress = (x - width * 0.12) / (width * 0.76);
-      const crossing = Math.sin(progress * Math.PI * 6 + trace * 0.12 + time * 0.0004) * (52 - state.secondary * 0.7);
-      const y = centerY + crossing + offset;
+      const extended = progress * 4 + (trace + 4) * 0.31 + time * 0.00008;
+      const bitIndex = Math.floor(extended);
+      const previous = ((bitIndex * 7 + trace * 3 + 5) % 11) > 5 ? 1 : -1;
+      const current = (((bitIndex + 1) * 7 + trace * 3 + 5) % 11) > 5 ? 1 : -1;
+      const local = extended - bitIndex;
+      const transitionProgress = clamp((local - 0.34) / 0.32, 0, 1);
+      const smooth = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
+      const value = previous + (current - previous) * smooth;
+      const jitter = Math.sin(x * 0.19 + trace * 1.7 + time * 0.001) * (1.4 + state.secondary * 0.045);
+      const y = centerY + value * rail + jitter;
       if (x === width * 0.12) labContext.moveTo(x, y);
       else labContext.lineTo(x, y);
     }
     labContext.stroke();
     labContext.restore();
+  }
+  const histogramX = width * 0.67;
+  for (let bucket = 0; bucket < 18; bucket += 1) {
+    const gaussian = Math.exp(-Math.pow((bucket - 8) / 3.5, 2));
+    const barWidth = 3;
+    const barHeight = 8 + gaussian * 36;
+    labContext.fillStyle = `rgba(199, 158, 95, ${0.08 + gaussian * 0.2})`;
+    labContext.fillRect(histogramX + bucket * 4, centerY + 70 - barHeight, barWidth, barHeight);
   }
   labContext.strokeStyle = "rgba(213, 244, 220, 0.15)";
   labContext.setLineDash([5, 7]);
@@ -2327,6 +2575,7 @@ function drawCommunicationModel(width, height, time) {
   labContext.stroke();
   labContext.setLineDash([]);
   drawLabel(labContext, "接收眼图与判决门限", width * 0.12, 24, rgba(color, 0.9));
+  drawLabel(labContext, "幅度直方图", histogramX, centerY + 88, "rgba(218, 190, 148, 0.5)");
   drawLabel(labContext, `链路损耗 ${formatNumber(state.secondary, 1)} dB`, width * 0.88, height - 20, rgba(color, 0.8), "right");
 }
 
@@ -2552,6 +2801,7 @@ function selectExperiment(experimentId, scrollToLab = false) {
     card.classList.toggle("selected", card.dataset.experimentId === experiment.id);
   });
   drawLabFrame(performance.now());
+  pulseMotion(labCanvas, "canvas-switch");
   if (scrollToLab) {
     document.getElementById("lab-section").scrollIntoView({ behavior: "smooth", block: "start" });
     showToast(`已切换到 ${experiment.name}`);
