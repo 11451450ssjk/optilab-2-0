@@ -266,7 +266,23 @@
     }
     try {
       const datasets = await Promise.all(requests);
-      state.results = dedupeResults(datasets.flat()).sort((a, b) => {
+      let collected = datasets.flat();
+      if (!collected.length && source === "crossref") {
+        try {
+          collected = await searchOpenAlex(query, journalKey, fromYear, sort);
+          if (collected.length) setApiStatus("", "已切换到 OpenAlex");
+        } catch (fallbackError) {
+          errors.push(`OpenAlex 备用源：${fallbackError.message}`);
+        }
+      } else if (!collected.length && source === "openalex") {
+        try {
+          collected = await searchCrossref(query, journalKey, fromYear, sort);
+          if (collected.length) setApiStatus("", "已切换到 Crossref");
+        } catch (fallbackError) {
+          errors.push(`Crossref 备用源：${fallbackError.message}`);
+        }
+      }
+      state.results = dedupeResults(collected).sort((a, b) => {
         if (sort === "citations") return b.citations - a.citations;
         if (sort === "newest") return Number(b.year || 0) - Number(a.year || 0);
         return 0;

@@ -724,7 +724,7 @@ function drawCanvasAxes(context, width, height, options = {}) {
   context.strokeStyle = "rgba(208, 242, 216, 0.25)";
   context.fillStyle = "rgba(208, 242, 216, 0.44)";
   context.lineWidth = 1;
-  context.font = '8px "Microsoft YaHei UI", sans-serif';
+  context.font = '9.5px "Microsoft YaHei UI", sans-serif';
   context.beginPath();
   context.moveTo(left, top);
   context.lineTo(left, bottom);
@@ -748,7 +748,7 @@ function drawLabel(context, text, x, y, color = "rgba(214, 245, 220, 0.55)", ali
   const safeY = y < 32 && (x < 150 || align === "right") ? y + 20 : y;
   context.save();
   context.fillStyle = color;
-  context.font = '9px "Microsoft YaHei UI", sans-serif';
+  context.font = '10.5px "Microsoft YaHei UI", sans-serif';
   context.textAlign = align;
   context.fillText(text, x, safeY);
   context.restore();
@@ -934,13 +934,13 @@ function drawPrincipleCanvasOverlay(width, height) {
   labContext.fill();
   labContext.stroke();
   labContext.fillStyle = "rgba(216, 249, 222, 0.55)";
-  labContext.font = '8px "Microsoft YaHei UI", sans-serif';
+  labContext.font = '9px "Microsoft YaHei UI", sans-serif';
   labContext.fillText("关键关系与变量", x + 13, y + 18);
   labContext.fillStyle = "rgba(190, 250, 199, 0.96)";
   labContext.font = '16px Georgia, "Times New Roman", serif';
   labContext.fillText(experiment.formula, x + 13, y + 41);
   labContext.fillStyle = "rgba(216, 249, 222, 0.62)";
-  labContext.font = '8px "Microsoft YaHei UI", sans-serif';
+  labContext.font = '9px "Microsoft YaHei UI", sans-serif';
   const clipped = principle.variables.length > 62 ? `${principle.variables.slice(0, 62)}…` : principle.variables;
   labContext.fillText(clipped, x + 13, y + 62, panelWidth - 26);
   labContext.fillStyle = "rgba(216, 249, 222, 0.38)";
@@ -1497,7 +1497,7 @@ function drawLaserHead(x, y, color, time, angle = 0) {
   labContext.fillStyle = rgba(color, 0.8);
   labContext.fillRect(14, -5, 4, 10);
   labContext.fillStyle = "rgba(226, 236, 229, 0.5)";
-  labContext.font = '7px Consolas, monospace';
+  labContext.font = '8.5px "Cascadia Code", Consolas, monospace';
   labContext.fillText("λ", -22, 2);
   labContext.restore();
   drawGlow(labContext, x, y, 28 + Math.sin(time * 0.003) * 2, color, 0.34);
@@ -1882,7 +1882,7 @@ function drawAnalogMeter(cx, cy, radius, value, label) {
   labContext.lineTo(cx + Math.cos(needleAngle) * radius * 0.72, cy + Math.sin(needleAngle) * radius * 0.72);
   labContext.stroke();
   labContext.fillStyle = "#59635e";
-  labContext.font = '7px "Microsoft YaHei UI", sans-serif';
+  labContext.font = '8.5px "Microsoft YaHei UI", sans-serif';
   labContext.textAlign = "center";
   labContext.fillText(label, cx, cy + radius + 13);
   labContext.restore();
@@ -2382,16 +2382,19 @@ function renderYearOverview() {
   const container = document.getElementById("year-overview");
   container.innerHTML = [1, 2, 3, 4].map((year) => {
     const semesters = CATALOG.filter((semester) => semester.year === year);
-    const generalSemesters = semesters.filter((semester) => semester.scope !== "hust");
+    const generalSemesters = semesters.filter((semester) => !semester.scope || semester.scope === "general");
     const hustModules = semesters
       .filter((semester) => semester.scope === "hust")
+      .reduce((total, semester) => total + semester.experiments.length, 0);
+    const electricalModules = semesters
+      .filter((semester) => semester.scope === "electrical")
       .reduce((total, semester) => total + semester.experiments.length, 0);
     const titles = generalSemesters.map((semester) => semester.title);
     const totalExperiments = semesters.reduce((total, semester) => total + semester.experiments.length, 0);
     return `<button class="year-overview-card" data-jump-year="${year}" data-year="${year}">
       <div class="year-card-top"><span>YEAR ${String(year).padStart(2, "0")}</span><i></i></div>
       <h3>${["基础建立", "核心能力", "专业深入", "系统创新"][year - 1]}</h3>
-      <p>${titles.join("；")}${hustModules ? `；含华科培养方案实验 ${hustModules} 项` : ""}</p>
+      <p>${titles.join("；")}${hustModules ? `；华科必修扩展 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
       <small>${totalExperiments} 个实验模块 · ${semesters.length} 个课程节点</small>
     </button>`;
   }).join("");
@@ -2413,6 +2416,7 @@ function filteredCatalog() {
     .filter((semester) =>
       state.filterYear === "all" ||
       (state.filterYear === "hust" && semester.scope === "hust") ||
+      (state.filterYear === "electrical" && semester.scope === "electrical") ||
       semester.year === Number(state.filterYear)
     )
     .map((semester) => ({
@@ -2442,26 +2446,28 @@ function renderCatalog() {
     const containsSelected = semester.experiments.some((experiment) => experiment.id === state.experimentId);
     const openByDefault = state.search.trim() ||
       containsSelected ||
-      (state.filterYear !== "all" && state.filterYear !== "hust" && semester.scope !== "hust");
+      (state.filterYear !== "all" && state.filterYear !== "hust" && state.filterYear !== "electrical" && semester.scope === "general");
+    const officialCourse = semester.scope === "hust" || semester.scope === "electrical";
+    const coursePrefix = semester.scope === "electrical" ? "华中科技大学电学扩展 · " : semester.scope === "hust" ? "华中科技大学必修实验 · " : "";
     return `
-    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""}">
+    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""}">
       <div class="semester-header">
         <div>
-          <span class="semester-number">${semester.scope === "hust" ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
+          <span class="semester-number">${officialCourse ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
           <div>
-            <h3>${semester.scope === "hust" ? "华中科技大学必修实验 · " : `大${["一", "二", "三", "四"][semester.year - 1]} · ${semester.term === 1 ? "上学期" : "下学期"} · `}${semester.title}</h3>
-            <p>${semester.focus}${semester.scope === "hust" ? ` · ${semester.officialCredits} 学分 / ${semester.officialHours} 学时` : ""}</p>
+            <h3>${coursePrefix || `大${["一", "二", "三", "四"][semester.year - 1]} · ${semester.term === 1 ? "上学期" : "下学期"} · `}${semester.title}</h3>
+            <p>${semester.focus}${officialCourse ? ` · 对应课程 ${semester.officialCredits} 学分 / ${semester.officialHours} 学时` : ""}</p>
           </div>
         </div>
         <div class="semester-group-actions">
-          <span>${semester.scope === "hust" ? "HUST 2025 方案 · " : ""}${semester.experiments.length} 个实验</span>
+          <span>${semester.scope === "hust" ? "HUST 2025 方案 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : ""}${semester.experiments.length} 个实验</span>
           <button class="group-toggle" data-group-toggle="${semester.id}" aria-expanded="${openByDefault ? "true" : "false"}">${openByDefault ? "收起" : "展开"}</button>
         </div>
       </div>
       <div class="experiment-card-grid ${openByDefault ? "" : "collapsed"}" data-group-grid="${semester.id}">
         ${semester.experiments.map((experiment, index) => `
-          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""}" data-experiment-id="${experiment.id}">
-            <span class="experiment-card-index">${semester.scope === "hust" ? semester.officialCode : "EXP"} ${String(index + 1).padStart(2, "0")}</span>
+          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""}" data-experiment-id="${experiment.id}">
+            <span class="experiment-card-index">${officialCourse ? semester.officialCode : "EXP"} ${String(index + 1).padStart(2, "0")}</span>
             <h4>${escapeHtml(experiment.name)}</h4>
             <p>${escapeHtml(experiment.description)}</p>
             <span class="experiment-card-formula">${escapeHtml(experiment.formula)}</span>
@@ -2893,7 +2899,7 @@ function drawAdvancedChart() {
   chartContext.save();
   chartContext.strokeStyle = "rgba(201, 224, 210, 0.11)";
   chartContext.fillStyle = "#929c97";
-  chartContext.font = '8px Consolas, monospace';
+  chartContext.font = '9.5px "Cascadia Code", Consolas, monospace';
   chartContext.textAlign = "right";
   chartContext.textBaseline = "middle";
   for (let index = 0; index <= 4; index += 1) {
@@ -3703,13 +3709,13 @@ window.OptilabBridge = {
 
 function initialize() {
   const total = EXPERIMENTS.length;
-  if (total !== 128) {
-    console.warn(`实验总数为 ${total}，预期为 128`);
+  if (total !== 176) {
+    console.warn(`实验总数为 ${total}，预期为 176`);
   }
   document.getElementById("hero-experiment-count").textContent = String(total);
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);
   document.getElementById("sidebar-catalog-summary").textContent =
-    `通用本科图谱 + 华科 2025 必修实验 · ${total} 个模块`;
+    `通用图谱 + 华科必修 + 电学扩展 · ${total} 个模块`;
   const initialReportText = `# 报告工作区
 
 当前还没有生成数据报告。

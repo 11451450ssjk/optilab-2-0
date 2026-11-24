@@ -631,6 +631,51 @@
   color: #d1a867;
 }
 
+.electrical-course-group {
+  border-color: #55716d;
+  background: rgba(30, 38, 39, 0.92);
+}
+
+.electrical-course-group .semester-header {
+  border-bottom-color: #40504e;
+  background:
+    linear-gradient(90deg, rgba(46, 72, 69, 0.58), rgba(31, 38, 39, 0.65));
+}
+
+.electrical-course-group .semester-number {
+  color: #a8d0c8;
+  background: rgba(17, 30, 29, 0.8);
+  font-size: 9px;
+}
+
+.electrical-course-group .semester-header h3 {
+  color: #e0eee8;
+}
+
+.electrical-experiment-card {
+  border-color: #394a48;
+  color: #dfeae5;
+  background: #1b2525;
+}
+
+.electrical-experiment-card:hover {
+  border-color: #719d95;
+  background: #202c2c;
+}
+
+.electrical-experiment-card.selected {
+  border-color: #83b5ab;
+  box-shadow: inset 0 0 0 1px #83b5ab;
+}
+
+.electrical-experiment-card h4 {
+  color: #e7f0ec;
+}
+
+.electrical-experiment-card .experiment-card-formula {
+  color: #9dcfc5;
+}
+
 .semester-list {
   display: grid;
   gap: 14px;
@@ -2475,6 +2520,220 @@
   }
 }
 
+/* Unified typography scale */
+.advanced-body {
+  --font-display: "Segoe UI Variable Display", "Aptos Display", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Aptos", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  line-height: 1.65;
+  font-kerning: normal;
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+}
+
+.advanced-body h1,
+.advanced-body h2,
+.advanced-body h3,
+.advanced-body h4,
+.advanced-body h5 {
+  font-family: var(--font-display);
+  font-weight: 660;
+  text-wrap: balance;
+}
+
+.advanced-body button,
+.advanced-body input,
+.advanced-body textarea,
+.advanced-body select {
+  font-family: var(--font-body);
+  letter-spacing: 0.01em;
+}
+
+.advanced-body .eyebrow,
+.advanced-body .panel-index,
+.advanced-body .info-kicker,
+.advanced-body .principle-index,
+.advanced-body .experiment-card-index,
+.advanced-body .api-status,
+.advanced-body .version-pill,
+.advanced-body .canvas-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.advanced-body .topbar h1 {
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.advanced-body .section-heading h2,
+.advanced-body .lab-title-line h2 {
+  font-size: 31px;
+  line-height: 1.25;
+}
+
+.advanced-body .section-heading p {
+  max-width: 440px;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.advanced-body .panel h3,
+.advanced-body .paper-config-heading h3,
+.advanced-body .history-heading h3,
+.advanced-body .citation-library-heading h3 {
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.advanced-body .semester-header h3 {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.advanced-body .semester-header p {
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.advanced-body .experiment-card h4 {
+  margin-top: 11px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.advanced-body .experiment-card p {
+  font-size: 10.5px;
+  line-height: 1.68;
+}
+
+.advanced-body .experiment-card-index,
+.advanced-body .experiment-card-formula {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.advanced-body .principle-card h4 {
+  font-size: 18px;
+}
+
+.advanced-body .principle-card p,
+.advanced-body .principle-steps-card ol {
+  font-size: 11.5px;
+  line-height: 1.82;
+}
+
+.advanced-body .lab-info-block h3 {
+  font-size: 15px;
+}
+
+.advanced-body .lab-info-block > p,
+.advanced-body .lab-info-block li,
+.advanced-body .live-derived small {
+  font-size: 10.5px;
+  line-height: 1.72;
+}
+
+.advanced-body .advanced-controls label > span,
+.advanced-body .control-row label > span,
+.advanced-body .record-grid span,
+.advanced-body .paper-config-panel > label > span,
+.advanced-body .mapping-row label,
+.advanced-body .batch-row label,
+.advanced-body .history-note,
+.advanced-body .paper-config-note {
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.advanced-body .advanced-controls label strong,
+.advanced-body .live-derived strong,
+.advanced-body .record-grid strong {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.advanced-body .panel-tag,
+.advanced-body .lab-year-tag,
+.advanced-body .dossier-status,
+.advanced-body #record-count,
+.advanced-body .result-source,
+.advanced-body .result-cites {
+  font-size: 9px;
+}
+
+.advanced-body .advanced-metrics strong,
+.advanced-body .metrics-grid strong,
+.advanced-body .paper-source-summary strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.advanced-body .advanced-metrics span {
+  font-size: 9px;
+}
+
+.advanced-body .history-item-top strong,
+.advanced-body .citation-item-top strong,
+.advanced-body .literature-result-card h4 {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.advanced-body .history-item p,
+.advanced-body .citation-item p,
+.advanced-body .result-meta,
+.advanced-body .result-abstract,
+.advanced-body .history-item-meta span {
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.advanced-body .literature-query input,
+.advanced-body .paper-config-panel input,
+.advanced-body .paper-config-panel select,
+.advanced-body .catalog-search input {
+  font-size: 11px;
+}
+
+.advanced-body .canvas-meta {
+  padding: 6px 8px;
+}
+
+.advanced-body .canvas-legend {
+  font-size: 8.5px;
+}
+
+.advanced-body .simulation-story span {
+  font-size: 8.5px;
+}
+
+.advanced-body .simulation-story strong {
+  font-size: 10.5px;
+  line-height: 1.62;
+}
+
+@media (max-width: 760px) {
+  .advanced-body .topbar h1 {
+    font-size: 23px;
+  }
+
+  .advanced-body .section-heading h2,
+  .advanced-body .lab-title-line h2 {
+    font-size: 27px;
+  }
+
+  .advanced-body .principle-card p,
+  .advanced-body .principle-steps-card ol,
+  .advanced-body .lab-info-block > p,
+  .advanced-body .lab-info-block li {
+    font-size: 11px;
+  }
+}
+
 @media (max-width: 480px) {
   .experiment-card-grid {
     grid-template-columns: 1fr;
@@ -2734,6 +2993,38 @@
 .advanced-body .experiment-card.selected::after {
   color: #e2bd7d;
   background: rgba(192, 154, 97, 0.15);
+}
+
+.advanced-body .electrical-course-group {
+  border-color: #4d6561;
+}
+
+.advanced-body .electrical-course-group .semester-header {
+  border-bottom-color: #3c4847;
+  background: linear-gradient(90deg, rgba(42, 67, 64, 0.5), rgba(25, 31, 32, 0.72));
+}
+
+.advanced-body .electrical-experiment-card {
+  border-color: #364744;
+  background: #182120;
+}
+
+.advanced-body .electrical-experiment-card:hover {
+  border-color: #719991;
+  background: #1e2928;
+}
+
+.advanced-body .electrical-experiment-card.selected {
+  border-color: #8ebdb4;
+  box-shadow: inset 0 0 0 1px #8ebdb4;
+}
+
+.advanced-body .electrical-experiment-card h4 {
+  color: #e2ebe7;
+}
+
+.advanced-body .electrical-experiment-card .experiment-card-formula {
+  color: #a1c9c1;
 }
 
 .advanced-body .lab-stage-topbar,
