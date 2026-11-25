@@ -9,7 +9,45 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="advanced.css">
 </head>
-<body class="advanced-body">
+<body class="advanced-body welcome-locked">
+  <section class="welcome-screen" id="welcome-screen" aria-labelledby="welcome-title">
+    <div class="welcome-background-grid" aria-hidden="true"></div>
+    <div class="welcome-panel">
+      <div class="welcome-brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="5"></circle>
+            <path d="M24 4v10M24 34v10M4 24h10M34 24h10M9.9 9.9l7.1 7.1M31 31l7.1 7.1M38.1 9.9 31 17M17 31l-7.1 7.1"></path>
+          </svg>
+        </span>
+        <span><strong>OptiLab</strong><small>ADVANCED 2.1</small></span>
+      </div>
+      <span class="welcome-kicker">光电信息本科实验工作台</span>
+      <h1 id="welcome-title">从实验原理到规范报告，<br>在同一工作区完成。</h1>
+      <p>覆盖本科四年实验课程，提供可交互演示、Excel 数据模板、自动统计、文献引用和报告版本管理。</p>
+      <div class="welcome-feature-row">
+        <div><strong>176</strong><span>实验模块</span></div>
+        <div><strong>30</strong><span>动态模型</span></div>
+        <div><strong>本地</strong><span>数据与报告</span></div>
+      </div>
+      <div class="welcome-actions">
+        <button class="primary-button" id="enter-optilab">进入实验系统</button>
+        <a class="welcome-secondary" href="optilab_data_template.xlsx" download>下载 Excel 数据模板</a>
+      </div>
+      <div class="welcome-notes">
+        <span>实验数据只保存在当前浏览器</span>
+        <a href="#contact-section">需要补充实验或提出问题</a>
+      </div>
+    </div>
+    <div class="welcome-demo-card" aria-hidden="true">
+      <div class="welcome-demo-top"><span>LIVE OPTICAL MODEL</span><i></i></div>
+      <div class="welcome-orbit orbit-a"></div>
+      <div class="welcome-orbit orbit-b"></div>
+      <div class="welcome-core">λ</div>
+      <div class="welcome-wave"></div>
+      <div class="welcome-demo-labels"><span>光源</span><span>干涉</span><span>数据</span></div>
+    </div>
+  </section>
   <div class="app-shell">
     <aside class="sidebar advanced-sidebar">
       <a class="brand" href="#top" aria-label="返回顶部">
@@ -53,6 +91,10 @@
         <button class="nav-item" data-target="paper-section">
           <span class="nav-icon">07</span>
           <span>论文工作台</span>
+        </button>
+        <button class="nav-item" data-target="contact-section">
+          <span class="nav-icon">08</span>
+          <span>联系与更新</span>
         </button>
       </nav>
 
@@ -291,7 +333,7 @@
               <h3 id="principle-title">实验原理与操作档案</h3>
               <p id="principle-subtitle">每个实验模块均配置独立原理说明</p>
             </div>
-            <span class="dossier-status">64 / 64 已建档</span>
+            <span class="dossier-status" id="dossier-status">已建档</span>
           </div>
           <div class="principle-grid">
             <article class="principle-card principle-lead">
@@ -329,6 +371,42 @@
             </article>
           </div>
         </section>
+
+        <section class="equipment-dossier" id="equipment-dossier">
+          <div class="equipment-dossier-heading">
+            <div>
+              <span class="eyebrow">EQUIPMENT CONDITIONS</span>
+              <h3>器材参数与实验条件</h3>
+              <p id="equipment-subtitle">按当前实验显示所需器材、环境条件与初学者提示</p>
+            </div>
+            <span class="equipment-badge">BEGINNER GUIDE</span>
+          </div>
+          <div class="equipment-main-grid">
+            <article class="equipment-card">
+              <span class="equipment-card-index">01</span>
+              <div>
+                <h4>建议器材与参数</h4>
+                <div id="equipment-instruments" class="equipment-instruments"></div>
+              </div>
+            </article>
+            <article class="equipment-card">
+              <span class="equipment-card-index">02</span>
+              <div>
+                <h4>推荐实验条件</h4>
+                <div id="equipment-conditions" class="equipment-conditions"></div>
+              </div>
+            </article>
+            <article class="equipment-card equipment-beginner-card">
+              <span class="equipment-card-index">03</span>
+              <div>
+                <h4>初学者操作提示</h4>
+                <ul id="equipment-tips"></ul>
+                <p id="equipment-safety"></p>
+              </div>
+            </article>
+          </div>
+          <p class="equipment-footnote">以上为教学演示建议参数。实际实验应以仪器铭牌、课程指导书和指导教师要求为准。</p>
+        </section>
       </section>
 
       <section class="data-section" id="data-section">
@@ -337,7 +415,7 @@
             <span class="eyebrow">DATA INTAKE</span>
             <h2>导入本次实验数据</h2>
           </div>
-          <p>上传或粘贴 CSV。每次成功导入都会立即生成一个独立报告版本。</p>
+          <p>上传或粘贴 CSV / Excel 数据。每次成功导入都会立即生成一个独立报告版本。</p>
         </div>
 
         <div class="data-layout">
@@ -349,16 +427,20 @@
               </div>
               <button class="text-button" id="load-smart-sample">生成示例数据</button>
             </div>
+            <div class="template-download-row">
+              <a href="optilab_data_template.xlsx" download>下载 Excel 数据模板</a>
+              <span>已预置列名、重复测量和计算列</span>
+            </div>
             <label class="advanced-drop" id="data-drop">
-              <input type="file" id="data-file" accept=".csv,.txt,text/csv">
+              <input type="file" id="data-file" accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
               <span class="drop-symbol">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 16V4M8 8l4-4 4 4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path>
                 </svg>
               </span>
               <span>
-                <strong>拖放或选择 CSV 数据</strong>
-                <small>支持多列数值，导入后自动推荐坐标轴</small>
+                <strong>拖放或选择 CSV / Excel 数据</strong>
+                <small>支持 XLSX、XLS、CSV，导入后自动推荐坐标轴</small>
               </span>
             </label>
             <details class="advanced-paste">
@@ -692,6 +774,46 @@
         </div>
       </section>
 
+      <section class="contact-section" id="contact-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">FEEDBACK & UPDATES</span>
+            <h2>实验补充与问题反馈</h2>
+          </div>
+          <p>建议通过公开问题页面提交新实验、数据格式或使用疑问，便于持续跟踪和更新。</p>
+        </div>
+        <div class="contact-grid">
+          <article class="contact-card contact-primary">
+            <span class="contact-index">A</span>
+            <div>
+              <h3>申请补充实验</h3>
+              <p>用于提交实验名称、课程代码、实验原理、器材条件和建议数据格式。</p>
+              <a href="https://github.com/11451450ssjk/optilab-2-0/issues/new?title=OptiLab%20%E5%AE%9E%E9%AA%8C%E8%A1%A5%E5%85%85%E5%BB%BA%E8%AE%AE" target="_blank" rel="noopener noreferrer">新建实验补充申请</a>
+            </div>
+          </article>
+          <article class="contact-card">
+            <span class="contact-index">B</span>
+            <div>
+              <h3>提交使用问题</h3>
+              <p>反馈页面异常、Excel 导入、报告内容或动画演示问题。</p>
+              <a href="https://github.com/11451450ssjk/optilab-2-0/issues/new?title=OptiLab%20%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98" target="_blank" rel="noopener noreferrer">新建问题反馈</a>
+            </div>
+          </article>
+          <article class="contact-card">
+            <span class="contact-index">C</span>
+            <div>
+              <h3>查看更新记录</h3>
+              <p>所有代码、版本提交和公开问题都可以持续检索与追踪。</p>
+              <a href="https://github.com/11451450ssjk/optilab-2-0" target="_blank" rel="noopener noreferrer">打开项目主页</a>
+            </div>
+          </article>
+        </div>
+        <div class="contact-note">
+          <strong>建议反馈内容</strong>
+          <p>请写明实验名称、所在课程、希望补充的器材参数、测量项目、数据单位，以及问题复现步骤。不要在公开问题中上传真实姓名、学号、手机号、未公开实验数据或其他敏感信息。</p>
+        </div>
+      </section>
+
       <footer class="advanced-footer">
         <span>OptiLab 2.0 · 光学与电子信息本科实验高级演示系统</span>
         <span>课程图谱为典型培养方案框架，可继续增补本校正式实验清单</span>
@@ -704,6 +826,8 @@
   <script src="principles.js"></script>
   <script src="hust.js"></script>
   <script src="electrical.js"></script>
+  <script src="optilab_equipment.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
   <script src="research.js"></script>
 </body>

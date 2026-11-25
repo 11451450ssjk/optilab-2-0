@@ -596,6 +596,65 @@ function principleInfo(experiment = currentExperiment()) {
   };
 }
 
+function equipmentProfile(experiment = currentExperiment()) {
+  return window.OPTILAB_EQUIPMENT_PROFILES?.[experiment.sim] || {
+    instruments: [
+      { name: "实验仪器与数据采集设备", spec: "量程、精度和校准状态满足课程要求", use: "完成测量和数据采集" }
+    ],
+    conditions: [
+      { label: "环境温度", value: "20±5 ℃" },
+      { label: "相对湿度", value: "30%–70%" },
+      { label: "供电", value: "符合仪器铭牌要求并可靠接地" }
+    ],
+    tips: ["先阅读仪器操作说明", "记录仪器编号和参数", "保留原始数据"],
+    safety: "遵守课程实验室安全规定，设备异常时立即断电并报告指导教师。"
+  };
+}
+
+function renderEquipmentProfile(experiment = currentExperiment()) {
+  const profile = equipmentProfile(experiment);
+  document.getElementById("equipment-subtitle").textContent =
+    `${experiment.name} · ${profile.instruments.length} 类建议器材`;
+  document.getElementById("equipment-instruments").innerHTML = profile.instruments.map((item, index) => `
+    <div class="equipment-item">
+      <span>${String(index + 1).padStart(2, "0")}</span>
+      <div>
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.spec)}</small>
+        <em>${escapeHtml(item.use)}</em>
+      </div>
+    </div>
+  `).join("");
+  document.getElementById("equipment-conditions").innerHTML = profile.conditions.map((item) => `
+    <div class="condition-item">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${escapeHtml(item.value)}</strong>
+    </div>
+  `).join("");
+  document.getElementById("equipment-tips").innerHTML = profile.tips
+    .map((tip) => `<li>${escapeHtml(tip)}</li>`)
+    .join("");
+  document.getElementById("equipment-safety").textContent = profile.safety;
+}
+
+function setupWelcomeScreen() {
+  const welcome = document.getElementById("welcome-screen");
+  const button = document.getElementById("enter-optilab");
+  if (!welcome || !button) {
+    document.body.classList.remove("welcome-locked");
+    return;
+  }
+  button.addEventListener("click", () => {
+    welcome.classList.add("leaving");
+    document.body.classList.remove("welcome-locked");
+    window.setTimeout(() => {
+      welcome.hidden = true;
+      document.getElementById("top").focus?.();
+    }, 420);
+  });
+  window.setTimeout(() => button.focus(), 100);
+}
+
 function sceneGuide(experiment = currentExperiment()) {
   return SCENE_GUIDES[experiment.sim] || {
     action: "实验模型根据当前参数实时计算并显示响应",
@@ -2781,6 +2840,7 @@ function selectExperiment(experimentId, scrollToLab = false) {
     .join("");
   document.getElementById("principle-caution").textContent = principle.caution;
   document.getElementById("principle-observations").textContent = principle.observations;
+  renderEquipmentProfile(experiment);
   document.getElementById("lab-legend").innerHTML = [
     `<span><i class="legend-green"></i> ${escapeHtml(config.primary.label)}</span>`,
     `<span><i class="legend-amber"></i> ${escapeHtml(config.secondary.label)}</span>`
@@ -3855,6 +3915,58 @@ function setupControls() {
   });
 }
 
+async function readExperimentDataFile(file) {
+  if (/\.(xlsx|xls)$/i.test(file.name)) {
+    if (!window.XLSX) {
+      throw new Error("Excel 解析组件未加载，请刷新页面或改用 CSV 文件");
+    }
+    const workbook = window.XLSX.read(await file.arrayBuffer(), {
+      type: "array",
+      cellDates: true
+    });
+    const sheetName = workbook.SheetNames.includes("Data")
+      ? "Data"
+      : workbook.SheetNames[0];
+    if (!sheetName) throw new Error("Excel 文件中没有工作表");
+    const worksheet = workbook.Sheets[sheetName];
+    const matrix = window.XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      raw: true,
+      defval: ""
+    });
+    const headers = matrix[0] || [];
+    const meanIndex = headers.findIndex((header) => /Y.*均值|均值|Y值|纵轴/i.test(String(header)));
+    const stdIndex = headers.findIndex((header) => /标准差|STD(?:EV)?/i.test(String(header)));
+    const repeatIndices = headers
+      .map((header, index) => /重复\s*\d+|Repeat\s*\d+/i.test(String(header)) ? index : -1)
+      .filter((index) => index >= 0);
+    if (meanIndex >= 0 && repeatIndices.length) {
+      matrix.slice(1).forEach((row) => {
+        const values = repeatIndices
+          .map((index) => Number(row[index]))
+          .filter(Number.isFinite);
+        if (!Number.isFinite(Number(row[meanIndex])) || row[meanIndex] === "") {
+          row[meanIndex] = values.length
+            ? values.reduce((total, value) => total + value, 0) / values.length
+            : "";
+        }
+        if (stdIndex >= 0 && values.length > 1 && (row[stdIndex] === "" || !Number.isFinite(Number(row[stdIndex])))) {
+          const mean = Number(row[meanIndex]);
+          row[stdIndex] = Math.sqrt(
+            values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1)
+          );
+        }
+      });
+    }
+    const normalized = window.XLSX.utils.aoa_to_sheet(matrix);
+    return {
+      text: window.XLSX.utils.sheet_to_csv(normalized, { blankrows: false }),
+      sourceName: `${file.name} · ${sheetName}`
+    };
+  }
+  return { text: await file.text(), sourceName: file.name };
+}
+
 function setupDataControls() {
   document.getElementById("catalog-search").addEventListener("input", (event) => {
     state.search = event.target.value;
@@ -3894,7 +4006,8 @@ function setupDataControls() {
     const file = event.target.files[0];
     if (!file) return;
     try {
-      ingestData(await file.text(), file.name);
+      const imported = await readExperimentDataFile(file);
+      ingestData(imported.text, imported.sourceName);
     } catch (error) {
       showToast(error.message);
     }
@@ -3916,7 +4029,8 @@ function setupDataControls() {
     const file = event.dataTransfer.files[0];
     if (!file) return;
     try {
-      ingestData(await file.text(), file.name);
+      const imported = await readExperimentDataFile(file);
+      ingestData(imported.text, imported.sourceName);
     } catch (error) {
       showToast(error.message);
     }
@@ -3966,6 +4080,7 @@ function initialize() {
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);
   document.getElementById("sidebar-catalog-summary").textContent =
     `通用图谱 + 华科必修 + 电学扩展 · ${total} 个模块`;
+  document.getElementById("dossier-status").textContent = `${total} / ${total} 已建档`;
   const initialReportText = `# 报告工作区
 
 当前还没有生成数据报告。
@@ -3973,7 +4088,7 @@ function initialize() {
 使用步骤：
 1. 在上方选择任意实验模块；
 2. 调整高级演示参数并观察测量变化；
-3. 导入 CSV 数据或生成示例数据；
+3. 导入 CSV / Excel 数据或生成示例数据；
 4. 系统会自动计算统计指标、生成独立编号报告并保存到版本库。
 
 每次导入数据都会创建新的报告版本，即使文件内容相同也不会覆盖上一份记录。`;
@@ -3983,6 +4098,7 @@ function initialize() {
   loadPersistedReports();
   renderReportHistory();
   selectExperiment("michelson", false);
+  setupWelcomeScreen();
   setupNavigation();
   setupControls();
   setupDataControls();
