@@ -644,13 +644,22 @@ function setupWelcomeScreen() {
     document.body.classList.remove("welcome-locked");
     return;
   }
-  button.addEventListener("click", () => {
+  const enterWorkspace = (targetId = "") => {
+    if (welcome.hidden) return;
     welcome.classList.add("leaving");
     document.body.classList.remove("welcome-locked");
     window.setTimeout(() => {
       welcome.hidden = true;
-      document.getElementById("top").focus?.();
+      if (targetId) {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: "instant", block: "start" });
+      } else {
+        document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
+      }
     }, 420);
+  };
+  button.addEventListener("click", () => enterWorkspace("catalog-section"));
+  document.querySelectorAll("[data-welcome-target]").forEach((targetButton) => {
+    targetButton.addEventListener("click", () => enterWorkspace(targetButton.dataset.welcomeTarget));
   });
   window.setTimeout(() => button.focus(), 100);
 }
@@ -2701,9 +2710,9 @@ function renderYearOverview() {
     const totalExperiments = semesters.reduce((total, semester) => total + semester.experiments.length, 0);
     return `<button class="year-overview-card" data-jump-year="${year}" data-year="${year}">
       <div class="year-card-top"><span>YEAR ${String(year).padStart(2, "0")}</span><i></i></div>
-      <h3>${["基础建立", "核心能力", "专业深入", "系统创新"][year - 1]}</h3>
+      <h3>${["先打好基础", "开始上手", "做深一点", "完成一个设计"][year - 1]}</h3>
       <p>${titles.join("；")}${hustModules ? `；华科必修扩展 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
-      <small>${totalExperiments} 个实验模块 · ${semesters.length} 个课程节点</small>
+      <small>${totalExperiments} 个实验 · ${semesters.length} 个课程节点</small>
     </button>`;
   }).join("");
   container.querySelectorAll("[data-jump-year]").forEach((button) => {
@@ -2744,8 +2753,8 @@ function renderCatalog() {
   const catalog = filteredCatalog();
   const visibleCount = catalog.reduce((total, semester) => total + semester.experiments.length, 0);
   document.getElementById("catalog-count").textContent = state.filterYear === "all" && !state.search
-    ? `共 ${visibleCount} 个实验模块`
-    : `筛选到 ${visibleCount} 个实验模块`;
+    ? `共 ${visibleCount} 个实验`
+    : `筛选到 ${visibleCount} 个实验`;
   if (!catalog.length) {
     container.innerHTML = '<div class="catalog-empty">没有匹配的实验。请尝试更短的关键词或切换年级。</div>';
     return;
@@ -2816,7 +2825,7 @@ function selectExperiment(experimentId, scrollToLab = false) {
   document.getElementById("lab-pause").textContent = "暂停";
   document.getElementById("lab-title").textContent = experiment.name;
   document.getElementById("lab-year-tag").textContent = `大${["一", "二", "三", "四"][experiment.year - 1]} · ${experiment.term === 1 ? "上" : "下"}`;
-  document.getElementById("lab-subtitle").textContent = `${simInfo(experiment).domain} · ${experiment.semesterTitle}`;
+  document.getElementById("lab-subtitle").textContent = `${simInfo(experiment).domain} · ${experiment.semesterTitle}，拖动参数看看哪里会变`;
   document.getElementById("lab-description").textContent = principle.intro;
   document.getElementById("lab-formula").textContent = experiment.formula;
   document.getElementById("lab-badge").textContent = experiment.sim.replaceAll("-", " ").toUpperCase();
@@ -3493,9 +3502,9 @@ function buildReportText(record) {
 均值相对变化：${formatNumber(meanDelta, 3)}%
 质量分变化：${qualityDelta >= 0 ? "+" : ""}${qualityDelta} 分
 
-若两个批次测量条件一致，较小的均值差异支持系统重复性；若差异显著，应先比较仪器参数、环境条件和数据轴定义，再判断实验现象是否发生变化。`;
+如果两个批次的测量条件一致，较小的均值差异说明重复测量比较稳定；如果差异明显，先比较仪器参数、环境条件和横纵轴定义，再判断实验现象是否真的发生了变化。`;
   } else {
-    comparisonText = "这是该实验在当前浏览器中记录的第一个详细版本，暂无同实验历史批次可供比较。完成重复测量后，系统会自动生成版本间对比。";
+    comparisonText = "这是当前浏览器中保存的第一份同实验报告，暂时没有其他批次可以比较。完成重复测量后，这里会并列显示不同批次。";
   }
   const procedureText = principle.steps
     .map((step, index) => `${index + 1}. ${step}`)
@@ -3517,19 +3526,19 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
       const doiText = item.doi ? ` https://doi.org/${item.doi}` : item.url || "";
       return `[${index + 1}] ${authors}. ${item.title}. ${item.journal || "未标注期刊"}, ${item.year || "n.d."}.${doiText}`;
     }).join("\n\n")
-    : "本次报告生成时引用库为空。可在“文献与引用”中添加 OpenAlex 或 Crossref 检索到的文献，后续报告会自动附上引用。";
+    : "整理这份报告时还没有保存文献。可以到“文献引用”中检索并保存，后面生成的报告会带上引用信息。";
 
-  return `# ${experiment.name}实验报告（详细版）
+  return `# ${experiment.name}实验报告
 
 报告编号：${record.id}
-生成时间：${dateText}
+整理时间：${dateText}
 实验批次：${record.batchName}
 数据文件：${record.sourceName}
 课程位置：大${["一", "二", "三", "四"][experiment.year - 1]} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}
-报告类型：数据分析、不确定度评估与实验复核
+报告类型：数据处理、误差分析与结果讨论
 
 ## 摘要
-本报告基于 ${analysis.n} 个有效数据点，对“${experiment.name}”实验进行数据处理与结果分析。横轴为“${record.xHeader}”，纵轴为“${record.yHeader}”。系统判定当前响应类型为“${modelType}”，数据质量评分为 ${analysis.qualityScore}/100。主要结果为：${trendText} ${outlierText} 本报告所有结论均需与原始记录、仪器参数和实验指导书共同核对。
+本次共整理 ${analysis.n} 个有效数据点，横轴为“${record.xHeader}”，纵轴为“${record.yHeader}”。从数据形态看，结果主要表现为${modelType}。数据完整度和趋势可解释性的提示分为 ${analysis.qualityScore}/100。${trendText} ${outlierText} 这些判断还需要和原始记录、仪器参数及课程指导书一起核对。
 
 ## 一、报告信息
 | 项目 | 内容 |
@@ -3544,7 +3553,7 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
 ## 二、实验目的
 ${principle.intro}
 
-本实验重点不仅是获得单个结果，还需要建立仪器条件、理论公式、原始数据和结论之间的可追溯关系。
+除了得到结果，还要说明仪器条件、使用的公式、原始数据和结论之间是怎样对应起来的。
 
 ## 三、实验原理
 ### 3.1 物理或系统机理
@@ -3559,18 +3568,18 @@ ${principle.variables}
 ### 3.4 图样、波形或曲线的判读原则
 ${principle.observations}
 
-## 四、仪器与实验条件
+## 四、器材与实验条件
 ${principle.apparatus}
 
-本次记录对应的软件仿真或测量参数如下：
+本次记录对应的参数如下：
 - ${parameterText.replace(/\n/g, "\n- ")}
 
-真实实验还应补充仪器编号、量程、环境温度、湿度、光源功率、采集软件版本和校准日期。
+做真实实验时，还应补上仪器编号、量程、环境温度、湿度、光源功率、采集软件版本和校准日期。
 
-## 五、推荐实验步骤
+## 五、实验步骤
 ${procedureText}
 
-实际执行时，应在每一步后确认仪器状态和数据是否合理，再进入下一步。出现异常读数时先停止采集并记录现场条件。
+每一步做完后，先确认仪器状态和数据是否合理，再继续往下做。出现异常读数时，先停止采集并记录现场条件。
 
 ## 六、数据来源与质量
 - 横轴：${record.xHeader}
@@ -3580,9 +3589,9 @@ ${procedureText}
 - 数据来源：${record.sourceName}
 - 实验照片检查：${photoText}
 
-数据质量评分仅用于提示样本数量、异常点比例和趋势可解释性，不代替教师审核，也不等同于测量不确定度。
+这里的提示分只反映数据完整度、异常点比例和趋势是否容易解释，不等同于测量不确定度，也不能代替教师审核。
 
-## 七、统计处理与模型诊断
+## 七、数据处理
 | 指标 | 计算结果 |
 | --- | --- |
 | 平均值 | ${compactNumber(analysis.mean)} |
@@ -3605,21 +3614,21 @@ ${procedureText}
 
 \`y = ${compactNumber(analysis.slope)} x + ${compactNumber(analysis.intercept)}\`
 
-该方程只在当前数据范围内作为统计描述使用。对于周期、指数、饱和或阈值型现象，不应把低 R² 直接解释为“数据错误”，也不应把高 R² 直接解释为“理论已被证明”。
+这条方程只对当前测量范围作统计描述。周期、指数、饱和或阈值型现象，不能只凭 R² 判断数据对错，也不能仅凭高 R² 就说理论已经得到证明。
 
 ## 八、结果分析
 ${trendText}
 
 ${outlierText}
 
-从误差和系统约束看，${info.errors}
+可能影响结果的误差来源包括：${info.errors}
 
-因此，当前结果应首先检查测量条件的一致性，再与理论公式或标准器件参数比较。对于超出理论区间的点，需回到原始记录判断是否由非线性工作区、接触问题、背景光、温漂或量程切换造成。
+遇到偏离趋势的点，先检查测量条件是否一致，再回到原始记录判断是不是非线性工作区、接触问题、背景光、温漂或量程切换造成的。
 
 ## 九、不确定度与误差讨论
 基于当前样本，均值的 A 类标准误差估计为 ${compactNumber(analysis.standardError)}，近似 95% 置信区间为 ${compactNumber(analysis.mean)} ± ${compactNumber(analysis.confidence95)}。该估计假设样本相对独立且主要误差为随机误差。
 
-如果仪器说明书给出了 B 类不确定度、分辨率或校准证书，还应将其与 A 类不确定度合成。系统没有自动读取真实仪器证书，因此报告中的标准误差不能替代完整的测量不确定度评定。
+如果仪器说明书给出了 B 类不确定度、分辨率或校准证书，还要把它与 A 类不确定度合成。这里没有读取真实仪器证书，因此标准误差不能代替完整的测量不确定度评定。
 
 ${principle.caution}
 
@@ -3632,9 +3641,9 @@ ${info.improvements}
 ${comparisonText}
 
 ## 十二、结论
-本次实验共整理 ${analysis.n} 个有效数据点，响应类型判定为“${modelType}”。${trendText} 当前数据质量分为 ${analysis.qualityScore}/100，${analysis.outliers.length ? `并发现 ${analysis.outliers.length} 个需要复核的高偏差点。` : "未发现超过当前统计阈值的显著高偏差点。"}
+本次实验共整理 ${analysis.n} 个有效数据点，从数据形态看，主要表现为${modelType}。${trendText} 数据完整度提示分为 ${analysis.qualityScore}/100，${analysis.outliers.length ? `并发现 ${analysis.outliers.length} 个需要复核的高偏差点。` : "未发现超过当前统计阈值的显著高偏差点。"}
 
-结论应表述为：在本次给定参数、仪器条件和数据范围内，观测结果与上述趋势描述一致；若需给出物理常数、器件性能或系统指标的正式结论，还需补充重复批次、仪器校准信息和完整不确定度评定。
+可以这样写结论：在本次参数、仪器条件和数据范围内，观测结果与上述趋势一致。若要进一步给出物理常数、器件性能或系统指标，还需补充重复测量、仪器校准信息和完整不确定度评定。
 
 ## 十三、提交前审核清单
 - [ ] 已核对实验名称、报告编号和批次名称。
@@ -3663,7 +3672,7 @@ ${principle.caution}
 ## 附录 D：引用文献
 ${literatureBlock}
 
-> 本报告由 OptiLab 2.0 详细报告引擎自动生成，包含数据统计、模型诊断、不确定度提示和批次比较。报告编号具有独立版本标识。软件不会替代真实实验操作、仪器校准、教师审核或安全培训。`;
+> 本报告根据本次导入的数据和当前实验模板整理，包含统计结果、趋势判断、误差提示和批次比较。提交前请按课程要求核对数据、补写讨论，并完成教师要求的签名和审核。`;
 }
 
 function persistReports() {
@@ -3695,7 +3704,7 @@ function renderReportHistory() {
     })) }
   }));
   if (!state.reports.length) {
-    list.innerHTML = `<div class="history-empty"><strong>还没有报告版本</strong><span>导入数据后会自动保存到这里</span></div>`;
+    list.innerHTML = `<div class="history-empty"><strong>还没有保存过报告</strong><span>导入数据后，新的报告会出现在这里</span></div>`;
     return;
   }
   list.innerHTML = state.reports.map((record) => {
@@ -4079,19 +4088,19 @@ function initialize() {
   document.getElementById("hero-experiment-count").textContent = String(total);
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);
   document.getElementById("sidebar-catalog-summary").textContent =
-    `通用图谱 + 华科必修 + 电学扩展 · ${total} 个模块`;
-  document.getElementById("dossier-status").textContent = `${total} / ${total} 已建档`;
-  const initialReportText = `# 报告工作区
+    `通用实验、华科必修和电学实验已整理 ${total} 个`;
+  document.getElementById("dossier-status").textContent = `${total} / ${total} 已整理`;
+  const initialReportText = `# 实验报告
 
 当前还没有生成数据报告。
 
 使用步骤：
-1. 在上方选择任意实验模块；
-2. 调整高级演示参数并观察测量变化；
-3. 导入 CSV / Excel 数据或生成示例数据；
-4. 系统会自动计算统计指标、生成独立编号报告并保存到版本库。
+1. 先选择一个实验；
+2. 对照原理和器材说明，拖动参数看看变化；
+3. 导入 CSV / Excel 数据，或者先用示例数据试一遍；
+4. 报告会自动计算统计量并保存一份新的记录。
 
-每次导入数据都会创建新的报告版本，即使文件内容相同也不会覆盖上一份记录。`;
+每次导入都会新建一份记录，即使文件内容相同，也不会覆盖上一份。`;
   reportPreview.textContent = initialReportText;
   renderYearOverview();
   renderCatalog();

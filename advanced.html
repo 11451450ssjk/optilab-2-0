@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="OptiLab 2.0 高级光电实验演示与数据分析系统，覆盖本科四年实验课程。">
-  <title>OptiLab 2.0 | 光电实验高级演示系统</title>
+  <meta name="description" content="面向光电与电子信息本科生的实验助手，包含实验原理、器材准备、操作演示、数据整理和报告草稿。">
+  <title>OptiLab | 光电与电子信息本科实验助手</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="advanced.css">
@@ -20,32 +20,63 @@
             <path d="M24 4v10M24 34v10M4 24h10M34 24h10M9.9 9.9l7.1 7.1M31 31l7.1 7.1M38.1 9.9 31 17M17 31l-7.1 7.1"></path>
           </svg>
         </span>
-        <span><strong>OptiLab</strong><small>ADVANCED 2.1</small></span>
+        <span><strong>OptiLab</strong><small>本科实验助手</small></span>
       </div>
-      <span class="welcome-kicker">光电信息本科实验工作台</span>
-      <h1 id="welcome-title">从实验原理到规范报告，<br>在同一工作区完成。</h1>
-      <p>覆盖本科四年实验课程，提供可交互演示、Excel 数据模板、自动统计、文献引用和报告版本管理。</p>
-      <div class="welcome-feature-row">
-        <div><strong>176</strong><span>实验模块</span></div>
-        <div><strong>30</strong><span>动态模型</span></div>
-        <div><strong>本地</strong><span>数据与报告</span></div>
+      <span class="welcome-kicker">第一次做，也能知道下一步</span>
+      <h1 id="welcome-title">先找到实验，<br>再一步一步做下去。</h1>
+      <p>这里整理了光电与电子信息本科四年的实验。每个实验都说明原理、器材、操作和观察重点；有自己的数据时，也可以直接整理成报告草稿。</p>
+      <div class="welcome-path" aria-label="使用步骤">
+        <button class="welcome-step" type="button" data-welcome-target="catalog-section">
+          <span>01</span>
+          <strong>找到要做的实验</strong>
+          <small>按年级、课程或实验名称查找</small>
+        </button>
+        <button class="welcome-step" type="button" data-welcome-target="lab-section">
+          <span>02</span>
+          <strong>先看一遍怎么做</strong>
+          <small>对照器材、步骤和可调参数</small>
+        </button>
+        <button class="welcome-step" type="button" data-welcome-target="data-section">
+          <span>03</span>
+          <strong>带着数据来整理</strong>
+          <small>导入 Excel，保留每次测量记录</small>
+        </button>
       </div>
       <div class="welcome-actions">
-        <button class="primary-button" id="enter-optilab">进入实验系统</button>
-        <a class="welcome-secondary" href="optilab_data_template.xlsx" download>下载 Excel 数据模板</a>
+        <button class="primary-button" id="enter-optilab">从实验目录开始</button>
+        <button class="welcome-secondary" type="button" data-welcome-target="lab-section">先看一个演示</button>
       </div>
       <div class="welcome-notes">
-        <span>实验数据只保存在当前浏览器</span>
-        <a href="#contact-section">需要补充实验或提出问题</a>
+        <span>不用注册，数据只留在本机</span>
+        <a href="optilab_data_template.xlsx" download>下载 Excel 模板</a>
+        <button type="button" data-welcome-target="contact-section">实验没找到？告诉我</button>
       </div>
     </div>
-    <div class="welcome-demo-card" aria-hidden="true">
-      <div class="welcome-demo-top"><span>LIVE OPTICAL MODEL</span><i></i></div>
-      <div class="welcome-orbit orbit-a"></div>
-      <div class="welcome-orbit orbit-b"></div>
-      <div class="welcome-core">λ</div>
-      <div class="welcome-wave"></div>
-      <div class="welcome-demo-labels"><span>光源</span><span>干涉</span><span>数据</span></div>
+    <div class="welcome-demo-card welcome-notebook" aria-hidden="true">
+      <div class="welcome-demo-top">
+        <span>今天的实验</span>
+        <span class="welcome-notebook-status"><i></i>演示中</span>
+      </div>
+      <div class="welcome-notebook-page">
+        <span class="welcome-note-index">实验笔记 · 01</span>
+        <h2>迈克尔逊干涉</h2>
+        <p>先找到两束光，再看条纹怎样变化。</p>
+        <div class="welcome-lab-sketch">
+          <span class="sketch-source">激光</span>
+          <i class="sketch-beam beam-a"></i>
+          <i class="sketch-beam beam-b"></i>
+          <span class="sketch-splitter"></span>
+          <span class="sketch-mirror mirror-a"></span>
+          <span class="sketch-mirror mirror-b"></span>
+          <span class="sketch-screen"><i></i><i></i><i></i><b>λ</b></span>
+        </div>
+        <ol class="welcome-checklist">
+          <li><span>1</span><div><strong>先调光路</strong><small>能看到明暗相间的条纹再继续</small></div></li>
+          <li><span>2</span><div><strong>再动镜面</strong><small>观察条纹向外或向内“吞吐”</small></div></li>
+          <li><span>3</span><div><strong>最后记数据</strong><small>单位、重复次数和条件都写清楚</small></div></li>
+        </ol>
+      </div>
+      <div class="welcome-note-footer"><span>慢慢来，先把一步看明白。</span><b>λ = 632 nm</b></div>
     </div>
   </section>
   <div class="app-shell">
@@ -59,58 +90,58 @@
         </span>
         <span>
           <strong>OptiLab</strong>
-          <small>ADVANCED 2.0</small>
+          <small>本科实验助手</small>
         </span>
       </a>
 
       <nav class="side-nav" aria-label="主要功能">
         <button class="nav-item active" data-target="overview">
           <span class="nav-icon">01</span>
-          <span>培养全景</span>
+          <span>专业概览</span>
         </button>
         <button class="nav-item" data-target="catalog-section">
           <span class="nav-icon">02</span>
-          <span>四年实验图谱</span>
+          <span>找实验</span>
         </button>
         <button class="nav-item" data-target="lab-section">
           <span class="nav-icon">03</span>
-          <span>高级演示台</span>
+          <span>实验演示</span>
         </button>
         <button class="nav-item" data-target="data-section">
           <span class="nav-icon">04</span>
-          <span>数据分析</span>
+          <span>导入数据</span>
         </button>
         <button class="nav-item" data-target="literature-section">
           <span class="nav-icon">05</span>
-          <span>文献与引用</span>
+          <span>文献引用</span>
         </button>
         <button class="nav-item" data-target="report-section">
           <span class="nav-icon">06</span>
-          <span>报告版本库</span>
+          <span>我的报告</span>
         </button>
         <button class="nav-item" data-target="paper-section">
           <span class="nav-icon">07</span>
-          <span>论文工作台</span>
+          <span>论文草稿</span>
         </button>
         <button class="nav-item" data-target="contact-section">
           <span class="nav-icon">08</span>
-          <span>联系与更新</span>
+          <span>问题与补充</span>
         </button>
       </nav>
 
       <div class="sidebar-progress">
         <div class="sidebar-progress-head">
-          <span>课程覆盖</span>
-          <strong>100%</strong>
+          <span>课程整理</span>
+          <strong>大一—大四</strong>
         </div>
         <div class="progress-track"><i></i></div>
-        <p id="sidebar-catalog-summary">正在读取课程图谱</p>
+        <p id="sidebar-catalog-summary">正在整理课程内容</p>
       </div>
 
       <div class="sidebar-note">
         <span class="status-dot"></span>
         <div>
-          <strong>本地高级版</strong>
+          <strong>数据留在本机</strong>
           <p>数据与历史报告保存在浏览器</p>
         </div>
       </div>
@@ -119,11 +150,11 @@
     <main class="main-content advanced-main" id="top">
       <header class="topbar">
         <div>
-          <span class="eyebrow">OPTICAL & ELECTRONIC INFORMATION LAB SYSTEM</span>
-          <h1>本科四年实验高级演示系统</h1>
+          <span class="eyebrow">光电与电子信息 · 本科实验助手</span>
+          <h1>从大一到毕业，按课程找实验</h1>
         </div>
         <div class="top-status">
-          <span class="live-pill"><i></i> 系统在线</span>
+          <span class="live-pill"><i></i> 页面已就绪</span>
           <span class="version-pill">v2.0</span>
           <span id="clock" class="clock">--:--</span>
         </div>
@@ -131,33 +162,33 @@
 
       <section class="advanced-hero" id="overview">
         <div class="advanced-hero-copy">
-          <span class="hero-kicker">通用四年图谱 + 华中科技大学 2025 级培养方案</span>
-          <h2>一套系统，贯穿<br>四年的实验训练。</h2>
-          <p>既覆盖从基础物理、波动光学、模拟与数字电路到智能光电系统的通用实验，也单独收录华中科技大学光电信息科学与工程 2025 级培养方案中的必修实验课程。</p>
+          <span class="hero-kicker">通用实验目录 + 华中科技大学 2025 级培养方案</span>
+          <h2>按课程找到实验，<br>知道下一步做什么。</h2>
+          <p>先按年级或课程找实验，再看原理、器材、操作和观察重点。课程里没有写细的地方，也能从这里补上；有自己的测量数据时，可以继续整理成报告草稿。</p>
           <div class="hero-actions">
-            <button class="primary-button" id="browse-catalog">浏览实验图谱</button>
-            <button class="ghost-button" id="launch-current">启动当前演示</button>
+            <button class="primary-button" id="browse-catalog">按课程找实验</button>
+            <button class="ghost-button" id="launch-current">先看一个演示</button>
           </div>
           <div class="hero-stat-row">
-            <div><strong id="hero-experiment-count">--</strong><span>实验模块</span></div>
-            <div><strong id="hero-course-count">--</strong><span>实验课程 / 学期节点</span></div>
-            <div><strong id="hero-report-count">0</strong><span>已生成数据报告</span></div>
+            <div><strong id="hero-experiment-count">--</strong><span>已整理实验</span></div>
+            <div><strong id="hero-course-count">--</strong><span>课程与学期节点</span></div>
+            <div><strong id="hero-report-count">0</strong><span>我的报告</span></div>
           </div>
         </div>
         <div class="advanced-hero-visual" aria-hidden="true">
           <div class="system-orbit orbit-a"></div>
           <div class="system-orbit orbit-b"></div>
           <div class="system-center">
-            <span>OPTICAL</span>
+            <span>实验助手</span>
             <strong>LAB</strong>
-            <small>4 YEAR SYSTEM</small>
+            <small>大一到大四</small>
           </div>
           <div class="system-node node-1"><i></i><span>物理光学</span></div>
           <div class="system-node node-2"><i></i><span>模拟电路</span></div>
           <div class="system-node node-3"><i></i><span>数字信号</span></div>
           <div class="system-node node-4"><i></i><span>光电子学</span></div>
           <div class="system-node node-5"><i></i><span>通信系统</span></div>
-          <div class="system-node node-6"><i></i><span>智能检测</span></div>
+          <div class="system-node node-6"><i></i><span>光电检测</span></div>
           <svg viewBox="0 0 520 440" class="system-lines">
             <circle cx="260" cy="220" r="150"></circle>
             <circle cx="260" cy="220" r="90"></circle>
@@ -170,10 +201,10 @@
       <section class="curriculum-overview">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">CURRICULUM MAP</span>
-            <h2>四年培养路径</h2>
+            <span class="eyebrow">四年的课程顺序</span>
+            <h2>四年大概会学什么</h2>
           </div>
-          <p>从测量与电路基本功，逐层进入光学、信号、光电系统和综合创新。</p>
+          <p>先认识测量和电路，再学光学、信号与系统，最后做综合设计和毕业实践。</p>
         </div>
         <div class="year-overview-grid" id="year-overview"></div>
       </section>
@@ -181,10 +212,10 @@
       <section class="catalog-section" id="catalog-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">EXPERIMENT ATLAS</span>
-            <h2>四年实验图谱</h2>
+            <span class="eyebrow">按课程和实验查找</span>
+            <h2>找这周要做的实验</h2>
           </div>
-          <p id="catalog-count">共 64 个实验模块</p>
+          <p id="catalog-count">共 64 个实验</p>
         </div>
         <div class="catalog-toolbar">
           <label class="catalog-search">
@@ -192,7 +223,7 @@
               <circle cx="11" cy="11" r="7"></circle>
               <path d="m16 16 5 5"></path>
             </svg>
-            <input id="catalog-search" type="search" placeholder="搜索实验、原理或工具..." autocomplete="off">
+            <input id="catalog-search" type="search" placeholder="输入实验名称、课程或关键词…" autocomplete="off">
           </label>
           <div class="year-filter" role="tablist" aria-label="按年级筛选">
             <button class="active" data-year="all">全部</button>
@@ -209,7 +240,7 @@
           <span>HUST · 2025</span>
           <div>
             <strong>华中科技大学 2025 级光电信息科学与工程专业培养方案</strong>
-            <p>已映射 11 门必修实验/实践课程与 8 组电学扩展课程，共 112 个华科相关实验模块。具体实验项目以学院当年实验教学安排为准。</p>
+            <p>已映射 11 门必修实验/实践课程与 8 组电学扩展课程，共 112 个相关实验。具体项目以学院当年的实验安排为准。</p>
           </div>
           <i>查看官方来源 ↗</i>
         </a>
@@ -219,12 +250,12 @@
       <section class="lab-section" id="lab-section">
         <div class="lab-section-heading">
           <div>
-            <span class="eyebrow">ADVANCED DEMO</span>
+            <span class="eyebrow">可以调参数的演示</span>
             <div class="lab-title-line">
               <h2 id="lab-title">迈克尔逊干涉</h2>
               <span class="lab-year-tag" id="lab-year-tag">大二 · 上</span>
             </div>
-            <p id="lab-subtitle">光学干涉 · 高级交互演示</p>
+            <p id="lab-subtitle">光学干涉 · 拖动参数看看哪里会变</p>
           </div>
           <div class="lab-heading-actions">
             <button class="secondary-button" id="reset-lab">恢复默认参数</button>
@@ -236,19 +267,19 @@
           <article class="lab-stage-panel">
             <div class="lab-stage-topbar">
               <div class="lab-tabs">
-                <button class="active" data-lab-mode="model">实时模型</button>
+                <button class="active" data-lab-mode="model">实验画面</button>
                 <button data-lab-mode="principle">原理图</button>
                 <button data-lab-mode="measure">测量视图</button>
               </div>
               <div class="lab-live-status">
-                <span><i></i> 实时示意模型</span>
+                <span><i></i> 画面会随参数变化</span>
                 <button id="sim-speed" title="切换动画速度">1.0×</button>
                 <button id="annotation-toggle" class="active" title="显示或隐藏场景标注">标注</button>
                 <button id="lab-pause">暂停</button>
               </div>
             </div>
             <div class="advanced-canvas-wrap">
-              <canvas id="lab-canvas" aria-label="高级实验交互演示"></canvas>
+              <canvas id="lab-canvas" aria-label="可调节参数的实验演示"></canvas>
               <div class="canvas-meta meta-top-left" id="lab-badge">INTERFEROMETER</div>
               <div class="canvas-meta meta-top-right" id="lab-readout">λ = 632 nm</div>
               <div class="canvas-legend" id="lab-legend">
@@ -258,15 +289,15 @@
             </div>
             <div class="simulation-story">
               <div>
-                <span><i>01</i> 此刻发生</span>
+                <span><i>01</i> 这时在发生</span>
                 <strong id="sim-action">激光经分束镜分为两束相干光</strong>
               </div>
               <div>
-                <span><i>02</i> 观察重点</span>
+                <span><i>02</i> 先看这里</span>
                 <strong id="sim-attention">同心条纹随光程差产生明暗变化</strong>
               </div>
               <div>
-                <span><i>03</i> 参数影响</span>
+                <span><i>03</i> 参数一变</span>
                 <strong id="sim-effect">镜面位移增加时条纹向外或向内吞吐</strong>
               </div>
             </div>
@@ -294,8 +325,8 @@
 
           <aside class="lab-info-panel">
             <div class="lab-info-block">
-              <span class="info-kicker">MODEL SUMMARY</span>
-              <h3>实验模型说明</h3>
+              <span class="info-kicker">一句话说明</span>
+              <h3>这个实验在做什么</h3>
               <p id="lab-description"></p>
             </div>
             <div class="lab-formula">
@@ -303,13 +334,13 @@
               <strong id="lab-formula">Δd = Nλ / 2</strong>
             </div>
             <div class="lab-info-block">
-              <span class="info-kicker">LEARNING OBJECTIVES</span>
-              <h3>本次演示目标</h3>
+              <span class="info-kicker">做完应该掌握</span>
+              <h3>看完要注意什么</h3>
               <ul id="lab-objectives"></ul>
             </div>
             <div class="lab-info-block">
-              <span class="info-kicker">DATA PLAN</span>
-              <h3>建议记录量</h3>
+              <span class="info-kicker">记录建议</span>
+              <h3>数据怎么记</h3>
               <div class="record-grid">
                 <div><span>横轴变量</span><strong id="record-x">输入参数</strong></div>
                 <div><span>纵轴响应</span><strong id="record-y">测量结果</strong></div>
@@ -320,7 +351,7 @@
             <div class="live-derived">
               <span>当前参数解读</span>
               <strong id="derived-reading">等待模型计算</strong>
-              <small id="derived-note">调整参数后实时更新</small>
+              <small id="derived-note">拖动参数后，这里会给出当前读数</small>
             </div>
             <button class="secondary-button full-width" id="jump-to-data">用这个实验生成报告</button>
           </aside>
@@ -329,11 +360,11 @@
         <section class="principle-dossier" aria-labelledby="principle-title">
           <div class="principle-dossier-heading">
             <div>
-              <span class="eyebrow">PRINCIPLE DOSSIER</span>
-              <h3 id="principle-title">实验原理与操作档案</h3>
-              <p id="principle-subtitle">每个实验模块均配置独立原理说明</p>
+              <span class="eyebrow">实验原理与操作</span>
+              <h3 id="principle-title">先弄懂，再动手</h3>
+              <p id="principle-subtitle">原理、公式、器材和步骤都按当前实验显示</p>
             </div>
-            <span class="dossier-status" id="dossier-status">已建档</span>
+            <span class="dossier-status" id="dossier-status">已整理</span>
           </div>
           <div class="principle-grid">
             <article class="principle-card principle-lead">
@@ -375,11 +406,11 @@
         <section class="equipment-dossier" id="equipment-dossier">
           <div class="equipment-dossier-heading">
             <div>
-              <span class="eyebrow">EQUIPMENT CONDITIONS</span>
-              <h3>器材参数与实验条件</h3>
+              <span class="eyebrow">实验准备</span>
+              <h3>需要哪些器材和条件</h3>
               <p id="equipment-subtitle">按当前实验显示所需器材、环境条件与初学者提示</p>
             </div>
-            <span class="equipment-badge">BEGINNER GUIDE</span>
+            <span class="equipment-badge">第一次做也能看懂</span>
           </div>
           <div class="equipment-main-grid">
             <article class="equipment-card">
@@ -412,24 +443,24 @@
       <section class="data-section" id="data-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">DATA INTAKE</span>
-            <h2>导入本次实验数据</h2>
+            <span class="eyebrow">把测量数据放进来</span>
+            <h2>导入 Excel 或 CSV</h2>
           </div>
-          <p>上传或粘贴 CSV / Excel 数据。每次成功导入都会立即生成一个独立报告版本。</p>
+          <p>文件只在本机浏览器里读取。每次导入都会留下一个报告版本，原来的记录不会被覆盖。</p>
         </div>
 
         <div class="data-layout">
           <div class="data-card panel">
             <div class="panel-heading">
               <div>
-                <span class="panel-index">DATA</span>
+                <span class="panel-index">数据文件</span>
                 <h3>实验数据文件</h3>
               </div>
-              <button class="text-button" id="load-smart-sample">生成示例数据</button>
+              <button class="text-button" id="load-smart-sample">没有数据？先试示例</button>
             </div>
             <div class="template-download-row">
               <a href="optilab_data_template.xlsx" download>下载 Excel 数据模板</a>
-              <span>已预置列名、重复测量和计算列</span>
+              <span>列名、重复测量和公式已经填好</span>
             </div>
             <label class="advanced-drop" id="data-drop">
               <input type="file" id="data-file" accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
@@ -440,7 +471,7 @@
               </span>
               <span>
                 <strong>拖放或选择 CSV / Excel 数据</strong>
-                <small>支持 XLSX、XLS、CSV，导入后自动推荐坐标轴</small>
+                <small>支持 XLSX、XLS、CSV；导入后会先推荐横纵轴</small>
               </span>
             </label>
             <details class="advanced-paste">
@@ -471,8 +502,8 @@
           <div class="data-summary-card panel">
             <div class="panel-heading">
               <div>
-                <span class="panel-index">ANALYSIS</span>
-                <h3>数据体检与统计</h3>
+                <span class="panel-index">数据检查</span>
+                <h3>先看看数据有没有问题</h3>
               </div>
               <span class="panel-tag success" id="record-count">尚未导入</span>
             </div>
@@ -482,7 +513,7 @@
               </div>
               <div>
                 <strong id="quality-label">等待数据</strong>
-                <p id="quality-note">导入数据后计算有效点、异常值和拟合表现。</p>
+                <p id="quality-note">导入数据后，会标出有效点、异常值和拟合情况。</p>
               </div>
             </div>
             <div class="advanced-metrics">
@@ -494,10 +525,10 @@
               <div><span>异常点</span><strong id="metric-outliers">—</strong></div>
             </div>
             <div class="advanced-chart-wrap">
-              <canvas id="advanced-chart" aria-label="导入数据的高级分析图"></canvas>
+              <canvas id="advanced-chart" aria-label="导入数据的统计图"></canvas>
               <div class="chart-empty" id="advanced-chart-empty">
                 <strong>等待实验数据</strong>
-                <span>点击“生成示例数据”可立即体验完整流程</span>
+                <span>没有现成数据，可以先点右上角“先试示例”</span>
               </div>
             </div>
             <div class="chart-axis-labels">
@@ -540,20 +571,20 @@
       <section class="literature-section" id="literature-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">LITERATURE & CITATION</span>
-            <h2>学术文献检索与引用</h2>
+            <span class="eyebrow">找资料 · 管引用</span>
+            <h2>查文献，保存引用</h2>
           </div>
-          <p>检索 OpenAlex 与 Crossref 元数据，支持 Nature、Science、PRL、Optics Express 等期刊。</p>
+          <p>按主题查论文题录，支持 Nature、Science、Optics Express 等期刊，引用信息可以留到报告和论文草稿里。</p>
         </div>
 
         <div class="literature-layout">
           <article class="literature-search-panel">
             <div class="literature-panel-heading">
               <div>
-                <span class="panel-index">SEARCH</span>
-                <h3>发现文献</h3>
+                <span class="panel-index">检索</span>
+                <h3>找相关论文</h3>
               </div>
-              <span class="api-status" id="literature-api-status"><i></i> API 就绪</span>
+              <span class="api-status" id="literature-api-status"><i></i> 可以检索</span>
             </div>
             <form id="literature-form" class="literature-form">
               <label class="literature-query">
@@ -612,8 +643,8 @@
           <aside class="citation-library-panel">
             <div class="citation-library-heading">
               <div>
-                <span class="eyebrow">CITATION LIBRARY</span>
-                <h3>我的引用库</h3>
+                <span class="eyebrow">稍后用得到</span>
+                <h3>保存的引用</h3>
               </div>
               <span id="citation-count">0</span>
             </div>
@@ -633,7 +664,7 @@
         <div class="literature-results-wrap">
           <div class="literature-results-heading">
             <div>
-              <span class="eyebrow">SEARCH RESULTS</span>
+              <span class="eyebrow">检索结果</span>
               <h3>检索结果</h3>
             </div>
             <span id="literature-result-count">等待检索</span>
@@ -651,10 +682,10 @@
       <section class="report-section advanced-report-section" id="report-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">REPORT STUDIO</span>
-            <h2>报告生成与历史版本</h2>
+            <span class="eyebrow">整理成实验报告</span>
+            <h2>报告和以前的版本</h2>
           </div>
-          <p>每份报告绑定实验、批次、数据统计和生成时间，可单独复制与下载。</p>
+          <p>每份报告都会写清实验、批次、统计结果和时间，可以单独复制或下载后继续修改。</p>
         </div>
         <div class="report-studio">
           <article class="advanced-report-panel">
@@ -679,8 +710,8 @@
           <aside class="report-history-panel">
             <div class="history-heading">
               <div>
-                <span class="eyebrow">VERSION HISTORY</span>
-                <h3>历史报告</h3>
+                <span class="eyebrow">以前保存的</span>
+                <h3>报告记录</h3>
               </div>
               <span id="history-count">0</span>
             </div>
@@ -698,21 +729,21 @@
       <section class="paper-section" id="paper-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">PAPER STUDIO</span>
-            <h2>实验报告与文献生成论文初稿</h2>
+            <span class="eyebrow">从报告往前走一步</span>
+            <h2>整理论文草稿</h2>
           </div>
-          <p>组合一份实验报告和引用库中的文献，生成可继续修改的中英文论文框架。</p>
+          <p>选一份报告和已经保存的文献，先生成结构框架，再按自己的实验结果逐段修改。</p>
         </div>
 
         <div class="paper-layout">
           <aside class="paper-config-panel">
             <div class="paper-config-heading">
-              <span class="panel-index">CONFIG</span>
-              <h3>论文生成设置</h3>
+              <span class="panel-index">设置</span>
+              <h3>这次要写什么</h3>
             </div>
             <label>
               <span>论文题目</span>
-              <input id="paper-title" type="text" placeholder="系统会根据实验自动生成">
+              <input id="paper-title" type="text" placeholder="留空时，会先放一个临时题目">
             </label>
             <label>
               <span>选择实验报告</span>
@@ -748,13 +779,13 @@
               <div><span>引用文献</span><strong id="paper-citation-count">0</strong></div>
             </div>
             <button class="primary-button paper-generate-button" id="generate-paper">生成论文初稿</button>
-            <p class="paper-config-note">生成结果是结构化学术初稿，不会虚构实验结果。参考文献的结论表述需要你阅读原文后进一步核实与改写。</p>
+            <p class="paper-config-note">这里得到的是草稿，不会替你编造实验结果。文献里的具体结论，仍要读完原文后核实和改写。</p>
           </aside>
 
           <article class="paper-preview-panel">
             <div class="paper-toolbar">
               <div>
-                <span class="eyebrow">MANUSCRIPT PREVIEW</span>
+                <span class="eyebrow">草稿预览</span>
                 <strong id="paper-word-count">0 字</strong>
               </div>
               <div class="report-actions">
@@ -762,14 +793,14 @@
                 <button class="primary-button compact" id="download-paper">下载 .md</button>
               </div>
             </div>
-            <pre id="paper-preview" tabindex="0"># 论文工作台
+            <pre id="paper-preview" tabindex="0"># 论文草稿
 
 1. 先导入实验数据并生成详细报告；
-2. 在“文献与引用”中检索并加入相关论文；
+2. 在“文献引用”中检索并保存相关论文；
 3. 选择报告、论文类型和引用格式；
 4. 点击“生成论文初稿”。
 
-论文将包含摘要、引言、实验方法、结果分析、讨论、结论和参考文献。系统仅使用已导入数据和已选择的文献元数据。</pre>
+草稿会包含摘要、引言、实验方法、结果分析、讨论、结论和参考文献。它只会使用已经导入的数据和已经选中的文献题录。</pre>
           </article>
         </div>
       </section>
@@ -777,10 +808,10 @@
       <section class="contact-section" id="contact-section">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">FEEDBACK & UPDATES</span>
-            <h2>实验补充与问题反馈</h2>
+            <span class="eyebrow">有问题，或者缺一个实验？</span>
+            <h2>告诉我，后面继续补</h2>
           </div>
-          <p>建议通过公开问题页面提交新实验、数据格式或使用疑问，便于持续跟踪和更新。</p>
+          <p>实验名、数据格式、页面打不开，或者哪一步看不明白，都可以发到公开问题页。</p>
         </div>
         <div class="contact-grid">
           <article class="contact-card contact-primary">
@@ -815,8 +846,8 @@
       </section>
 
       <footer class="advanced-footer">
-        <span>OptiLab 2.0 · 光学与电子信息本科实验高级演示系统</span>
-        <span>课程图谱为典型培养方案框架，可继续增补本校正式实验清单</span>
+        <span>OptiLab · 光电与电子信息本科实验助手</span>
+        <span>实验内容会继续补充；具体安排仍以课程指导书和任课教师要求为准</span>
       </footer>
     </main>
   </div>
