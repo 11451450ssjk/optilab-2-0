@@ -543,6 +543,18 @@
       inline: inlineCitation(item, index, style),
       reference: formatReference(item, index, style)
     }));
+    let knowledgeEvidence = [];
+    try {
+      const storedProject = JSON.parse(localStorage.getItem("optilab_research_project_v1") || "null");
+      knowledgeEvidence = Array.isArray(storedProject?.evidence) ? storedProject.evidence.slice(0, 12) : [];
+    } catch {
+      knowledgeEvidence = [];
+    }
+    const knowledgeBlock = knowledgeEvidence.length
+      ? knowledgeEvidence.map((item, index) =>
+        `[K${index + 1}] ${item.documentTitle || "本地文献"}${item.location ? `，${item.location}` : ""}：${item.claim || "待补充主张"}。摘录：${item.finding || "待补充原文依据"}`
+      ).join("\n")
+      : "当前项目还没有手工整理的文献证据卡片。";
     const citationOverview = citations.map((citation) =>
       `${citation.inline} ${citation.item.title}（${citation.item.journal || "未标注期刊"}, ${citation.item.year || "n.d."}）`
     ).join("\n");
@@ -673,6 +685,12 @@ ${information.errors}
 
 从文献背景看，${citations.slice(0, 4).map((citation) => `${citation.inline} ${citation.item.title}`).join("；")} 提供了与本研究相关的检索入口。由于未阅读全文，本文不对这些文献的具体结论作扩展推断。正式写作时，应在每个论点后补充准确引用，并明确本实验与既有研究在对象、尺度、方法和精度上的差异。
 
+### 5.1 文献知识库证据
+
+${knowledgeBlock}
+
+以上内容来自作者上传或粘贴到本机知识库后整理的证据卡片，系统没有自动判断这些结论是否适用于当前实验。正式写作时仍需核对原文、页码和适用边界。
+
 当前结果的主要限制包括：数据点数量有限；仪器校准和环境信息未完整纳入报告；部分文献只有公开元数据；结构化生成文本仍需人工完成学术表达、因果解释和图表编号。
 
 ${extendedSections}
@@ -690,6 +708,12 @@ ${extendedSections}
 ## 参考文献
 
 ${citations.map((citation) => citation.reference).join("\n\n")}
+
+## 本地知识库资料
+
+${knowledgeEvidence.length
+  ? knowledgeEvidence.map((item, index) => `[K${index + 1}] ${item.documentTitle || "本地文献"}${item.location ? `，${item.location}` : ""}.`).join("\n\n")
+  : "本次写作未引用本地知识库证据卡片。"}
 
 ## 作者审核清单
 

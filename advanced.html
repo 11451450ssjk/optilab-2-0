@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="advanced.css">
+  <link rel="stylesheet" href="research_suite.css">
 </head>
 <body class="advanced-body welcome-locked">
   <section class="welcome-screen" id="welcome-screen" aria-labelledby="welcome-title">
@@ -99,32 +100,36 @@
           <span class="nav-icon">01</span>
           <span>专业概览</span>
         </button>
-        <button class="nav-item" data-target="catalog-section">
+        <button class="nav-item" data-target="research-workspace">
           <span class="nav-icon">02</span>
+          <span>科研项目</span>
+        </button>
+        <button class="nav-item" data-target="catalog-section">
+          <span class="nav-icon">03</span>
           <span>找实验</span>
         </button>
         <button class="nav-item" data-target="lab-section">
-          <span class="nav-icon">03</span>
+          <span class="nav-icon">04</span>
           <span>实验演示</span>
         </button>
         <button class="nav-item" data-target="data-section">
-          <span class="nav-icon">04</span>
+          <span class="nav-icon">05</span>
           <span>导入数据</span>
         </button>
         <button class="nav-item" data-target="literature-section">
-          <span class="nav-icon">05</span>
+          <span class="nav-icon">06</span>
           <span>文献引用</span>
         </button>
         <button class="nav-item" data-target="report-section">
-          <span class="nav-icon">06</span>
+          <span class="nav-icon">07</span>
           <span>我的报告</span>
         </button>
         <button class="nav-item" data-target="paper-section">
-          <span class="nav-icon">07</span>
+          <span class="nav-icon">08</span>
           <span>论文草稿</span>
         </button>
         <button class="nav-item" data-target="contact-section">
-          <span class="nav-icon">08</span>
+          <span class="nav-icon">09</span>
           <span>问题与补充</span>
         </button>
       </nav>
@@ -195,6 +200,370 @@
             <path d="M260 70 390 145 390 295 260 370 130 295 130 145Z"></path>
             <path d="M260 70v70M260 300v70M110 220h80M330 220h80M154 141l58 42M366 257l-58-42M366 141l-58 42M154 299l58-42"></path>
           </svg>
+        </div>
+      </section>
+
+      <section class="research-workspace" id="research-workspace" aria-labelledby="research-title">
+        <div class="research-heading">
+          <div>
+            <span class="eyebrow">AI + 科研项目工作流</span>
+            <h2 id="research-title">从一个问题开始，把研究做完</h2>
+            <p>把研究问题、实验设计、文献全文、数据处理、论文草稿和审阅记录放在同一个项目里。数据仍优先保存在本机。</p>
+          </div>
+          <div class="research-heading-actions">
+            <span class="research-save-state" id="research-save-state">项目会在本机自动保存</span>
+            <button class="secondary-button small" id="research-new-project">新建项目</button>
+          </div>
+        </div>
+
+        <div class="research-tabbar" role="tablist" aria-label="科研项目功能">
+          <button class="active" type="button" role="tab" data-research-tab="project">项目设计</button>
+          <button type="button" role="tab" data-research-tab="knowledge">文献知识库</button>
+          <button type="button" role="tab" data-research-tab="analysis">科研统计</button>
+          <button type="button" role="tab" data-research-tab="package">可复现导出</button>
+          <button type="button" role="tab" data-research-tab="review">审阅协作</button>
+        </div>
+
+        <div class="research-panel active" data-research-panel="project" role="tabpanel">
+          <div class="research-project-grid">
+            <article class="research-card research-brief-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>项目档案</span>
+                  <h3>这次研究想解决什么</h3>
+                </div>
+                <span class="research-id" id="research-project-id">R-PROJECT</span>
+              </div>
+              <div class="research-form-grid">
+                <label class="research-field research-field-wide">
+                  <span>项目名称</span>
+                  <input id="research-project-title" type="text" maxlength="100" placeholder="例如：基于迈克尔逊干涉的微小位移测量">
+                </label>
+                <label class="research-field research-field-wide">
+                  <span>研究问题</span>
+                  <textarea id="research-question" rows="3" maxlength="600" placeholder="写清楚要回答什么，例如：不同镜面步进速度下，条纹计数得到的位移结果是否一致？"></textarea>
+                </label>
+                <label class="research-field research-field-wide">
+                  <span>研究假设</span>
+                  <textarea id="research-hypothesis" rows="3" maxlength="500" placeholder="例如：在稳定平台上，条纹计数结果与参考位移的偏差小于 2%。"></textarea>
+                </label>
+                <label class="research-field">
+                  <span>可用器材</span>
+                  <textarea id="research-equipment" rows="3" maxlength="500" placeholder="列出已有仪器和限制"></textarea>
+                </label>
+                <label class="research-field">
+                  <span>目标指标</span>
+                  <textarea id="research-metric" rows="3" maxlength="400" placeholder="例如：位移误差、灵敏度、信噪比"></textarea>
+                </label>
+                <label class="research-field">
+                  <span>项目阶段</span>
+                  <select id="research-project-stage">
+                    <option value="planning">方案设计</option>
+                    <option value="collecting">数据采集</option>
+                    <option value="analyzing">数据分析</option>
+                    <option value="writing">论文写作</option>
+                    <option value="review">审核修改</option>
+                    <option value="final">最终版本</option>
+                  </select>
+                </label>
+                <div class="research-field research-field-buttons">
+                  <span>关联当前实验</span>
+                  <button class="secondary-button small" id="research-link-experiment" type="button">使用当前实验</button>
+                </div>
+              </div>
+              <div class="research-form-actions">
+                <button class="primary-button compact" id="research-save-project" type="button">保存项目</button>
+                <button class="secondary-button small" id="download-project-json" type="button">导出项目文件</button>
+                <label class="secondary-button small research-import-label">
+                  导入项目文件
+                  <input id="import-project-json" type="file" accept=".json,application/json">
+                </label>
+              </div>
+              <p class="research-field-note">“使用当前实验”会关联左侧演示中正在查看的实验，并把默认器材条件带入设计建议。</p>
+            </article>
+
+            <aside class="research-card research-progress-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>项目进度</span>
+                  <h3>研究闭环</h3>
+                </div>
+                <strong id="research-progress-value">20%</strong>
+              </div>
+              <div class="research-pipeline" id="research-pipeline">
+                <div data-project-step="question"><i>1</i><span><strong>提出问题和假设</strong><small>项目档案</small></span></div>
+                <div data-project-step="design"><i>2</i><span><strong>形成实验方案</strong><small>设计助手</small></span></div>
+                <div data-project-step="knowledge"><i>3</i><span><strong>整理文献证据</strong><small>全文知识库</small></span></div>
+                <div data-project-step="analysis"><i>4</i><span><strong>完成统计分析</strong><small>科研统计</small></span></div>
+                <div data-project-step="review"><i>5</i><span><strong>审阅并形成版本</strong><small>协作审阅</small></span></div>
+              </div>
+              <div class="research-count-grid">
+                <div><span>关联实验</span><strong id="research-linked-experiment">未关联</strong></div>
+                <div><span>知识库文献</span><strong id="research-kb-count">0</strong></div>
+                <div><span>报告</span><strong id="research-report-count">0</strong></div>
+                <div><span>审阅记录</span><strong id="research-comment-count">0</strong></div>
+              </div>
+              <button class="primary-button research-wide-button" id="generate-research-design" type="button">生成实验设计建议</button>
+              <p class="research-field-note">建议由当前实验原理、器材条件、项目输入和知识库内容在本地组合生成，不会上传问题或数据。</p>
+            </aside>
+          </div>
+
+          <article class="research-card research-design-card hidden" id="research-design-card">
+            <div class="research-card-heading">
+              <div>
+                <span>方案草稿</span>
+                <h3>实验设计建议</h3>
+              </div>
+              <div class="research-inline-actions">
+                <span id="research-design-time">尚未生成</span>
+                <button class="secondary-button small" id="copy-research-design" type="button">复制方案</button>
+              </div>
+            </div>
+            <div class="research-design-output" id="research-design-output"></div>
+          </article>
+        </div>
+
+        <div class="research-panel" data-research-panel="knowledge" role="tabpanel" hidden>
+          <div class="research-kb-layout">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>全文资料</span>
+                  <h3>本机文献知识库</h3>
+                </div>
+                <label class="primary-button compact research-upload-label">
+                  添加全文
+                  <input id="research-knowledge-file" type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown" multiple>
+                </label>
+              </div>
+              <div class="research-kb-summary">
+                <div><span>文档</span><strong id="kb-document-count">0</strong></div>
+                <div><span>页/段落</span><strong id="kb-section-count">0</strong></div>
+                <div><span>可检索字数</span><strong id="kb-character-count">0</strong></div>
+              </div>
+              <div class="research-document-list" id="research-document-list">
+                <div class="research-empty-state"><strong>知识库还是空的</strong><span>可以上传自己下载的 PDF、TXT 或 Markdown 文件。</span></div>
+              </div>
+              <p class="research-field-note">PDF 只在本机解析；扫描版 PDF 如果没有文字层，需要先做 OCR。请遵守论文版权和课程数据使用要求。</p>
+            </article>
+
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>全文检索</span>
+                  <h3>从资料里找片段</h3>
+                </div>
+                <span class="research-soft-tag">离线排序</span>
+              </div>
+              <form class="research-inline-form" id="knowledge-search-form">
+                <input id="knowledge-search-query" type="search" placeholder="输入方法、变量或结论关键词">
+                <button class="primary-button compact" type="submit">查找</button>
+              </form>
+              <div class="knowledge-search-results" id="knowledge-search-results">
+                <div class="research-empty-state"><strong>等待输入关键词</strong><span>会按页或段落返回最相关的原文片段。</span></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="research-evidence-layout">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>证据卡片</span>
+                  <h3>把文献结论与项目关联</h3>
+                </div>
+              </div>
+              <form class="research-evidence-form" id="evidence-form">
+                <label class="research-field">
+                  <span>来源文档</span>
+                  <select id="evidence-document"></select>
+                </label>
+                <label class="research-field">
+                  <span>页码或段落</span>
+                  <input id="evidence-location" type="text" maxlength="30" placeholder="例如：第 4 页">
+                </label>
+                <label class="research-field">
+                  <span>作者观点 / 本研究主张</span>
+                  <input id="evidence-claim" type="text" maxlength="240" placeholder="这条证据要支持或反驳什么">
+                </label>
+                <label class="research-field">
+                  <span>原文依据或方法摘录</span>
+                  <textarea id="evidence-finding" rows="3" maxlength="600" placeholder="用自己的话概括，必要时保留原文关键词"></textarea>
+                </label>
+                <label class="research-field">
+                  <span>与本研究的关系</span>
+                  <select id="evidence-relation">
+                    <option value="support">支持</option>
+                    <option value="method">方法参考</option>
+                    <option value="limit">适用边界 / 限制</option>
+                    <option value="contrast">与本研究不同</option>
+                  </select>
+                </label>
+                <button class="primary-button compact" type="submit">保存证据卡片</button>
+              </form>
+            </article>
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div>
+                  <span>证据清单</span>
+                  <h3>已整理的文献线索</h3>
+                </div>
+                <span id="evidence-count">0 条</span>
+              </div>
+              <div class="research-evidence-list" id="research-evidence-list">
+                <div class="research-empty-state"><strong>还没有证据卡片</strong><span>先检索资料，再记录它支持哪一项判断。</span></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="research-panel" data-research-panel="analysis" role="tabpanel" hidden>
+          <div class="research-analysis-toolbar">
+            <div>
+              <span class="eyebrow">科研统计与图表</span>
+              <h3>先检查数据，再决定怎么拟合</h3>
+            </div>
+            <div class="research-analysis-controls">
+              <label>
+                <span>报告</span>
+                <select id="research-report-select"><option value="">等待实验报告</option></select>
+              </label>
+              <label>
+                <span>仪器分辨率 B 类分量</span>
+                <input id="research-resolution" type="number" min="0" step="any" placeholder="例如 0.01">
+              </label>
+              <button class="primary-button compact" id="refresh-research-analysis" type="button">重新分析</button>
+            </div>
+          </div>
+
+          <div class="research-metrics-grid" id="research-metrics-grid">
+            <div><span>最佳模型</span><strong id="stat-best-model">等待数据</strong></div>
+            <div><span>拟合 R²</span><strong id="stat-best-r2">—</strong></div>
+            <div><span>均值合成标准不确定度</span><strong id="stat-combined-u">—</strong></div>
+            <div><span>均值扩展不确定度 U₉₅</span><strong id="stat-expanded-u">—</strong></div>
+            <div><span>近似信噪比</span><strong id="stat-snr">—</strong></div>
+            <div><span>探测限估计</span><strong id="stat-lod">—</strong></div>
+            <div><span>重复组 ANOVA</span><strong id="stat-anova">—</strong></div>
+            <div><span>有效数据点</span><strong id="stat-point-count">—</strong></div>
+          </div>
+
+          <div class="research-chart-grid">
+            <article class="research-card research-chart-card">
+              <div class="research-card-heading">
+                <div><span>拟合与不确定度</span><h3>最优模型和 95% 近似区间</h3></div>
+              </div>
+              <canvas id="research-fit-chart" aria-label="实验数据拟合及近似预测区间"></canvas>
+            </article>
+            <article class="research-card research-chart-card">
+              <div class="research-card-heading">
+                <div><span>残差检查</span><h3>发现趋势和异常点</h3></div>
+              </div>
+              <canvas id="research-residual-chart" aria-label="模型残差图"></canvas>
+            </article>
+          </div>
+
+          <div class="research-analysis-bottom">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>模型比较</span><h3>哪条曲线更适合现在这批数据</h3></div>
+                <span class="research-soft-tag">AIC 越小越简洁</span>
+              </div>
+              <div class="research-table-wrap">
+                <table class="research-model-table">
+                  <thead><tr><th>模型</th><th>R²</th><th>RMSE</th><th>AIC</th><th>BIC</th></tr></thead>
+                  <tbody id="research-model-table"><tr><td colspan="5">等待实验报告</td></tr></tbody>
+                </table>
+              </div>
+            </article>
+            <article class="research-card research-recommendation-card">
+              <div class="research-card-heading">
+                <div><span>分析建议</span><h3>提交前先检查这些</h3></div>
+              </div>
+              <div id="research-analysis-recommendation"><p>导入数据并生成实验报告后，这里会给出模型、样本量、异常点和不确定度提示。</p></div>
+              <button class="secondary-button small" id="save-research-analysis" type="button">保存本次分析快照</button>
+            </article>
+          </div>
+        </div>
+
+        <div class="research-panel" data-research-panel="package" role="tabpanel" hidden>
+          <div class="research-package-grid">
+            <article class="research-card research-package-hero">
+              <span class="eyebrow">可复现研究包</span>
+              <h3>把数据、参数、脚本和文字一起带走</h3>
+              <p>导出一个 ZIP 文件，其他人可以查看原始数据、当前报告、论文草稿、设计建议、知识库全文、证据卡片、审阅意见和复算脚本。</p>
+              <div class="research-package-checklist" id="research-package-checklist"></div>
+              <button class="primary-button research-wide-button" id="download-research-package" type="button">下载可复现研究包 .zip</button>
+              <p class="research-field-note">压缩包在本机生成，不会上传。真实研究者之外的人打开前，请先检查是否包含未公开数据。</p>
+            </article>
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>包内文件</span><h3>导出内容</h3></div>
+              </div>
+              <ul class="research-package-file-list">
+                <li><strong>project.json</strong><span>问题、假设、阶段、成员和审阅状态</span></li>
+                <li><strong>data/</strong><span>原始数据与清洗后 CSV</span></li>
+                <li><strong>analysis/</strong><span>统计快照、模型比较和复算说明</span></li>
+                <li><strong>knowledge/</strong><span>本机全文资料和证据卡片</span></li>
+                <li><strong>manuscript/</strong><span>Markdown 报告与论文草稿</span></li>
+                <li><strong>review/</strong><span>成员、批注和修改状态</span></li>
+                <li><strong>scripts/reproduce.py</strong><span>不依赖第三方库的基础复算脚本</span></li>
+                <li><strong>README.md</strong><span>打开顺序、数据来源和运行方法</span></li>
+              </ul>
+            </article>
+          </div>
+        </div>
+
+        <div class="research-panel" data-research-panel="review" role="tabpanel" hidden>
+          <div class="research-review-layout">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>项目成员</span><h3>谁在负责哪部分</h3></div>
+              </div>
+              <form class="research-member-form" id="research-member-form">
+                <input id="review-member-name" type="text" maxlength="40" placeholder="成员姓名或昵称">
+                <select id="review-member-role">
+                  <option value="负责人">负责人</option>
+                  <option value="实验与数据">实验与数据</option>
+                  <option value="文献与写作">文献与写作</option>
+                  <option value="审阅教师">审阅教师</option>
+                  <option value="其他">其他</option>
+                </select>
+                <button class="secondary-button small" type="submit">添加成员</button>
+              </form>
+              <div class="research-member-list" id="research-member-list">
+                <div class="research-empty-state"><strong>还没有添加成员</strong><span>成员信息只用于本机项目记录。</span></div>
+              </div>
+            </article>
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>审阅批注</span><h3>把意见落到具体位置</h3></div>
+                <span id="review-status-tag">方案设计</span>
+              </div>
+              <form class="research-review-form" id="research-review-form">
+                <div class="research-review-form-row">
+                  <select id="review-author"><option value="">选择成员</option></select>
+                  <select id="review-target">
+                    <option value="项目问题与假设">项目问题与假设</option>
+                    <option value="实验设计">实验设计</option>
+                    <option value="文献证据">文献证据</option>
+                    <option value="数据与统计">数据与统计</option>
+                    <option value="报告">报告</option>
+                    <option value="论文草稿">论文草稿</option>
+                    <option value="研究包">研究包</option>
+                  </select>
+                </div>
+                <textarea id="review-comment" rows="3" maxlength="800" placeholder="写清楚问题、建议修改的位置，以及修改后的判断标准。"></textarea>
+                <button class="primary-button compact" type="submit">添加批注</button>
+              </form>
+              <div class="research-review-list" id="research-review-list">
+                <div class="research-empty-state"><strong>还没有审阅意见</strong><span>批注会跟随项目文件一起导出。</span></div>
+              </div>
+            </article>
+          </div>
+          <div class="research-review-note">
+            <strong>当前版本是单机审阅流程</strong>
+            <p>成员和批注保存在当前浏览器。需要多人实时同步时，应在后续接入账号、权限和数据库；现在可以先导出项目文件，交给另一位同学或老师后重新导入。</p>
+          </div>
         </div>
       </section>
 
@@ -861,5 +1230,7 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
   <script src="research.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="research_suite.js"></script>
 </body>
 </html>
