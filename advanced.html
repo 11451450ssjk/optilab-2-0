@@ -220,8 +220,10 @@
           <button class="active" type="button" role="tab" data-research-tab="project">项目设计</button>
           <button type="button" role="tab" data-research-tab="knowledge">文献知识库</button>
           <button type="button" role="tab" data-research-tab="analysis">科研统计</button>
+          <button type="button" role="tab" data-research-tab="instrument">仪器直采</button>
           <button type="button" role="tab" data-research-tab="package">可复现导出</button>
           <button type="button" role="tab" data-research-tab="review">审阅协作</button>
+          <button type="button" role="tab" data-research-tab="services">AI 与云同步</button>
         </div>
 
         <div class="research-panel active" data-research-panel="project" role="tabpanel">
@@ -264,6 +266,18 @@
                     <option value="writing">论文写作</option>
                     <option value="review">审核修改</option>
                     <option value="final">最终版本</option>
+                  </select>
+                </label>
+                <label class="research-field">
+                  <span>科研设计模板</span>
+                  <select id="research-design-template">
+                    <option value="auto">根据实验自动选择</option>
+                    <option value="interference">干涉与精密测量</option>
+                    <option value="calibration">器件标定</option>
+                    <option value="fiber">光纤与传感器</option>
+                    <option value="detector">光电探测与噪声</option>
+                    <option value="spectrum">光谱与频率响应</option>
+                    <option value="custom">自定义探索</option>
                   </select>
                 </label>
                 <div class="research-field research-field-buttons">
@@ -331,11 +345,21 @@
                   <span>全文资料</span>
                   <h3>本机文献知识库</h3>
                 </div>
-                <label class="primary-button compact research-upload-label">
-                  添加全文
-                  <input id="research-knowledge-file" type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown" multiple>
-                </label>
+                <div class="research-inline-actions">
+                  <label class="secondary-button small research-upload-label">
+                    导入题录
+                    <input id="research-citation-file" type="file" accept=".bib,.ris,.json,application/json,text/plain" multiple>
+                  </label>
+                  <label class="primary-button compact research-upload-label">
+                    添加全文
+                    <input id="research-knowledge-file" type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown" multiple>
+                  </label>
+                </div>
               </div>
+              <label class="research-ocr-toggle">
+                <input id="research-ocr-enabled" type="checkbox">
+                <span>扫描版 PDF 尝试 OCR（首次使用需要联网下载语言包）</span>
+              </label>
               <div class="research-kb-summary">
                 <div><span>文档</span><strong id="kb-document-count">0</strong></div>
                 <div><span>页/段落</span><strong id="kb-section-count">0</strong></div>
@@ -357,6 +381,10 @@
               </div>
               <form class="research-inline-form" id="knowledge-search-form">
                 <input id="knowledge-search-query" type="search" placeholder="输入方法、变量或结论关键词">
+                <select id="knowledge-search-mode" aria-label="检索模式">
+                  <option value="hybrid">混合语义检索</option>
+                  <option value="exact">精确关键词</option>
+                </select>
                 <button class="primary-button compact" type="submit">查找</button>
               </form>
               <div class="knowledge-search-results" id="knowledge-search-results">
@@ -436,6 +464,20 @@
             </div>
           </div>
 
+          <div class="research-unit-toolbar">
+            <div>
+              <strong>单位与量纲检查</strong>
+              <span id="research-unit-diagnostic">等待实验报告</span>
+            </div>
+            <label><span>横轴单位</span><input id="research-x-unit" type="text" placeholder="自动识别"></label>
+            <label><span>横轴换算系数</span><input id="research-x-factor" type="number" step="any" value="1"></label>
+            <label><span>纵轴单位</span><input id="research-y-unit" type="text" placeholder="自动识别"></label>
+            <label><span>纵轴换算系数</span><input id="research-y-factor" type="number" step="any" value="1"></label>
+            <button class="secondary-button small" id="apply-research-units" type="button">应用换算</button>
+            <button class="secondary-button small export-figure-button" data-figure-format="png" type="button">高清 PNG</button>
+            <button class="secondary-button small export-figure-button" data-figure-format="svg" type="button">SVG</button>
+          </div>
+
           <div class="research-metrics-grid" id="research-metrics-grid">
             <div><span>最佳模型</span><strong id="stat-best-model">等待数据</strong></div>
             <div><span>拟合 R²</span><strong id="stat-best-r2">—</strong></div>
@@ -483,6 +525,81 @@
               <button class="secondary-button small" id="save-research-analysis" type="button">保存本次分析快照</button>
             </article>
           </div>
+
+          <div class="research-advanced-analysis-grid">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>不确定度预算</span><h3>逐项列出误差来源</h3></div>
+                <button class="secondary-button small" id="add-uncertainty-row" type="button">添加项目</button>
+              </div>
+              <div class="research-table-wrap">
+                <table class="research-model-table uncertainty-table">
+                  <thead><tr><th>来源</th><th>类型</th><th>标准不确定度</th><th>贡献</th><th></th></tr></thead>
+                  <tbody id="uncertainty-budget-body"></tbody>
+                </table>
+              </div>
+              <div class="research-budget-summary">
+                <span>合成标准不确定度 <strong id="budget-combined">—</strong></span>
+                <span>扩展不确定度 U₉₅ <strong id="budget-expanded">—</strong></span>
+              </div>
+              <canvas id="uncertainty-contribution-chart" class="research-mini-chart" aria-label="不确定度贡献图"></canvas>
+            </article>
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>跨实验比较</span><h3>比较多个实验和批次</h3></div>
+                <button class="secondary-button small" id="export-comparison-csv" type="button">导出 CSV</button>
+              </div>
+              <div class="research-comparison-picker" id="research-comparison-picker"></div>
+              <button class="primary-button compact research-wide-button" id="build-research-comparison" type="button">生成对比</button>
+              <canvas id="research-comparison-chart" class="research-mini-chart" aria-label="跨实验比较图"></canvas>
+            </article>
+          </div>
+        </div>
+
+        <div class="research-panel" data-research-panel="instrument" role="tabpanel" hidden>
+          <div class="research-instrument-layout">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>串口仪器</span><h3>从真实设备直接采集</h3></div>
+                <span class="research-soft-tag" id="serial-status">未连接</span>
+              </div>
+              <div class="research-instrument-form">
+                <label class="research-field"><span>波特率</span><select id="serial-baud"><option>9600</option><option>19200</option><option>38400</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
+                <label class="research-field"><span>数据分隔</span><select id="serial-delimiter"><option value=",">逗号</option><option value="\t">制表符</option><option value=";">分号</option><option value=" ">空格</option></select></label>
+                <label class="research-field"><span>采样时长 / 秒</span><input id="serial-duration" type="number" min="1" max="3600" value="30"></label>
+                <label class="research-field"><span>启动指令 SCPI</span><input id="serial-command" type="text" placeholder="例如 MEAS:VOLT?; 留空则监听连续输出"></label>
+              </div>
+              <div class="research-instrument-actions">
+                <button class="primary-button compact" id="serial-connect" type="button">连接仪器</button>
+                <button class="secondary-button small" id="serial-start" type="button" disabled>开始采集</button>
+                <button class="secondary-button small" id="serial-stop" type="button" disabled>停止</button>
+                <button class="secondary-button small" id="serial-demo" type="button">运行模拟数据流</button>
+              </div>
+              <div class="research-instrument-stats">
+                <div><span>样本</span><strong id="serial-sample-count">0</strong></div>
+                <div><span>持续时间</span><strong id="serial-runtime">0.0 s</strong></div>
+                <div><span>最新读数</span><strong id="serial-latest">—</strong></div>
+              </div>
+              <label class="research-field serial-line-field">
+                <span>显示字段</span>
+                <input id="serial-fields" type="text" value="X值,Y均值" placeholder="逗号分隔，例如 X值,Y均值">
+              </label>
+              <div class="research-instrument-actions">
+                <button class="secondary-button small" id="serial-send-analysis" type="button" disabled>送入数据分析</button>
+                <button class="secondary-button small" id="serial-download" type="button" disabled>下载 CSV</button>
+              </div>
+              <p class="research-field-note">串口直采需要 Chrome 或 Edge，并需要 HTTPS。首次连接时浏览器会要求选择串口设备。</p>
+            </article>
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>实时曲线</span><h3>采集时同步查看趋势</h3></div>
+              </div>
+              <canvas id="serial-live-chart" class="serial-live-chart" aria-label="仪器实时数据曲线"></canvas>
+              <div class="research-serial-log" id="research-serial-log">
+                <div class="research-empty-state"><strong>等待仪器数据</strong><span>连接设备或运行模拟数据流后开始显示。</span></div>
+              </div>
+            </article>
+          </div>
         </div>
 
         <div class="research-panel" data-research-panel="package" role="tabpanel" hidden>
@@ -493,6 +610,12 @@
               <p>导出一个 ZIP 文件，其他人可以查看原始数据、当前报告、论文草稿、设计建议、知识库全文、证据卡片、审阅意见和复算脚本。</p>
               <div class="research-package-checklist" id="research-package-checklist"></div>
               <button class="primary-button research-wide-button" id="download-research-package" type="button">下载可复现研究包 .zip</button>
+              <div class="research-export-grid">
+                <button class="secondary-button small" id="export-research-docx" type="button">导出 Word</button>
+                <button class="secondary-button small" id="export-research-pdf" type="button">打印 / 保存 PDF</button>
+                <button class="secondary-button small" id="export-research-latex" type="button">导出 LaTeX</button>
+                <button class="secondary-button small" id="export-research-bibtex" type="button">导出 BibTeX</button>
+              </div>
               <p class="research-field-note">压缩包在本机生成，不会上传。真实研究者之外的人打开前，请先检查是否包含未公开数据。</p>
             </article>
             <article class="research-card">
@@ -563,6 +686,56 @@
           <div class="research-review-note">
             <strong>当前版本是单机审阅流程</strong>
             <p>成员和批注保存在当前浏览器。需要多人实时同步时，应在后续接入账号、权限和数据库；现在可以先导出项目文件，交给另一位同学或老师后重新导入。</p>
+          </div>
+        </div>
+
+        <div class="research-panel" data-research-panel="services" role="tabpanel" hidden>
+          <div class="research-services-grid">
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>大模型服务</span><h3>AI 后端与本地回退</h3></div>
+                <span class="research-soft-tag" id="ai-service-status">本地模式</span>
+              </div>
+              <div class="research-service-form">
+                <label class="research-field research-field-wide"><span>OpenAI 兼容代理地址</span><input id="ai-endpoint" type="url" placeholder="https://your-worker.example.com/v1/chat/completions"></label>
+                <label class="research-field"><span>模型名称</span><input id="ai-model" type="text" placeholder="例如 gpt-4.1-mini"></label>
+                <label class="research-field"><span>代理访问令牌（可选）</span><input id="ai-token" type="password" autocomplete="off" placeholder="推荐把真实模型密钥放在代理服务中"></label>
+                <label class="research-field"><span>温度</span><input id="ai-temperature" type="number" min="0" max="2" step="0.1" value="0.2"></label>
+                <label class="research-field"><span>响应长度</span><input id="ai-max-tokens" type="number" min="256" max="6000" value="1800"></label>
+                <label class="research-field research-field-wide"><span>科研审阅提示</span><textarea id="ai-system-prompt" rows="4">你是一名谨慎的光电与电子信息科研助手。只根据提供的项目、数据和文献证据给出建议，不虚构实验数据、文献结论或引用。明确区分事实、推断和待验证内容。</textarea></label>
+              </div>
+              <div class="research-instrument-actions">
+                <button class="primary-button compact" id="ai-save-config" type="button">保存配置</button>
+                <button class="secondary-button small" id="ai-test-service" type="button">测试连接</button>
+                <button class="secondary-button small" id="ai-generate-review" type="button">AI 审阅当前项目</button>
+              </div>
+              <div class="research-ai-output" id="research-ai-output">
+                <div class="research-empty-state"><strong>本地模式可直接使用</strong><span>配置代理后，可让大模型审阅项目问题、实验方案和现有证据。</span></div>
+              </div>
+            </article>
+
+            <article class="research-card">
+              <div class="research-card-heading">
+                <div><span>云端项目</span><h3>加密同步与分享</h3></div>
+                <span class="research-soft-tag" id="cloud-sync-status">未配置</span>
+              </div>
+              <div class="research-service-form">
+                <label class="research-field research-field-wide"><span>同步服务地址</span><input id="cloud-sync-endpoint" type="url" placeholder="https://your-sync-worker.example.com/projects"></label>
+                <label class="research-field"><span>项目空间 ID</span><input id="cloud-room-id" type="text" placeholder="例如 optilab-team-01"></label>
+                <label class="research-field"><span>访问令牌</span><input id="cloud-token" type="password" autocomplete="off" placeholder="由同步服务提供"></label>
+                <label class="research-field research-field-wide"><span>端到端加密口令</span><input id="cloud-passphrase" type="password" autocomplete="new-password" placeholder="至少 8 个字符；服务端只保存密文"></label>
+              </div>
+              <div class="research-instrument-actions">
+                <button class="primary-button compact" id="cloud-save-config" type="button">保存配置</button>
+                <button class="secondary-button small" id="cloud-push" type="button">上传当前项目</button>
+                <button class="secondary-button small" id="cloud-pull" type="button">拉取云端项目</button>
+                <button class="secondary-button small" id="cloud-share-link" type="button">生成本机分享链接</button>
+              </div>
+              <div class="research-cloud-note">
+                <strong>没有云服务也能协作</strong>
+                <p>可以导出项目 JSON 或可复现研究包，再由另一位成员导入。加密云同步使用 AES-GCM，口令不会发送到服务器。</p>
+              </div>
+            </article>
           </div>
         </div>
       </section>
@@ -1232,5 +1405,6 @@
   <script src="research.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js"></script>
+  <script src="research_advanced.js"></script>
 </body>
 </html>

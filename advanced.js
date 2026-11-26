@@ -4071,6 +4071,8 @@ window.OptilabBridge = {
   currentExperiment,
   simInfo,
   principleInfo,
+  getCurrentData: () => state.data,
+  loadExternalData: (text, sourceName = "仪器直采数据") => prepareParsedData(text, sourceName),
   getReports: () => state.reports,
   getActiveReport: () => activeReport(),
   showToast,

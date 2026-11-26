@@ -1,0 +1,14 @@
+name = "optilab-research-services"
+main = "research-services.worker.js"
+compatibility_date = "2026-11-25"
+
+[[kv_namespaces]]
+binding = "OPTILAB_PROJECTS"
+id = "replace-with-your-kv-namespace-id"
+
+# Use `wrangler secret put` for the actual values:
+# UPSTREAM_AI_URL
+# UPSTREAM_AI_KEY
+# PROJECT_SYNC_TOKEN
+# PROXY_ACCESS_TOKEN (optional)
+# ALLOWED_ORIGIN (optional)

@@ -806,6 +806,11 @@ ${knowledgeEvidence.length
   window.ResearchStudio = {
     search: performLiteratureSearch,
     generatePaper,
+    reloadCitations: () => {
+      loadCitations();
+      renderLibrary();
+      updatePaperCounts();
+    },
     getState: () => ({
       results: state.results,
       citations: state.citations,

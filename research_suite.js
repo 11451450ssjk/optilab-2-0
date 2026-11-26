@@ -7,6 +7,44 @@
   const DB_NAME = "optilab_research_knowledge_v1";
   const DB_STORE = "documents";
   const MAX_DOCUMENT_BYTES = 30 * 1024 * 1024;
+  const RESEARCH_TEMPLATES = {
+    interference: {
+      label: "干涉与精密测量",
+      sample: "固定同一光路，至少完成 3 个独立扫描批次，每批覆盖多个完整条纹周期。",
+      stats: "比较峰间距和周期稳定性，同时给出重复批次均值、相对偏差和不确定度。",
+      figures: "原始条纹、峰位标注、拟合曲线、残差图和批次对比图。"
+    },
+    calibration: {
+      label: "器件标定",
+      sample: "覆盖低、中、高三个测量区间，每个标准点至少重复 3 次，并记录标准件证书信息。",
+      stats: "建立校准曲线，报告斜率、截距、R²、残差、灵敏度、探测限和重复性。",
+      figures: "校准曲线、误差棒、残差、重复性箱线图和不确定度贡献图。"
+    },
+    fiber: {
+      label: "光纤与传感器",
+      sample: "保持光纤固定和温度稳定，至少完成 3 次升程与回程扫描以检查迟滞。",
+      stats: "比较灵敏度、线性度、迟滞、重复性和温度漂移，区分升程与回程模型。",
+      figures: "响应曲线、迟滞环、重复性曲线、频谱或时域漂移图。"
+    },
+    detector: {
+      label: "光电探测与噪声",
+      sample: "在暗场、固定光功率和不同偏置条件下重复采样，每个条件至少 3 个批次。",
+      stats: "报告响应度、暗电流、噪声、信噪比、线性范围和饱和区，区分随机噪声与漂移。",
+      figures: "光功率响应、暗噪声、频谱、线性区和饱和区对照图。"
+    },
+    spectrum: {
+      label: "光谱与频率响应",
+      sample: "覆盖完整关注频段或光谱范围，在峰值附近增加采样密度，并重复基线测量。",
+      stats: "检查峰位、峰宽、分辨率、基线漂移和谐波，比较重复扫描的峰位偏差。",
+      figures: "原始频谱、基线校正、峰位标注、局部放大和重复扫描叠图。"
+    },
+    custom: {
+      label: "自定义探索",
+      sample: "先完成小样本预实验，再根据漂移和离散程度调整点数、重复次数和采样间隔。",
+      stats: "先绘制原始数据，再根据数据形态选择模型；报告样本量、异常点和适用边界。",
+      figures: "原始数据、分布、趋势、残差和异常点图。"
+    }
+  };
 
   const state = {
     project: null,
@@ -74,6 +112,13 @@
       experimentId: "",
       stage: "planning",
       resolution: "",
+      designTemplate: "auto",
+      unitSettings: {
+        xUnit: "",
+        yUnit: "",
+        xFactor: 1,
+        yFactor: 1
+      },
       design: {
         generatedAt: "",
         text: "",
@@ -95,6 +140,10 @@
       design: {
         ...base.design,
         ...(candidate.design && typeof candidate.design === "object" ? candidate.design : {})
+      },
+      unitSettings: {
+        ...base.unitSettings,
+        ...(candidate.unitSettings && typeof candidate.unitSettings === "object" ? candidate.unitSettings : {})
       },
       evidence: Array.isArray(candidate.evidence) ? candidate.evidence : [],
       members: Array.isArray(candidate.members) ? candidate.members : [],
@@ -143,7 +192,8 @@
     equipment: "#research-equipment",
     metric: "#research-metric",
     stage: "#research-project-stage",
-    resolution: "#research-resolution"
+    resolution: "#research-resolution",
+    designTemplate: "#research-design-template"
   };
 
   function readProjectForm() {
@@ -228,7 +278,9 @@
         });
         if (tab === "knowledge") renderKnowledge();
         if (tab === "analysis") refreshResearchAnalysis();
+        if (tab === "instrument") window.OptilabAdvanced?.onInstrumentTab?.();
         if (tab === "package") updatePackageChecklist();
+        if (tab === "services") window.OptilabAdvanced?.onServicesTab?.();
         if (tab === "review") {
           renderMembers();
           renderComments();
@@ -304,8 +356,20 @@
     const conditions = profile?.conditions?.map((item) => `${item.label}：${item.value}`) || [];
     const evidence = state.project.evidence.slice(0, 5);
     const documents = state.documents.slice(0, 5);
+    const explicitTemplate = state.project.designTemplate;
+    const inferredTemplate = /干涉|干涉|micro|位移|fringe/i.test(`${experiment.name} ${experiment.id}`)
+      ? "interference"
+      : /光纤|传感/.test(experiment.name)
+        ? "fiber"
+        : /光谱|频率|光栅/.test(experiment.name)
+          ? "spectrum"
+          : /探测|噪声|探测|光电效应/.test(experiment.name)
+            ? "detector"
+            : "custom";
+    const templateKey = explicitTemplate && explicitTemplate !== "auto" ? explicitTemplate : inferredTemplate;
+    const researchTemplate = RESEARCH_TEMPLATES[templateKey] || RESEARCH_TEMPLATES.custom;
 
-    let sampling = "建议至少完成 3 次独立重复，每个重复保留原始读数、单位、仪器设置和环境条件。";
+    let sampling = researchTemplate.sample;
     if (analysis) {
       sampling = analysis.peaks?.length >= 2
         ? `当前数据有 ${analysis.peaks.length} 个局部峰值。建议覆盖至少 3 个完整周期，并记录峰位、峰间距和对应的扫描条件。`
@@ -313,7 +377,7 @@
     }
     const statsPlan = analysis?.peaks?.length >= 2
       ? "先检查周期性，再比较峰间距和周期稳定性；同时报告异常点、重复批次差异及仪器分辨率带来的不确定度。"
-      : "先比较线性、二次、对数和指数模型的 AIC/BIC，再报告 R²、残差、标准误差、合成不确定度和重复组差异。";
+      : `先比较线性、二次、对数和指数模型的 AIC/BIC，再报告 R²、残差、标准误差、合成不确定度和重复组差异。${researchTemplate.stats}`;
     const objective = state.project.question.trim()
       ? `围绕“${state.project.question.trim()}”建立可重复的实验流程，并检验假设“${state.project.hypothesis.trim() || "待补充"}”。`
       : `围绕“${experiment.name}”建立一个可以复现、可以比较批次差异的实验研究流程。`;
@@ -348,7 +412,11 @@
       },
       {
         title: "统计与判断标准",
-        html: `<p>${escapeHtml(statsPlan)}</p><p>主要指标：${escapeHtml(state.project.metric || "根据数据选择误差、信噪比、灵敏度或拟合参数")}。</p>`
+        html: `<p>${escapeHtml(`${researchTemplate.label}：${statsPlan}`)}</p><p>主要指标：${escapeHtml(state.project.metric || "根据数据选择误差、信噪比、灵敏度或拟合参数")}。</p>`
+      },
+      {
+        title: "建议图表",
+        html: `<p>${escapeHtml(researchTemplate.figures)}</p>`
       },
       {
         title: "风险、误差与停止条件",
@@ -380,7 +448,10 @@
       ...principle.steps.map((item, index) => `${index + 1}. ${item}`),
       "",
       "## 统计与判断标准",
-      statsPlan,
+      `${researchTemplate.label}：${statsPlan}`,
+      "",
+      "## 建议图表",
+      researchTemplate.figures,
       "",
       "## 风险与误差",
       simulation.errors,
@@ -582,6 +653,10 @@
       const content = await page.getTextContent();
       const text = content.items.map((item) => item.str || "").join(" ").replace(/\s+/g, " ").trim();
       if (text) sections.push(`[第 ${pageNumber} 页]\n${text}`);
+      if (pageNumber % 5 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    if (!sections.length && $("#research-ocr-enabled")?.checked && window.OptilabAdvanced?.ocrPdfFile) {
+      return window.OptilabAdvanced.ocrPdfFile(file);
     }
     return {
       text: sections.join("\n\n"),
@@ -621,7 +696,8 @@
       text: parsed.text.slice(0, 2_000_000),
       sections: parsed.sections.slice(0, 500),
       metadata: parsed.metadata || {},
-      keywords: extractKeywords(`${title}\n${parsed.text.slice(0, 30000)}`)
+      keywords: extractKeywords(`${title}\n${parsed.text.slice(0, 30000)}`),
+      structure: window.OptilabAdvanced?.extractTextStructure?.(parsed.text) || []
     };
   }
 
@@ -654,7 +730,8 @@
     if (!documents.length) {
       list.innerHTML = `<div class="research-empty-state"><strong>知识库还是空的</strong><span>可以上传自己下载的 PDF、TXT 或 Markdown 文件。</span></div>`;
     } else {
-      list.innerHTML = documents.map((item) => `
+      const shown = documents.slice(0, 40);
+      list.innerHTML = shown.map((item) => `
         <article class="research-document-item">
           <div class="research-document-top">
             <div>
@@ -664,12 +741,15 @@
             <button type="button" data-delete-document="${escapeHtml(item.id)}">移除</button>
           </div>
           <p>${escapeHtml((item.text || "").slice(0, 180))}${item.charCount > 180 ? "…" : ""}</p>
+          ${item.structure?.length ? `<small>结构：${item.structure.map((section) => escapeHtml(section.title)).join(" · ")}</small>` : ""}
           <div class="research-document-actions">
             <button type="button" data-copy-document="${escapeHtml(item.id)}">复制引用信息</button>
             <button type="button" data-use-document="${escapeHtml(item.id)}">写入证据卡片</button>
           </div>
         </article>
-      `).join("");
+      `).join("") + (documents.length > shown.length
+        ? `<div class="research-empty-state"><strong>还有 ${documents.length - shown.length} 份资料</strong><span>为保持页面流畅，只显示最近 40 份；全文检索仍会覆盖全部文档。</span></div>`
+        : "");
     }
     list.querySelectorAll("[data-delete-document]").forEach((button) => {
       button.addEventListener("click", async () => {
@@ -726,7 +806,7 @@
     return `${start ? "…" : ""}${source.slice(start, end).replace(/\s+/g, " ")}${end < source.length ? "…" : ""}`;
   }
 
-  function performKnowledgeSearch() {
+  async function performKnowledgeSearch() {
     const query = $("#knowledge-search-query").value.trim();
     if (!query) {
       bridge.showToast("请输入检索关键词");
@@ -734,10 +814,15 @@
     }
     const tokens = searchTokens(query);
     const results = [];
-    state.documents.forEach((doc) => {
+    let scannedSections = 0;
+    for (const doc of state.documents) {
       (doc.sections || [doc.text]).forEach((section, index) => {
         const lower = String(section || "").toLowerCase();
         let score = lower.includes(query.toLowerCase()) ? 10 : 0;
+        const semantic = $("#knowledge-search-mode")?.value === "hybrid"
+          ? window.OptilabAdvanced?.knowledgeSimilarity?.(query, section) || 0
+          : 0;
+        score += semantic;
         tokens.forEach((token) => {
           const count = lower.split(token).length - 1;
           score += Math.min(5, count);
@@ -752,7 +837,11 @@
           });
         }
       });
-    });
+      scannedSections += doc.sections?.length || 1;
+      if (scannedSections > 60 && scannedSections % 60 < (doc.sections?.length || 1)) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
     state.searchResults = results.sort((a, b) => b.score - a.score).slice(0, 12);
     renderKnowledgeSearch(query);
   }
@@ -1128,8 +1217,10 @@
   }
 
   function analyzeScientificReport(report) {
+    const xFactor = safeNumber(state.project.unitSettings?.xFactor, 1) || 1;
+    const yFactor = safeNumber(state.project.unitSettings?.yFactor, 1) || 1;
     const points = (report?.dataPoints || [])
-      .map((point) => ({ x: Number(point.x), y: Number(point.y) }))
+      .map((point) => ({ x: Number(point.x) * xFactor, y: Number(point.y) * yFactor }))
       .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
     if (points.length < 3) return null;
     const models = analyzeScientificModels(points);
@@ -1164,8 +1255,8 @@
     return {
       reportId: report.id,
       experimentName: report.experimentName,
-      xHeader: report.xHeader,
-      yHeader: report.yHeader,
+      xHeader: state.project.unitSettings?.xUnit || report.xHeader,
+      yHeader: state.project.unitSettings?.yUnit || report.yHeader,
       points,
       models,
       best,
@@ -1213,6 +1304,7 @@
       $("#research-model-table").innerHTML = `<tr><td colspan="5">等待实验报告</td></tr>`;
       $("#research-analysis-recommendation").innerHTML = `<p>先在上方“导入数据”区域导入实验数据，并生成一份报告。</p>`;
       drawResearchCharts();
+      window.dispatchEvent(new CustomEvent("optilab:research-analysis-updated", { detail: { analysis: null } }));
       return;
     }
     state.analysis = analyzeScientificReport(report);
@@ -1243,6 +1335,7 @@
     `).join("");
     $("#research-analysis-recommendation").innerHTML = `<ul>${analysis.recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
     drawResearchCharts();
+    window.dispatchEvent(new CustomEvent("optilab:research-analysis-updated", { detail: { analysis: state.analysis } }));
   }
 
   function drawResearchCharts() {
@@ -1554,8 +1647,14 @@ python scripts/reproduce.py
       bridge.showToast("ZIP 组件未加载，请刷新页面");
       return;
     }
-    readProjectForm();
-    saveProject({ silent: true });
+    const packageButton = $("#download-research-package");
+    const originalLabel = packageButton.textContent;
+    packageButton.disabled = true;
+    packageButton.textContent = "正在整理研究包…";
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      readProjectForm();
+      saveProject({ silent: true });
     const reports = bridge.getReports?.() || [];
     const report = reports.find((item) => item.id === $("#research-report-select").value) || reports[0] || null;
     if (!$("[data-research-panel='analysis']").hidden || !state.analysis) refreshResearchAnalysis();
@@ -1593,6 +1692,15 @@ python scripts/reproduce.py
       } : null
     }, null, 2));
     zip.file("analysis/citations.json", JSON.stringify(citations, null, 2));
+    if (Array.isArray(state.project.uncertaintyBudget)) {
+      const budgetRows = [
+        "来源,类型,标准不确定度",
+        ...state.project.uncertaintyBudget.map((row) =>
+          `${JSON.stringify(row.name || "")},${JSON.stringify(row.type || "")},${safeNumber(row.value, 0)}`
+        )
+      ];
+      zip.file("analysis/uncertainty_budget.csv", budgetRows.join("\n"));
+    }
     zip.file("review/review.json", JSON.stringify({
       members: state.project.members,
       comments: state.project.comments,
@@ -1603,9 +1711,13 @@ python scripts/reproduce.py
       zip.file(`knowledge/${name}`, `${documentRecord.title}\n来源文件：${documentRecord.fileName}\n\n${documentRecord.text}`);
     });
     zip.file("scripts/reproduce.py", buildPythonScript(report, analysis));
-    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
-    downloadBlob(blob, `${safeFileName(state.project.title || "OptiLab科研项目")}-可复现研究包.zip`);
-    bridge.showToast("可复现研究包已生成");
+      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+      downloadBlob(blob, `${safeFileName(state.project.title || "OptiLab科研项目")}-可复现研究包.zip`);
+      bridge.showToast("可复现研究包已生成");
+    } finally {
+      packageButton.disabled = false;
+      packageButton.textContent = originalLabel;
+    }
   }
 
   function setupPackage() {
@@ -1734,7 +1846,16 @@ python scripts/reproduce.py
     getDocuments: () => state.documents,
     getAnalysis: () => state.analysis,
     generateDesign: buildResearchDesign,
-    refreshAnalysis: refreshResearchAnalysis
+    refreshAnalysis: refreshResearchAnalysis,
+    readProjectForm,
+    saveProject: () => {
+      readProjectForm();
+      return saveProject({ silent: true });
+    },
+    renderProject,
+    renderKnowledge,
+    refreshReportOptions,
+    getSelectedReport: () => (bridge.getReports?.() || []).find((item) => item.id === $("#research-report-select")?.value) || null
   };
 
   initialize().catch((error) => {
