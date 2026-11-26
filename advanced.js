@@ -2697,8 +2697,12 @@ function drawGenericModel(width, height, time) {
 
 function renderYearOverview() {
   const container = document.getElementById("year-overview");
+  const graduateModules = CATALOG
+    .filter((semester) => semester.scope === "graduate")
+    .reduce((total, semester) => total + semester.experiments.length, 0);
+  const graduateCourses = CATALOG.filter((semester) => semester.scope === "graduate").length;
   container.innerHTML = [1, 2, 3, 4].map((year) => {
-    const semesters = CATALOG.filter((semester) => semester.year === year);
+    const semesters = CATALOG.filter((semester) => semester.year === year && semester.scope !== "graduate");
     const generalSemesters = semesters.filter((semester) => !semester.scope || semester.scope === "general");
     const hustModules = semesters
       .filter((semester) => semester.scope === "hust")
@@ -2714,7 +2718,14 @@ function renderYearOverview() {
       <p>${titles.join("；")}${hustModules ? `；华科必修扩展 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
       <small>${totalExperiments} 个实验 · ${semesters.length} 个课程节点</small>
     </button>`;
-  }).join("");
+  }).join("") + `<button class="graduate-overview-card" data-jump-year="graduate">
+    <span>GRADUATE RESEARCH</span>
+    <div>
+      <strong>研究生实验与研究平台</strong>
+      <p>高等光谱、超快光学、量子光子学、微纳光子学、生物医学光子学、智能仪器与先进光网络。</p>
+    </div>
+    <small>${graduateModules} 个研究生实验 · ${graduateCourses} 个方向</small>
+  </button>`;
   container.querySelectorAll("[data-jump-year]").forEach((button) => {
     button.addEventListener("click", () => {
       state.filterYear = button.dataset.jumpYear;
@@ -2732,6 +2743,7 @@ function filteredCatalog() {
   return CATALOG
     .filter((semester) =>
       state.filterYear === "all" ||
+      (state.filterYear === "graduate" && semester.scope === "graduate") ||
       (state.filterYear === "hust" && semester.scope === "hust") ||
       (state.filterYear === "electrical" && semester.scope === "electrical") ||
       semester.year === Number(state.filterYear)
@@ -2763,11 +2775,18 @@ function renderCatalog() {
     const containsSelected = semester.experiments.some((experiment) => experiment.id === state.experimentId);
     const openByDefault = state.search.trim() ||
       containsSelected ||
-      (state.filterYear !== "all" && state.filterYear !== "hust" && state.filterYear !== "electrical" && semester.scope === "general");
-    const officialCourse = semester.scope === "hust" || semester.scope === "electrical";
-    const coursePrefix = semester.scope === "electrical" ? "华中科技大学电学扩展 · " : semester.scope === "hust" ? "华中科技大学必修实验 · " : "";
+      (state.filterYear !== "all" && state.filterYear !== "hust" && state.filterYear !== "electrical" && state.filterYear !== "graduate" && semester.scope === "general") ||
+      (state.filterYear === "graduate" && semester.scope === "graduate");
+    const officialCourse = semester.scope === "hust" || semester.scope === "electrical" || semester.scope === "graduate";
+    const coursePrefix = semester.scope === "electrical"
+      ? "华中科技大学电学扩展 · "
+      : semester.scope === "hust"
+        ? "华中科技大学必修实验 · "
+        : semester.scope === "graduate"
+          ? `研究生 · 研${semester.degreeYear === 2 ? "二" : "一"} · `
+          : "";
     return `
-    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""}">
+    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""} ${semester.scope === "graduate" ? "graduate-course-group" : ""}">
       <div class="semester-header">
         <div>
           <span class="semester-number">${officialCourse ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
@@ -2777,13 +2796,13 @@ function renderCatalog() {
           </div>
         </div>
         <div class="semester-group-actions">
-          <span>${semester.scope === "hust" ? "HUST 2025 方案 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : ""}${semester.experiments.length} 个实验</span>
+          <span>${semester.scope === "hust" ? "HUST 2025 方案 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : semester.scope === "graduate" ? "研究生研究实验 · " : ""}${semester.experiments.length} 个实验</span>
           <button class="group-toggle" data-group-toggle="${semester.id}" aria-expanded="${openByDefault ? "true" : "false"}">${openByDefault ? "收起" : "展开"}</button>
         </div>
       </div>
       <div class="experiment-card-grid ${openByDefault ? "" : "collapsed"}" data-group-grid="${semester.id}">
         ${semester.experiments.map((experiment, index) => `
-          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""}" data-experiment-id="${experiment.id}">
+          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""} ${semester.scope === "graduate" ? "graduate-experiment-card" : ""}" data-experiment-id="${experiment.id}">
             <span class="experiment-card-index">${officialCourse ? semester.officialCode : "EXP"} ${String(index + 1).padStart(2, "0")}</span>
             <h4>${escapeHtml(experiment.name)}</h4>
             <p>${escapeHtml(experiment.description)}</p>
@@ -2824,7 +2843,10 @@ function selectExperiment(experimentId, scrollToLab = false) {
   document.getElementById("auto-scan").setAttribute("aria-pressed", "false");
   document.getElementById("lab-pause").textContent = "暂停";
   document.getElementById("lab-title").textContent = experiment.name;
-  document.getElementById("lab-year-tag").textContent = `大${["一", "二", "三", "四"][experiment.year - 1]} · ${experiment.term === 1 ? "上" : "下"}`;
+  const courseLevel = experiment.scope === "graduate"
+    ? `研${experiment.degreeYear === 2 ? "二" : "一"}`
+    : `大${["一", "二", "三", "四"][experiment.year - 1]}`;
+  document.getElementById("lab-year-tag").textContent = `${courseLevel} · ${experiment.term === 1 ? "上" : "下"}`;
   document.getElementById("lab-subtitle").textContent = `${simInfo(experiment).domain} · ${experiment.semesterTitle}，拖动参数看看哪里会变`;
   document.getElementById("lab-description").textContent = principle.intro;
   document.getElementById("lab-formula").textContent = experiment.formula;
@@ -2837,7 +2859,7 @@ function selectExperiment(experimentId, scrollToLab = false) {
     `记录${simInfo(experiment).xLabel}与${simInfo(experiment).yLabel}并评价异常点`
   ].map((text) => `<li>${escapeHtml(text)}</li>`).join("");
   document.getElementById("principle-subtitle").textContent =
-    `${experiment.name} · 大${["一", "二", "三", "四"][experiment.year - 1]}${experiment.term === 1 ? "上" : "下"} · ${experiment.semesterTitle}`;
+    `${experiment.name} · ${courseLevel}${experiment.term === 1 ? "上" : "下"} · ${experiment.semesterTitle}`;
   document.getElementById("principle-intro-title").textContent = experiment.name;
   document.getElementById("principle-intro").textContent = principle.intro;
   document.getElementById("principle-theory").textContent = principle.theory;
@@ -3527,6 +3549,9 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
       return `[${index + 1}] ${authors}. ${item.title}. ${item.journal || "未标注期刊"}, ${item.year || "n.d."}.${doiText}`;
     }).join("\n\n")
     : "整理这份报告时还没有保存文献。可以到“文献引用”中检索并保存，后面生成的报告会带上引用信息。";
+  const reportCourseLevel = experiment.scope === "graduate"
+    ? `研${experiment.degreeYear === 2 ? "二" : "一"}`
+    : `大${["一", "二", "三", "四"][experiment.year - 1]}`;
 
   return `# ${experiment.name}实验报告
 
@@ -3534,7 +3559,7 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
 整理时间：${dateText}
 实验批次：${record.batchName}
 数据文件：${record.sourceName}
-课程位置：大${["一", "二", "三", "四"][experiment.year - 1]} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}
+课程位置：${reportCourseLevel} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}
 报告类型：数据处理、误差分析与结果讨论
 
 ## 摘要
@@ -4084,8 +4109,8 @@ window.OptilabBridge = {
 
 function initialize() {
   const total = EXPERIMENTS.length;
-  if (total !== 176) {
-    console.warn(`实验总数为 ${total}，预期为 176`);
+  if (total !== 208) {
+    console.warn(`实验总数为 ${total}，预期为 208`);
   }
   document.getElementById("hero-experiment-count").textContent = String(total);
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);

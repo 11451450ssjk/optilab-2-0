@@ -5,6 +5,10 @@
 - `POST /ai`：浏览器把 OpenAI 兼容请求发给代理，真实模型密钥只保存在 Worker 中。
 - `GET/PUT /projects/:room`：保存端到端加密后的项目信封，服务端看不到项目正文。
 
+如果使用 DeepSeek，将 `UPSTREAM_AI_URL` 配置为
+`https://api.deepseek.com/chat/completions`，网站服务提供方选择 DeepSeek
+Chat 或 DeepSeek Reasoner，并把代理地址填写为 Worker 的 `/ai`。
+
 ## Cloudflare Workers
 
 1. 安装 Wrangler 并登录 Cloudflare。

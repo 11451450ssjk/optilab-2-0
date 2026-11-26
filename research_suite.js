@@ -238,7 +238,9 @@
       design: Boolean(state.project.design.generatedAt),
       knowledge: state.project.evidence.length > 0,
       analysis: Boolean(state.project.analysis || reports.length),
-      review: state.project.comments.length > 0 || state.project.stage === "final"
+      review: state.project.comments.length > 0 ||
+        state.project.stage === "final" ||
+        (state.project.tasks?.length > 0 && state.project.tasks.every((task) => task.status === "done"))
     };
     const completeCount = Object.values(steps).filter(Boolean).length;
     const activeKey = Object.keys(steps).find((key) => !steps[key]) || "review";
@@ -278,6 +280,7 @@
         });
         if (tab === "knowledge") renderKnowledge();
         if (tab === "analysis") refreshResearchAnalysis();
+        if (tab === "tasks") window.OptilabExperience?.onTasksTab?.();
         if (tab === "instrument") window.OptilabAdvanced?.onInstrumentTab?.();
         if (tab === "package") updatePackageChecklist();
         if (tab === "services") window.OptilabAdvanced?.onServicesTab?.();
@@ -1704,6 +1707,7 @@ python scripts/reproduce.py
     zip.file("review/review.json", JSON.stringify({
       members: state.project.members,
       comments: state.project.comments,
+      tasks: state.project.tasks || [],
       stage: state.project.stage
     }, null, 2));
     state.documents.forEach((documentRecord, index) => {

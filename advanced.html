@@ -3,15 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="面向光电与电子信息本科生的实验助手，包含实验原理、器材准备、操作演示、数据整理和报告草稿。">
-  <title>OptiLab | 光电与电子信息本科实验助手</title>
+  <meta name="theme-color" id="theme-color" content="#090d10">
+  <meta name="description" content="面向光电与电子信息本科生和研究生的实验与科研助手，包含实验原理、器材准备、操作演示、科研统计、论文草稿和自动分工。">
+  <title>OptiLab | 光电与电子信息本科—研究生实验与科研助手</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="advanced.css">
   <link rel="stylesheet" href="research_suite.css">
+  <link rel="stylesheet" href="experience.css">
+  <script>
+    try {
+      if (localStorage.getItem("optilab_theme_v1") === "day") {
+        document.documentElement.dataset.theme = "day";
+      }
+    } catch {}
+  </script>
 </head>
 <body class="advanced-body welcome-locked">
   <section class="welcome-screen" id="welcome-screen" aria-labelledby="welcome-title">
+    <button class="theme-toggle welcome-theme-toggle" type="button" data-theme-toggle>
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span data-theme-label>切换日间</span>
+    </button>
     <div class="welcome-background-grid" aria-hidden="true"></div>
     <div class="welcome-panel">
       <div class="welcome-brand">
@@ -21,11 +34,11 @@
             <path d="M24 4v10M24 34v10M4 24h10M34 24h10M9.9 9.9l7.1 7.1M31 31l7.1 7.1M38.1 9.9 31 17M17 31l-7.1 7.1"></path>
           </svg>
         </span>
-        <span><strong>OptiLab</strong><small>本科实验助手</small></span>
+        <span><strong>OptiLab</strong><small>本科—研究生科研</small></span>
       </div>
       <span class="welcome-kicker">第一次做，也能知道下一步</span>
       <h1 id="welcome-title">先找到实验，<br>再一步一步做下去。</h1>
-      <p>这里整理了光电与电子信息本科四年的实验。每个实验都说明原理、器材、操作和观察重点；有自己的数据时，也可以直接整理成报告草稿。</p>
+      <p>这里整理了光电与电子信息从本科到研究生的实验。每个实验都说明原理、器材、操作和观察重点；有自己的数据时，也可以直接整理成报告草稿。</p>
       <div class="welcome-path" aria-label="使用步骤">
         <button class="welcome-step" type="button" data-welcome-target="catalog-section">
           <span>01</span>
@@ -91,7 +104,7 @@
         </span>
         <span>
           <strong>OptiLab</strong>
-          <small>本科实验助手</small>
+          <small>本科—研究生科研</small>
         </span>
       </a>
 
@@ -100,36 +113,40 @@
           <span class="nav-icon">01</span>
           <span>专业概览</span>
         </button>
-        <button class="nav-item" data-target="research-workspace">
+        <button class="nav-item" data-target="morning-checkin">
           <span class="nav-icon">02</span>
+          <span>晨光打卡</span>
+        </button>
+        <button class="nav-item" data-target="research-workspace">
+          <span class="nav-icon">03</span>
           <span>科研项目</span>
         </button>
         <button class="nav-item" data-target="catalog-section">
-          <span class="nav-icon">03</span>
+          <span class="nav-icon">04</span>
           <span>找实验</span>
         </button>
         <button class="nav-item" data-target="lab-section">
-          <span class="nav-icon">04</span>
+          <span class="nav-icon">05</span>
           <span>实验演示</span>
         </button>
         <button class="nav-item" data-target="data-section">
-          <span class="nav-icon">05</span>
+          <span class="nav-icon">06</span>
           <span>导入数据</span>
         </button>
         <button class="nav-item" data-target="literature-section">
-          <span class="nav-icon">06</span>
+          <span class="nav-icon">07</span>
           <span>文献引用</span>
         </button>
         <button class="nav-item" data-target="report-section">
-          <span class="nav-icon">07</span>
+          <span class="nav-icon">08</span>
           <span>我的报告</span>
         </button>
         <button class="nav-item" data-target="paper-section">
-          <span class="nav-icon">08</span>
+          <span class="nav-icon">09</span>
           <span>论文草稿</span>
         </button>
         <button class="nav-item" data-target="contact-section">
-          <span class="nav-icon">09</span>
+          <span class="nav-icon">10</span>
           <span>问题与补充</span>
         </button>
       </nav>
@@ -137,7 +154,7 @@
       <div class="sidebar-progress">
         <div class="sidebar-progress-head">
           <span>课程整理</span>
-          <strong>大一—大四</strong>
+          <strong>本科—研究生</strong>
         </div>
         <div class="progress-track"><i></i></div>
         <p id="sidebar-catalog-summary">正在整理课程内容</p>
@@ -156,20 +173,24 @@
       <header class="topbar">
         <div>
           <span class="eyebrow">光电与电子信息 · 本科实验助手</span>
-          <h1>从大一到毕业，按课程找实验</h1>
+          <h1>从本科到研究生，按课程找实验</h1>
         </div>
         <div class="top-status">
           <span class="live-pill"><i></i> 页面已就绪</span>
-          <span class="version-pill">v2.0</span>
+          <span class="version-pill">v2.2</span>
           <span id="clock" class="clock">--:--</span>
+          <button class="theme-toggle topbar-theme-toggle" type="button" data-theme-toggle>
+            <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+            <span data-theme-label>日间</span>
+          </button>
         </div>
       </header>
 
       <section class="advanced-hero" id="overview">
         <div class="advanced-hero-copy">
-          <span class="hero-kicker">通用实验目录 + 华中科技大学 2025 级培养方案</span>
+          <span class="hero-kicker">本科基础 + 华科培养方案 + 研究生研究实验</span>
           <h2>按课程找到实验，<br>知道下一步做什么。</h2>
-          <p>先按年级或课程找实验，再看原理、器材、操作和观察重点。课程里没有写细的地方，也能从这里补上；有自己的测量数据时，可以继续整理成报告草稿。</p>
+          <p>先按年级、培养层次或课程找实验，再看原理、器材、操作和观察重点。本科阶段打基础，研究生阶段进入超快光学、量子光子学、微纳器件和智能仪器等研究训练。</p>
           <div class="hero-actions">
             <button class="primary-button" id="browse-catalog">按课程找实验</button>
             <button class="ghost-button" id="launch-current">先看一个演示</button>
@@ -186,7 +207,7 @@
           <div class="system-center">
             <span>实验助手</span>
             <strong>LAB</strong>
-            <small>大一到大四</small>
+            <small>本科到研究生</small>
           </div>
           <div class="system-node node-1"><i></i><span>物理光学</span></div>
           <div class="system-node node-2"><i></i><span>模拟电路</span></div>
@@ -201,6 +222,82 @@
             <path d="M260 70v70M260 300v70M110 220h80M330 220h80M154 141l58 42M366 257l-58-42M366 141l-58 42M154 299l58-42"></path>
           </svg>
         </div>
+      </section>
+
+      <section class="morning-checkin" id="morning-checkin" aria-labelledby="morning-title">
+        <div class="morning-sky" aria-hidden="true">
+          <i class="morning-ray ray-one"></i>
+          <i class="morning-ray ray-two"></i>
+          <i class="morning-ray ray-three"></i>
+          <span class="morning-sun"></span>
+          <span class="morning-horizon"></span>
+        </div>
+        <div class="morning-main">
+          <span class="eyebrow">晨光科研打卡</span>
+          <p class="morning-date" id="morning-date">今天的日期</p>
+          <h2 id="morning-title">早上好，今天先推进一小步。</h2>
+          <p class="morning-copy" id="morning-copy">写下一件真正要做完的事。打卡不是任务完成率，而是给今天的研究留下一个清楚的起点。</p>
+          <form class="morning-form" id="morning-checkin-form">
+            <label class="morning-focus-field">
+              <span>今天最想推进什么？</span>
+              <input id="morning-focus" type="text" maxlength="120" placeholder="例如：完成迈克尔逊干涉第一批重复测量">
+            </label>
+            <label>
+              <span>预计投入</span>
+              <select id="morning-minutes">
+                <option value="30">30 分钟</option>
+                <option value="60" selected>1 小时</option>
+                <option value="120">2 小时</option>
+                <option value="180">3 小时</option>
+                <option value="240">4 小时以上</option>
+              </select>
+            </label>
+            <label>
+              <span>现在的心情</span>
+              <select id="morning-mood">
+                <option value="平稳">平稳</option>
+                <option value="有点紧">有点紧</option>
+                <option value="好奇">好奇</option>
+                <option value="疲惫">疲惫</option>
+                <option value="有把握">有把握</option>
+              </select>
+            </label>
+            <label class="morning-note-field">
+              <span>一句提醒自己的话</span>
+              <input id="morning-note" type="text" maxlength="120" placeholder="先核对单位和原始数据，再开始拟合">
+            </label>
+            <button class="morning-checkin-button" id="morning-checkin-button" type="submit">
+              <span class="morning-button-icon">☀</span>
+              <span id="morning-button-label">完成今日打卡</span>
+            </button>
+          </form>
+          <p class="morning-saved" id="morning-saved">今天还没有打卡</p>
+        </div>
+        <aside class="morning-side">
+          <div class="morning-streak-card">
+            <div class="morning-streak-ring" id="morning-streak-ring" style="--streak:0">
+              <strong id="morning-streak-count">0</strong>
+              <span>连续天数</span>
+            </div>
+            <div>
+              <span class="morning-side-kicker">这一周</span>
+              <div class="morning-week" id="morning-week"></div>
+              <p id="morning-week-note">从今天开始，留下一段连续的研究记录。</p>
+            </div>
+          </div>
+          <div class="morning-today-card" id="morning-today-card">
+            <span>今日研究坐标</span>
+            <strong id="morning-today-focus">还没有设定重点</strong>
+            <div class="morning-today-steps">
+              <i class="done"></i><i></i><i></i>
+            </div>
+            <small id="morning-today-meta">完成后会把记录连接到科研项目审阅。</small>
+          </div>
+          <div class="morning-recent" id="morning-recent">
+            <span>最近几天</span>
+            <div class="morning-recent-list"></div>
+          </div>
+        </aside>
       </section>
 
       <section class="research-workspace" id="research-workspace" aria-labelledby="research-title">
@@ -220,6 +317,7 @@
           <button class="active" type="button" role="tab" data-research-tab="project">项目设计</button>
           <button type="button" role="tab" data-research-tab="knowledge">文献知识库</button>
           <button type="button" role="tab" data-research-tab="analysis">科研统计</button>
+          <button type="button" role="tab" data-research-tab="tasks">自动分工</button>
           <button type="button" role="tab" data-research-tab="instrument">仪器直采</button>
           <button type="button" role="tab" data-research-tab="package">可复现导出</button>
           <button type="button" role="tab" data-research-tab="review">审阅协作</button>
@@ -556,6 +654,47 @@
           </div>
         </div>
 
+        <div class="research-panel" data-research-panel="tasks" role="tabpanel" hidden>
+          <div class="task-automation-hero research-card">
+            <div class="task-automation-copy">
+              <span class="eyebrow">自动分工装置</span>
+              <h3>让任务找到合适的人，也看清彼此依赖</h3>
+              <p>根据项目阶段、成员角色、当前实验和已有任务自动生成分工。分配结果会考虑角色匹配和工作量平衡，并用于晨光打卡的今日重点。</p>
+              <div class="task-automation-actions">
+                <button class="primary-button compact" id="auto-assign-tasks" type="button">自动生成分工</button>
+                <button class="secondary-button small" id="reshuffle-task-assignments" type="button">重新平衡</button>
+                <button class="secondary-button small" id="export-task-csv" type="button">导出任务 CSV</button>
+              </div>
+            </div>
+            <div class="task-flow-visual" id="task-flow-visual" aria-label="任务依赖关系图">
+              <div class="task-flow-orbit orbit-one"></div>
+              <div class="task-flow-orbit orbit-two"></div>
+              <svg class="task-flow-lines" viewBox="0 0 500 280" aria-hidden="true">
+                <path d="M132 58 C205 82 210 112 250 140"></path>
+                <path d="M385 84 C336 102 314 118 250 140"></path>
+                <path d="M250 140 C285 183 323 211 382 223"></path>
+                <path d="M250 140 C207 183 164 211 118 220"></path>
+                <path class="return-path" d="M118 220 C42 164 56 74 132 58"></path>
+              </svg>
+              <div class="task-flow-core"><span>RESEARCH</span><strong>FLOW</strong></div>
+              <div class="task-flow-node node-plan"><i></i><span>问题与方案</span></div>
+              <div class="task-flow-node node-data"><i></i><span>实验与数据</span></div>
+              <div class="task-flow-node node-analysis"><i></i><span>统计与图表</span></div>
+              <div class="task-flow-node node-writing"><i></i><span>报告与论文</span></div>
+            </div>
+          </div>
+          <div class="task-summary-grid">
+            <div><span>任务总数</span><strong id="task-total-count">0</strong></div>
+            <div><span>待完成</span><strong id="task-open-count">0</strong></div>
+            <div><span>参与成员</span><strong id="task-member-count">0</strong></div>
+            <div><span>工作量偏差</span><strong id="task-balance-score">—</strong></div>
+          </div>
+          <div class="task-board" id="task-board">
+            <div class="research-empty-state"><strong>还没有自动分工</strong><span>先在“审阅协作”里添加成员，或者直接生成一组默认角色任务。</span></div>
+          </div>
+          <p class="research-field-note" id="task-automation-note">自动分工使用本地算法，不会把成员信息发送到服务器。</p>
+        </div>
+
         <div class="research-panel" data-research-panel="instrument" role="tabpanel" hidden>
           <div class="research-instrument-layout">
             <article class="research-card">
@@ -697,6 +836,13 @@
                 <span class="research-soft-tag" id="ai-service-status">本地模式</span>
               </div>
               <div class="research-service-form">
+                <label class="research-field"><span>服务提供方</span><select id="ai-provider">
+                  <option value="local">本地规则模式</option>
+                  <option value="deepseek-chat">DeepSeek Chat</option>
+                  <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+                  <option value="openai-compatible">OpenAI 兼容服务</option>
+                  <option value="custom">自定义代理</option>
+                </select></label>
                 <label class="research-field research-field-wide"><span>OpenAI 兼容代理地址</span><input id="ai-endpoint" type="url" placeholder="https://your-worker.example.com/v1/chat/completions"></label>
                 <label class="research-field"><span>模型名称</span><input id="ai-model" type="text" placeholder="例如 gpt-4.1-mini"></label>
                 <label class="research-field"><span>代理访问令牌（可选）</span><input id="ai-token" type="password" autocomplete="off" placeholder="推荐把真实模型密钥放在代理服务中"></label>
@@ -743,10 +889,10 @@
       <section class="curriculum-overview">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">四年的课程顺序</span>
-            <h2>四年大概会学什么</h2>
+            <span class="eyebrow">从基础课到研究训练</span>
+            <h2>本科和研究生会做什么</h2>
           </div>
-          <p>先认识测量和电路，再学光学、信号与系统，最后做综合设计和毕业实践。</p>
+          <p>本科先认识测量、电路和光学，再进入系统设计；研究生阶段进一步做精密测量、量子光子学、微纳器件和智能实验平台。</p>
         </div>
         <div class="year-overview-grid" id="year-overview"></div>
       </section>
@@ -773,6 +919,7 @@
             <button data-year="2">大二</button>
             <button data-year="3">大三</button>
             <button data-year="4">大四</button>
+            <button data-year="graduate">研究生</button>
             <button data-year="hust">华科必修</button>
             <button data-year="electrical">华科电学</button>
           </div>
@@ -1388,7 +1535,7 @@
       </section>
 
       <footer class="advanced-footer">
-        <span>OptiLab · 光电与电子信息本科实验助手</span>
+        <span>OptiLab · 光电与电子信息本科—研究生实验与科研助手</span>
         <span>实验内容会继续补充；具体安排仍以课程指导书和任课教师要求为准</span>
       </footer>
     </main>
@@ -1399,6 +1546,7 @@
   <script src="principles.js"></script>
   <script src="hust.js"></script>
   <script src="electrical.js"></script>
+  <script src="graduate.js"></script>
   <script src="optilab_equipment.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
@@ -1406,5 +1554,6 @@
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js"></script>
   <script src="research_advanced.js"></script>
+  <script src="experience_enhancements.js"></script>
 </body>
 </html>

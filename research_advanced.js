@@ -9,6 +9,18 @@
   const CLOUD_CONFIG_KEY = "optilab_cloud_sync_config_v1";
   const AI_TOKEN_KEY = "optilab_ai_token";
   const CLOUD_TOKEN_KEY = "optilab_cloud_token";
+  const AI_PROVIDERS = {
+    "deepseek-chat": {
+      label: "DeepSeek Chat",
+      endpoint: "https://api.deepseek.com/chat/completions",
+      model: "deepseek-chat"
+    },
+    "deepseek-reasoner": {
+      label: "DeepSeek Reasoner",
+      endpoint: "https://api.deepseek.com/chat/completions",
+      model: "deepseek-reasoner"
+    }
+  };
 
   const UNIT_GROUPS = {
     length: {
@@ -131,12 +143,14 @@
   /* AI proxy */
   function loadAiConfig() {
     const config = localConfig(AI_CONFIG_KEY, {
+      provider: "local",
       endpoint: "",
       model: "",
       temperature: 0.2,
       maxTokens: 1800,
       systemPrompt: "你是一名谨慎的光电与电子信息科研助手。只根据提供的项目、数据和文献证据给出建议，不虚构实验数据、文献结论或引用。"
     });
+    $("#ai-provider").value = config.provider || "local";
     $("#ai-endpoint").value = config.endpoint || "";
     $("#ai-model").value = config.model || "";
     $("#ai-temperature").value = config.temperature ?? 0.2;
@@ -149,6 +163,7 @@
   function readAiConfig() {
     return {
       endpoint: $("#ai-endpoint").value.trim(),
+      provider: $("#ai-provider").value,
       model: $("#ai-model").value.trim(),
       token: $("#ai-token").value.trim(),
       temperature: Number($("#ai-temperature").value) || 0,
@@ -160,6 +175,7 @@
   function saveAiConfig() {
     const config = readAiConfig();
     saveLocalConfig(AI_CONFIG_KEY, {
+      provider: config.provider,
       endpoint: config.endpoint,
       model: config.model,
       temperature: config.temperature,
@@ -176,7 +192,10 @@
     const config = readAiConfig();
     const status = $("#ai-service-status");
     if (!status) return;
-    status.textContent = config.endpoint ? (config.model ? `代理 · ${config.model}` : "代理已配置") : "本地模式";
+    const providerLabel = AI_PROVIDERS[config.provider]?.label;
+    status.textContent = config.endpoint
+      ? (providerLabel || config.model ? `${providerLabel || "AI"} · ${config.model || "代理"}` : "代理已配置")
+      : "本地模式";
     status.classList.toggle("ready", Boolean(config.endpoint));
   }
 
@@ -197,6 +216,7 @@
           messages,
           temperature: options.temperature ?? config.temperature,
           max_tokens: options.maxTokens || config.maxTokens,
+          provider: config.provider,
           stream: false
         }),
         signal: controller.signal
@@ -210,6 +230,7 @@
       }
       if (!response.ok) throw new Error(data.error?.message || data.message || `AI 服务返回 ${response.status}`);
       return data.choices?.[0]?.message?.content
+        || data.choices?.[0]?.message?.reasoning_content
         || data.output_text
         || data.response
         || data.answer
@@ -1481,6 +1502,18 @@ ${lines.join("\n\n")}
     $("#ai-test-service").addEventListener("click", testAiService);
     $("#ai-generate-review").addEventListener("click", aiReviewProject);
     ["#ai-endpoint", "#ai-model"].forEach((selector) => $(selector).addEventListener("input", updateAiStatus));
+    $("#ai-provider").addEventListener("change", () => {
+      const provider = $("#ai-provider").value;
+      const preset = AI_PROVIDERS[provider];
+      if (provider === "local") {
+        $("#ai-endpoint").value = "";
+        $("#ai-model").value = "";
+      } else if (preset) {
+        $("#ai-endpoint").value = preset.endpoint;
+        $("#ai-model").value = preset.model;
+      }
+      updateAiStatus();
+    });
   }
 
   function setupCloudEvents() {
