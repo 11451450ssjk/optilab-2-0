@@ -3963,6 +3963,25 @@ function setupNavigation() {
 function setupControls() {
   window.OptilabPanorama?.init(labCanvas);
   window.OptilabPanorama3D?.init(lab3dCanvas);
+  const guideToggle = document.getElementById("guide-panel-toggle");
+  const guidePanel = document.getElementById("lab-guide-panel");
+  const labGrid = document.getElementById("lab-stage-card");
+  let guideCollapsed = false;
+  try {
+    guideCollapsed = localStorage.getItem("optilab-guide-collapsed") === "1";
+  } catch {
+    guideCollapsed = false;
+  }
+  const syncGuidePanel = (threeD) => {
+    if (guideToggle) {
+      guideToggle.hidden = !threeD;
+      guideToggle.textContent = guideCollapsed ? "显示指导" : "隐藏指导";
+      guideToggle.setAttribute("aria-expanded", String(!guideCollapsed));
+      guideToggle.title = guideCollapsed ? "展开右侧实验指导面板" : "折叠右侧实验指导面板";
+    }
+    if (labGrid) labGrid.classList.toggle("guide-collapsed", Boolean(threeD && guideCollapsed));
+    if (guidePanel) guidePanel.setAttribute("aria-hidden", String(Boolean(threeD && guideCollapsed)));
+  };
   const syncOverallMode = (mode) => {
     const overall = mode === "overall";
     const spatial = overall || mode === "3d";
@@ -3979,8 +3998,20 @@ function setupControls() {
     if (loading && !threeD) loading.hidden = true;
     const overlay = document.getElementById("lab-3d-overlay");
     if (overlay) overlay.hidden = !threeD;
+    syncGuidePanel(threeD);
   };
   syncOverallMode(state.labMode);
+  guideToggle?.addEventListener("click", () => {
+    guideCollapsed = !guideCollapsed;
+    try {
+      localStorage.setItem("optilab-guide-collapsed", guideCollapsed ? "1" : "0");
+    } catch {
+      // Browsers can disable local storage in private or restricted contexts.
+    }
+    syncOverallMode(state.labMode);
+    window.dispatchEvent(new Event("resize"));
+    drawLabFrame(performance.now());
+  });
   primaryControl.addEventListener("input", (event) => {
     state.primary = Number(event.target.value);
     updateControlReadouts();

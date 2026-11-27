@@ -878,6 +878,7 @@
           </div>
           <div class="lab-heading-actions">
             <button class="secondary-button" id="reset-lab">恢复默认参数</button>
+            <button class="secondary-button" id="guide-panel-toggle" type="button" aria-controls="lab-guide-panel" aria-expanded="true" hidden>隐藏指导</button>
             <button class="primary-button compact" id="fullscreen-lab">全屏演示</button>
           </div>
         </div>
@@ -1014,7 +1015,7 @@
             </div>
           </article>
 
-          <aside class="lab-info-panel">
+          <aside class="lab-info-panel" id="lab-guide-panel">
             <div class="lab-info-block">
               <span class="info-kicker">一句话说明</span>
               <h3>这个实验在做什么</h3>

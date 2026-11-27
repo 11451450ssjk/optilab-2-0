@@ -872,6 +872,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 13px;
+  transition: grid-template-columns 220ms ease;
+}
+
+.advanced-lab-grid.guide-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.advanced-lab-grid.guide-collapsed .lab-info-panel {
+  display: none !important;
+}
+
+.advanced-lab-grid.guide-collapsed .lab-stage-panel {
+  grid-column: 1 / -1;
+}
+
+#guide-panel-toggle[hidden] {
+  display: none !important;
 }
 
 .lab-stage-panel,
@@ -1160,6 +1177,7 @@
 }
 
 .lab-info-panel {
+  min-width: 0;
   padding: 20px;
   display: flex;
   flex-direction: column;
