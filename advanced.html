@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-assembly-demo">
+  <link rel="stylesheet" href="experience.css?v=20261128-assembly-clear-view">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -918,18 +918,6 @@
                   <button type="button" data-3d-view="top">俯视</button>
                   <button type="button" data-3d-view="focus">器材特写</button>
                 </div>
-                <div class="lab-3d-autotune-hud" id="lab-3d-autotune-hud" hidden>
-                  <div class="lab-3d-autotune-head">
-                    <div>
-                      <span id="lab-3d-autotune-phase">自动调试 · 批次 1 / 3</span>
-                      <strong id="lab-3d-autotune-headline">正在同步器材位置与工作参数</strong>
-                    </div>
-                    <button type="button" id="lab-3d-autotune-stop">停止</button>
-                  </div>
-                  <div class="lab-3d-autotune-devices" id="lab-3d-autotune-devices"></div>
-                  <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
-                  <small>逐个摆放：每次只处理 1 个器件，完成后进入下一个</small>
-                </div>
                 <div class="lab-3d-live-monitor" id="lab-3d-live-monitor">
                   <div class="lab-3d-live-head">
                     <div>
@@ -1047,6 +1035,18 @@
                 <span><i class="legend-green"></i> 相干光</span>
                 <span><i class="legend-amber"></i> 测量信号</span>
               </div>
+            </div>
+            <div class="lab-3d-autotune-hud" id="lab-3d-autotune-hud" hidden>
+              <div class="lab-3d-autotune-head">
+                <div>
+                  <span id="lab-3d-autotune-phase">自动调试 · 批次 1 / 3</span>
+                  <strong id="lab-3d-autotune-headline">正在同步器材位置与工作参数</strong>
+                </div>
+                <button type="button" id="lab-3d-autotune-stop">停止</button>
+              </div>
+              <div class="lab-3d-autotune-devices" id="lab-3d-autotune-devices"></div>
+              <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
+              <small>逐个摆放：每次只处理 1 个器件，完成后进入下一个</small>
             </div>
             <div class="panorama-toolbar" id="panorama-toolbar">
               <div class="panorama-status">
@@ -1735,7 +1735,7 @@
   <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
   <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
   <script src="lab_panorama.js?v=20261128-smooth-autotune"></script>
-  <script src="lab_panorama_3d.js?v=20261128-assembly-demo"></script>
+  <script src="lab_panorama_3d.js?v=20261128-assembly-clear-view"></script>
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>

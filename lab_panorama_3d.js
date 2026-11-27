@@ -42,6 +42,7 @@
     processSteps: [],
     processStep: 0,
     processCollapsed: false,
+    processCollapsedBeforeAssembly: null,
     autoTour: false,
     autoTourAt: 0,
     autoTune: null,
@@ -1898,7 +1899,9 @@
     });
     state.deviceGroups.clear();
     state.proceduralGroups.clear();
+    const wasAssembling = Boolean(state.autoTune);
     state.autoTune = null;
+    if (wasAssembling) leaveAssemblyPresentation();
     state.autoTuneBadges.clear();
     if (state.assemblyShelf) state.assemblyShelf.visible = false;
     const autoTuneHud = $("#lab-3d-autotune-hud");
@@ -2338,12 +2341,26 @@
     const panel = $("#lab-3d-process");
     const reopen = $("#lab-3d-process-reopen");
     const reopenCount = $("#lab-3d-process-reopen-count");
-    if (panel) panel.hidden = state.processCollapsed;
-    if (reopen) reopen.hidden = !state.processCollapsed || !state.active;
+    if (panel) panel.hidden = state.processCollapsed || Boolean(state.autoTune);
+    if (reopen) reopen.hidden = !state.processCollapsed || Boolean(state.autoTune) || !state.active;
     if (reopenCount) {
       reopenCount.textContent =
         `${String(state.processStep + 1).padStart(2, "0")} / ${String(state.processSteps.length || 0).padStart(2, "0")}`;
     }
+  }
+
+  function enterAssemblyPresentation() {
+    state.processCollapsedBeforeAssembly = state.processCollapsed;
+    state.processCollapsed = true;
+    syncProcessCollapse();
+  }
+
+  function leaveAssemblyPresentation() {
+    if (typeof state.processCollapsedBeforeAssembly === "boolean") {
+      state.processCollapsed = state.processCollapsedBeforeAssembly;
+    }
+    state.processCollapsedBeforeAssembly = null;
+    syncProcessCollapse();
   }
 
   function setProcessStep(index, selectDevice = true) {
@@ -3071,6 +3088,7 @@
       fromStates: new Map(),
       targetControls: new Map()
     };
+    enterAssemblyPresentation();
     state.dragGroup = null;
     state.orbit = null;
     setViewPreset("overview");
@@ -3286,6 +3304,7 @@
     if (!state.autoTune) return;
     state.presetInfo.devices.forEach((device) => applyDeviceControls(device.id, false));
     state.autoTune = null;
+    leaveAssemblyPresentation();
     removeAutoTuneBadges();
     rebuildConnections();
     updateHud();
@@ -4081,6 +4100,7 @@
       hideTooltip();
       closeInspector();
       state.autoTune = null;
+      leaveAssemblyPresentation();
       removeAutoTuneBadges();
       if (state.assemblyShelf) state.assemblyShelf.visible = false;
       const hud = $("#lab-3d-autotune-hud");
@@ -4096,6 +4116,7 @@
 
   function resetLayout() {
     state.autoTune = null;
+    leaveAssemblyPresentation();
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
     if (state.assemblyShelf) state.assemblyShelf.visible = false;
