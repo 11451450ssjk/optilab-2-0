@@ -442,7 +442,7 @@ const state = {
   autoScan: false,
   phase: 0,
   lastFrame: 0,
-  labMode: "model",
+  labMode: "overall",
   speed: 1,
   annotations: true,
   parsed: null,
@@ -844,6 +844,24 @@ function drawBeam(context, x1, y1, x2, y2, color, time, alpha = 1, dotted = true
 function drawLabFrame(time) {
   const { width, height } = setCanvasResolution(labCanvas);
   labContext.clearRect(0, 0, width, height);
+  if (state.labMode === "overall" && window.OptilabPanorama) {
+    window.OptilabPanorama.init(labCanvas);
+    const experiment = currentExperiment();
+    const control = controlConfig(experiment);
+    const beamColor = experiment.primaryUnit === "nm"
+      ? wavelengthToRgb(clamp(state.primary, 380, 780))
+      : wavelengthToRgb(632);
+    window.OptilabPanorama.draw(labContext, width, height, time, {
+      primary: state.primary,
+      secondary: state.secondary,
+      primaryUnit: control.primary.unit,
+      secondaryUnit: control.secondary.unit,
+      experimentName: experiment.name,
+      annotations: state.annotations,
+      beamColor
+    });
+    return;
+  }
   const gradient = labContext.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, "#0c1e16");
   gradient.addColorStop(0.58, "#0e2118");
@@ -3931,6 +3949,16 @@ function setupNavigation() {
 }
 
 function setupControls() {
+  window.OptilabPanorama?.init(labCanvas);
+  const syncOverallMode = (mode) => {
+    const overall = mode === "overall";
+    labCanvas.classList.toggle("overall-canvas", overall);
+    document.querySelector(".advanced-canvas-wrap")?.classList.toggle("overall-mode", overall);
+    const toolbar = document.getElementById("panorama-toolbar");
+    if (toolbar) toolbar.hidden = !overall;
+    window.OptilabPanorama?.setActive(overall);
+  };
+  syncOverallMode(state.labMode);
   primaryControl.addEventListener("input", (event) => {
     state.primary = Number(event.target.value);
     updateControlReadouts();
@@ -3966,11 +3994,15 @@ function setupControls() {
   document.querySelectorAll("[data-preset]").forEach((button) => {
     button.addEventListener("click", () => setPreset(button.dataset.preset));
   });
-  document.getElementById("reset-lab").addEventListener("click", () => setPreset("typical"));
+  document.getElementById("reset-lab").addEventListener("click", () => {
+    setPreset("typical");
+    window.OptilabPanorama?.resetLayout();
+  });
   document.querySelectorAll("[data-lab-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.labMode = button.dataset.labMode;
       document.querySelectorAll("[data-lab-mode]").forEach((item) => item.classList.toggle("active", item === button));
+      syncOverallMode(state.labMode);
       drawLabFrame(performance.now());
     });
   });

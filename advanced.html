@@ -886,25 +886,44 @@
           <article class="lab-stage-panel">
             <div class="lab-stage-topbar">
               <div class="lab-tabs">
-                <button class="active" data-lab-mode="model">实验画面</button>
+                <button class="active" data-lab-mode="overall">全景实验台</button>
+                <button data-lab-mode="model">单项原理</button>
                 <button data-lab-mode="principle">原理图</button>
                 <button data-lab-mode="measure">测量视图</button>
               </div>
               <div class="lab-live-status">
-                <span><i></i> 画面会随参数变化</span>
+                <span><i></i> 器件可拖动，光路与电路实时联动</span>
                 <button id="sim-speed" title="切换动画速度">1.0×</button>
                 <button id="annotation-toggle" class="active" title="显示或隐藏场景标注">标注</button>
                 <button id="lab-pause">暂停</button>
               </div>
             </div>
             <div class="advanced-canvas-wrap">
-              <canvas id="lab-canvas" aria-label="可调节参数的实验演示"></canvas>
+              <canvas id="lab-canvas" class="overall-canvas" aria-label="可拖动全部器件的真实实验场景"></canvas>
               <div class="canvas-meta meta-top-left" id="lab-badge">INTERFEROMETER</div>
               <div class="canvas-meta meta-top-right" id="lab-readout">λ = 632 nm</div>
               <div class="canvas-legend" id="lab-legend">
                 <span><i class="legend-green"></i> 相干光</span>
                 <span><i class="legend-amber"></i> 测量信号</span>
               </div>
+            </div>
+            <div class="panorama-toolbar" id="panorama-toolbar">
+              <div class="panorama-status">
+                <span>综合场景状态</span>
+                <strong id="panorama-status">正在建立实验场景</strong>
+              </div>
+              <div class="panorama-metrics">
+                <div><span>光路对准</span><strong id="panorama-alignment">—</strong></div>
+                <div><span>探测器功率</span><strong id="panorama-power">—</strong></div>
+                <div><span>信号频率</span><strong id="panorama-frequency">—</strong></div>
+                <div><span>近似信噪比</span><strong id="panorama-snr">—</strong></div>
+              </div>
+              <div class="panorama-actions">
+                <span id="panorama-selected">正在观察：可调激光器</span>
+                <button class="secondary-button small" id="panorama-reset-layout" type="button">复位器件</button>
+                <button class="secondary-button small active" id="panorama-toggle-cables" type="button">电气连线：开</button>
+              </div>
+              <div class="panorama-device-list" id="panorama-device-list" aria-label="全景实验台器件"></div>
             </div>
             <div class="simulation-story">
               <div>
@@ -1479,6 +1498,7 @@
   <script src="hust_exact.js"></script>
   <script src="graduate.js"></script>
   <script src="dedupe_catalog.js"></script>
+  <script src="lab_panorama.js"></script>
   <script src="optilab_equipment.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
