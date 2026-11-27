@@ -572,6 +572,14 @@
         ? `观测结果在当前数据范围内呈较强线性关系，拟合斜率为 ${bridge.compactNumber(analysis.slope)} ± ${bridge.compactNumber(analysis.slopeStandardError)}。`
         : `当前数据未呈现稳定的单一线性关系，可能存在非线性区段、周期波动或测量噪声。`;
     const procedure = principle.steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+    const physicsTrace = report.physicsSnapshot
+      ? `计算引擎：${report.physicsSnapshot.engineVersion}
+模型路径：${report.physicsSnapshot.sim}
+基础关系：${report.physicsSnapshot.formula}
+参数推演：${report.physicsSnapshot.derived?.value || "不适用"}
+模型假设：${(report.physicsSnapshot.derived?.assumptions || []).join("；") || "以课程指导书为准"}
+输入哈希：${report.physicsSnapshot.inputHash}`
+      : "该报告未保存统一计算快照；本文只使用报告中的统计量，不补充不存在的模型结果。";
     const extendedSections = depth === "extended" ? `
 ## 6. 扩展讨论与局限
 
@@ -648,6 +656,10 @@ ${principle.apparatus}
 
 ${report.parameters ? `- ${report.parameters.primaryLabel}：${report.parameters.primaryValue} ${report.parameters.primaryUnit}
 - ${report.parameters.secondaryLabel}：${report.parameters.secondaryValue} ${report.parameters.secondaryUnit}` : "- 未保存模型参数。"}
+
+统一计算链记录：
+
+${physicsTrace}
 
 ### 3.3 实验步骤
 
@@ -815,7 +827,23 @@ ${knowledgeEvidence.length
       results: state.results,
       citations: state.citations,
       lastPaper: state.lastPaper
-    })
+    }),
+    setExternalPaper: (paper, title = "", isAi = false) => {
+      state.lastPaper = paper;
+      state.lastPaperTitle = title;
+      const preview = document.getElementById("paper-preview");
+      preview.textContent = paper;
+      preview.classList.remove("paper-generated");
+      preview.classList.toggle("paper-ai-generated", Boolean(isAi));
+      void preview.offsetWidth;
+      preview.classList.add("paper-generated");
+      document.getElementById("paper-word-count").textContent = `${paper.replace(/\s/g, "").length} 字`;
+      const badge = document.getElementById("paper-ai-badge");
+      if (badge) {
+        badge.hidden = !isAi;
+        badge.textContent = isAi ? "AI 辅助草稿 · 待审核" : "本地结构化草稿";
+      }
+    }
   };
 
   initialize();

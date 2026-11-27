@@ -946,6 +946,18 @@
                   <div class="lab-3d-inspector-actions">
                     <button type="button" id="lab-3d-inspector-focus">查看器材特写</button>
                   </div>
+                  <div class="lab-3d-model-asset">
+                    <div>
+                      <span>GLTF / GLB 模型资产</span>
+                      <small id="lab-3d-model-status">自动 LOD · 程序化模型</small>
+                    </div>
+                    <div class="lab-3d-model-actions">
+                      <button type="button" id="lab-3d-model-import">导入高精度模型</button>
+                      <button type="button" id="lab-3d-model-export">导出当前 GLB</button>
+                      <button type="button" id="lab-3d-model-reset">恢复内置</button>
+                    </div>
+                    <input id="lab-3d-model-file" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden>
+                  </div>
                   <small class="lab-3d-inspector-foot">教学仿真参数 · 实物规格以实验室铭牌为准</small>
                 </aside>
                 <div class="lab-3d-process" id="lab-3d-process">
@@ -1141,7 +1153,10 @@
               <h3>需要哪些器材和条件</h3>
               <p id="equipment-subtitle">按当前实验显示所需器材、环境条件与初学者提示</p>
             </div>
-            <span class="equipment-badge">第一次做也能看懂</span>
+            <div class="equipment-heading-actions">
+              <span class="equipment-badge">第一次做也能看懂</span>
+              <button class="secondary-button small" id="open-equipment-library" type="button">器材参数库</button>
+            </div>
           </div>
           <div class="equipment-main-grid">
             <article class="equipment-card">
@@ -1510,6 +1525,13 @@
               <div><span>引用文献</span><strong id="paper-citation-count">0</strong></div>
             </div>
             <button class="primary-button paper-generate-button" id="generate-paper">生成论文初稿</button>
+            <button class="secondary-button paper-ai-button" id="generate-ai-paper" type="button">AI 增强初稿并核验引用</button>
+            <div class="paper-ai-workflow" id="paper-ai-workflow" aria-label="AI 写作工作流">
+              <span data-ai-stage="evidence">汇总证据</span>
+              <span data-ai-stage="compute">统一计算</span>
+              <span data-ai-stage="draft">生成草稿</span>
+              <span data-ai-stage="verify">引用核验</span>
+            </div>
             <p class="paper-config-note">这里得到的是草稿，不会替你编造实验结果。文献里的具体结论，仍要读完原文后核实和改写。</p>
           </aside>
 
@@ -1517,7 +1539,10 @@
             <div class="paper-toolbar">
               <div>
                 <span class="eyebrow">草稿预览</span>
-                <strong id="paper-word-count">0 字</strong>
+                <div class="paper-preview-meta">
+                  <strong id="paper-word-count">0 字</strong>
+                  <span class="paper-ai-badge" id="paper-ai-badge" hidden>AI 辅助草稿 · 待审核</span>
+                </div>
               </div>
               <div class="report-actions">
                 <button class="icon-button" id="copy-paper">复制</button>
@@ -1583,6 +1608,36 @@
     </main>
   </div>
 
+  <section class="equipment-library-modal" id="equipment-library-modal" hidden aria-labelledby="equipment-library-title">
+    <div class="equipment-library-backdrop" data-equipment-library-close></div>
+    <div class="equipment-library-dialog" role="dialog" aria-modal="true">
+      <div class="equipment-library-head">
+        <div>
+          <span class="eyebrow">独立器材参数库</span>
+          <h3 id="equipment-library-title">编辑、导入和导出现有器材参数</h3>
+        </div>
+        <button class="equipment-library-close" type="button" data-equipment-library-close aria-label="关闭器材参数库">×</button>
+      </div>
+      <div class="equipment-library-toolbar">
+        <label>
+          <span>实验模型</span>
+          <select id="equipment-library-profile"></select>
+        </label>
+        <span id="equipment-library-status" role="status">当前使用内置参数</span>
+      </div>
+      <textarea id="equipment-library-editor" spellcheck="false" aria-label="器材参数 JSON 编辑器"></textarea>
+      <div class="equipment-library-actions">
+        <button class="primary-button compact" id="equipment-library-save" type="button">保存并应用</button>
+        <button class="secondary-button small" id="equipment-library-export" type="button">导出 JSON</button>
+        <button class="secondary-button small" id="equipment-library-import" type="button">导入 JSON</button>
+        <button class="secondary-button small" id="equipment-library-reset-one" type="button">恢复当前</button>
+        <button class="secondary-button small" id="equipment-library-reset-all" type="button">清除全部自定义</button>
+        <input id="equipment-library-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p class="equipment-library-note">参数保存在当前浏览器；导出后可作为课程或实验室统一的器材参数模板。具体实物仍以铭牌和校准证书为准。</p>
+    </div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="catalog.js"></script>
   <script src="principles.js"></script>
@@ -1591,15 +1646,19 @@
   <script src="hust_exact.js"></script>
   <script src="graduate.js"></script>
   <script src="dedupe_catalog.js"></script>
+  <script src="optilab_physics.js"></script>
   <script src="lab_panorama.js"></script>
   <script src="lab_panorama_3d.js"></script>
   <script src="optilab_equipment.js"></script>
+  <script src="equipment_store.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
   <script src="research.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js"></script>
   <script src="research_advanced.js"></script>
+  <script src="paper_ai_tools.js"></script>
+  <script src="equipment_library.js"></script>
   <script src="experience_enhancements.js"></script>
 </body>
 </html>

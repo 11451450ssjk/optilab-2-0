@@ -18,6 +18,7 @@
     dragGroup: null,
     orbit: null,
     deviceGroups: new Map(),
+    proceduralGroups: new Map(),
     initialPositions: new Map(),
     dynamicTextures: [],
     selectionHelper: null,
@@ -41,6 +42,9 @@
     processCollapsed: false,
     autoTour: false,
     autoTourAt: 0,
+    gltfLoader: null,
+    gltfExporter: null,
+    modelAssetStatus: "正在检查模型资产",
     cameraState: {
       radius: 8.35,
       theta: Math.PI * 0.38,
@@ -345,6 +349,11 @@
     const safePrimary = Number.isFinite(primary) ? primary : 0;
     const safeSecondary = Number.isFinite(secondary) ? secondary : 0;
     const experimentName = String(config.experiment?.name || state.presetInfo?.name || "实验");
+    const unified = window.OptilabPhysics?.calculate(
+      config.experiment || { sim: "measurement" },
+      safePrimary,
+      safeSecondary
+    );
     const unitText = (value, unit, digits = 2) => `${formatNumber(value, digits)}${unit ? ` ${unit}` : ""}`;
     const primaryIsVoltage = /v(olt)?|伏/i.test(`${config.primaryLabel || ""} ${primaryUnit}`);
     const secondaryIsVoltage = /v(olt)?|伏/i.test(`${config.secondaryLabel || ""} ${secondaryUnit}`);
@@ -405,7 +414,10 @@
       peakWavelengthText: unitText(peakWavelength, "nm", 1),
       exposureText: unitText(exposureMs, "ms", exposureMs < 1 ? 2 : 1),
       gainText: `${formatNumber(gain, 1)}×`,
-      snrText: unitText(state.metrics.snr, "dB", 1)
+      snrText: unitText(state.metrics.snr, "dB", 1),
+      unified,
+      unifiedValue: unified?.value || "按实验关系计算",
+      engineVersion: unified?.engineVersion || "local"
     };
   }
 
@@ -1490,6 +1502,251 @@
     });
   }
 
+  function createLowDetailProxy(device) {
+    const THREE = state.three;
+    const proxy = new THREE.Group();
+    const accent = new THREE.Color(device.accent || "#d9b474");
+    const body = addDeviceMesh(proxy, new THREE.Mesh(
+      beveledBoxGeometry(0.78, 0.42, 0.48, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: 0x26332f,
+        metalness: 0.35,
+        roughness: 0.62
+      })
+    ), device);
+    body.position.y = 0.27;
+    const marker = addDeviceMesh(proxy, new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.1, 0.02),
+      new THREE.MeshBasicMaterial({ color: accent })
+    ), device);
+    marker.position.set(0, 0.29, 0.251);
+    const label = makeLabelSprite(device.label, device.accent || "#d9b474");
+    label.scale.set(1.3, 0.245, 1);
+    label.position.set(0, 0.02, 0.58);
+    label.userData.deviceId = device.id;
+    proxy.add(label);
+    return proxy;
+  }
+
+  function createDeviceLOD(device, detail) {
+    const THREE = state.three;
+    const lod = new THREE.LOD();
+    const position = detail.position.clone();
+    detail.position.set(0, 0, 0);
+    lod.position.copy(position);
+    lod.userData.deviceId = device.id;
+    lod.userData.kind = deviceKind(device);
+    lod.addLevel(detail, 0);
+    lod.addLevel(createLowDetailProxy(device), 12);
+    state.proceduralGroups.set(device.id, detail);
+    return lod;
+  }
+
+  function openModelAssetDb() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error("当前浏览器不支持本地模型资产存储"));
+        return;
+      }
+      const request = indexedDB.open("optilab_model_assets_v1", 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("models")) {
+          db.createObjectStore("models", { keyPath: "kind" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("无法打开模型资产库"));
+    });
+  }
+
+  async function readStoredModel(kind) {
+    try {
+      const db = await openModelAssetDb();
+      return await new Promise((resolve, reject) => {
+        const transaction = db.transaction("models", "readonly");
+        const request = transaction.objectStore("models").get(kind);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function saveStoredModel(asset) {
+    const db = await openModelAssetDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("models", "readwrite");
+      transaction.objectStore("models").put(asset);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("模型保存失败"));
+    });
+  }
+
+  async function deleteStoredModel(kind) {
+    const db = await openModelAssetDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("models", "readwrite");
+      transaction.objectStore("models").delete(kind);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("模型删除失败"));
+    });
+  }
+
+  async function loadGltfLoader() {
+    if (!state.gltfLoader) {
+      const module = await import(new URL("./vendor/three/addons/loaders/GLTFLoader.js", document.baseURI).href);
+      state.gltfLoader = new module.GLTFLoader();
+    }
+    return state.gltfLoader;
+  }
+
+  function normalizeImportedModel(model, device) {
+    const THREE = state.three;
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const largest = Math.max(size.x, size.y, size.z, 0.001);
+    const scale = 1.3 / largest;
+    model.scale.multiplyScalar(scale);
+    model.updateMatrixWorld(true);
+    const scaledBounds = new THREE.Box3().setFromObject(model);
+    const scaledCenter = scaledBounds.getCenter(new THREE.Vector3());
+    model.position.x -= scaledCenter.x;
+    model.position.z -= scaledCenter.z;
+    model.position.y -= scaledBounds.min.y;
+    model.traverse((node) => {
+      if (node.isMesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+        node.userData.deviceId = device.id;
+      }
+    });
+    return model;
+  }
+
+  async function hydrateImportedModel(device, lod) {
+    const asset = await readStoredModel(deviceKind(device));
+    if (!asset || !state.deviceGroups.has(device.id) || state.deviceGroups.get(device.id) !== lod) return false;
+    try {
+      const loader = await loadGltfLoader();
+      const source = asset.type?.includes("json") && typeof asset.data === "string"
+        ? asset.data
+        : asset.data;
+      const gltf = await loader.parseAsync(source, "");
+      const wrapper = new state.three.Group();
+      const model = normalizeImportedModel(gltf.scene, device);
+      wrapper.add(model);
+      const label = makeLabelSprite(device.label, device.accent || "#d9b474");
+      label.scale.set(1.3, 0.245, 1);
+      label.position.set(0, 0.02, 0.58);
+      label.userData.deviceId = device.id;
+      wrapper.add(label);
+      const detail = state.proceduralGroups.get(device.id);
+      const detailLevel = lod.levels.find((entry) => entry.object === detail);
+      if (detailLevel) detailLevel.distance = 4.5;
+      if (lod.userData.importedModel) {
+        lod.removeLevel?.(lod.userData.importedModel);
+        lod.remove(lod.userData.importedModel);
+        disposeObject(lod.userData.importedModel);
+      }
+      lod.addLevel(wrapper, 0);
+      lod.userData.importedModel = wrapper;
+      lod.userData.modelSource = `GLB · ${asset.name}`;
+      lod.userData.modelStatus = "已加载高精度模型";
+      state.modelAssetStatus = lod.userData.modelStatus;
+      updateModelAssetStatus();
+      return true;
+    } catch (error) {
+      lod.userData.modelStatus = `模型读取失败：${error.message}`;
+      state.modelAssetStatus = lod.userData.modelStatus;
+      updateModelAssetStatus();
+      return false;
+    }
+  }
+
+  async function importModelFile(file) {
+    const id = state.inspectorId;
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    const lod = state.deviceGroups.get(id);
+    if (!device || !lod || !file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["glb", "gltf"].includes(extension)) {
+      state.modelAssetStatus = "请选择 .glb 或 .gltf 模型";
+      updateModelAssetStatus();
+      return;
+    }
+    state.modelAssetStatus = "正在读取模型…";
+    updateModelAssetStatus();
+    const data = extension === "gltf" ? await file.text() : await file.arrayBuffer();
+    await saveStoredModel({
+      kind: deviceKind(device),
+      data,
+      name: file.name,
+      type: file.type,
+      updatedAt: new Date().toISOString()
+    });
+    const loaded = await hydrateImportedModel(device, lod);
+    state.modelAssetStatus = loaded ? `已导入 ${file.name}` : state.modelAssetStatus;
+    updateModelAssetStatus();
+    updateSelectionHelper();
+  }
+
+  async function resetImportedModel() {
+    const id = state.inspectorId;
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    const lod = state.deviceGroups.get(id);
+    if (!device || !lod) return;
+    await deleteStoredModel(deviceKind(device));
+    if (lod.userData.importedModel) {
+      lod.removeLevel?.(lod.userData.importedModel);
+      lod.remove(lod.userData.importedModel);
+      disposeObject(lod.userData.importedModel);
+      delete lod.userData.importedModel;
+    }
+    const detail = state.proceduralGroups.get(device.id);
+    const detailLevel = lod.levels.find((entry) => entry.object === detail);
+    if (detailLevel) detailLevel.distance = 0;
+    lod.userData.modelSource = "OptiLab 程序化高精度模型";
+    lod.userData.modelStatus = "已恢复内置模型";
+    state.modelAssetStatus = lod.userData.modelStatus;
+    updateModelAssetStatus();
+    updateSelectionHelper();
+  }
+
+  async function exportCurrentModel() {
+    const id = state.inspectorId;
+    const detail = state.proceduralGroups.get(id);
+    if (!detail) return;
+    const module = await import(new URL("./vendor/three/addons/exporters/GLTFExporter.js", document.baseURI).href);
+    const exporter = state.gltfExporter || new module.GLTFExporter();
+    state.gltfExporter = exporter;
+    state.modelAssetStatus = "正在导出 GLB…";
+    updateModelAssetStatus();
+    const result = await new Promise((resolve, reject) => {
+      exporter.parse(detail, resolve, reject, { binary: true, onlyVisible: true });
+    });
+    const blob = new Blob([result], { type: "model/gltf-binary" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    anchor.href = url;
+    anchor.download = `${deviceKind(device || {})}-${device?.id || "model"}.glb`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+    state.modelAssetStatus = "当前模型已导出为 GLB";
+    updateModelAssetStatus();
+  }
+
+  function updateModelAssetStatus() {
+    const status = $("#lab-3d-model-status");
+    if (status) status.textContent = state.modelAssetStatus;
+  }
+
   function buildScene() {
     if (!state.ready || !state.presetInfo) return;
     const THREE = state.three;
@@ -1498,13 +1755,16 @@
       disposeObject(group);
     });
     state.deviceGroups.clear();
+    state.proceduralGroups.clear();
     state.initialPositions.clear();
     state.dynamicTextures = [];
     state.animatedObjects = [];
     state.presetInfo.devices.forEach((device) => {
-      const group = createDeviceGroup(device);
+      const detail = createDeviceGroup(device);
+      const group = createDeviceLOD(device, detail);
       state.deviceGroups.set(device.id, group);
       state.scene.add(group);
+      hydrateImportedModel(device, group);
     });
     if (!state.beamGroup) {
       state.beamGroup = new THREE.Group();
@@ -2297,8 +2557,20 @@
     };
     const alignment = optical.length ? clamp(0.91 - deviation(optical) * 0.8, 0.18, 0.98) : 0.84;
     const connectivity = electronic.length ? clamp(0.92 - deviation(electronic) * 0.95, 0.2, 0.98) : 0.74;
-    const sourceDrive = clamp(Math.abs(Number(state.config?.primary) || 1) / 20, 0.18, 1);
     const hasOptics = optical.length >= 2;
+    const hasElectronics = electronic.length >= 2;
+    const unified = window.OptilabPhysics?.computeScene(state.config?.experiment || {}, {
+      primary: state.config?.primary,
+      secondary: state.config?.secondary,
+      primaryUnit: state.config?.primaryUnit,
+      secondaryUnit: state.config?.secondaryUnit,
+      alignment,
+      connectivity,
+      hasOptics,
+      hasElectronics
+    });
+    if (unified?.metrics) return unified.metrics;
+    const sourceDrive = clamp(Math.abs(Number(state.config?.primary) || 1) / 20, 0.18, 1);
     const power = hasOptics
       ? clamp((0.8 + sourceDrive * 3.8) * alignment, 0.08, 12)
       : clamp((0.2 + sourceDrive * 5.2) * connectivity, 0.03, 26);
@@ -2314,7 +2586,7 @@
       frequency,
       snr: clamp(8 + score * 38 - (1 - alignment) * 12, 3, 58),
       hasOptics,
-      hasElectronics: electronic.length >= 2
+      hasElectronics
     };
   }
 
@@ -2399,6 +2671,7 @@
     const add = (label, value) => specs.push([label, String(value)]);
     add("结构类型", DEVICE_KIND_LABELS[kind] || "实验仪器");
     add("实验场景", display.experimentName);
+    add("统一计算引擎", display.engineVersion);
     switch (kind) {
       case "laser":
         add("工作波长", display.wavelengthText);
@@ -2687,7 +2960,7 @@
       connectionText,
       warning: warningMap[kind] || "以设备铭牌、校准证书和指导教师要求为准；异常发热、异味或读数跳变时立即停止。",
       reading: inspectorReadout(kind, display),
-      note: `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText}`,
+      note: `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText} · ${display.unifiedValue}`,
       state: /scope|analyzer|computer|daq|sensor/.test(kind) ? "SIGNAL LOCKED" :
         /power|laser|generator/.test(kind) ? "OUTPUT ON" :
           /camera|spectrometer/.test(kind) ? "ACQUIRING" : "READY"
@@ -2723,6 +2996,10 @@
     }
     panel.hidden = false;
     state.inspectorId = id;
+    const lod = state.deviceGroups.get(id);
+    state.modelAssetStatus = lod?.userData.modelStatus
+      || (lod?.userData.modelSource ? `${lod.userData.modelSource} · 自动 LOD` : "自动 LOD · 程序化模型");
+    updateModelAssetStatus();
   }
 
   function openInspector(id) {
@@ -2749,7 +3026,7 @@
     const display = liveDisplayData(device, state.config || {});
     $("#lab-3d-inspector-value") && ($("#lab-3d-inspector-value").textContent = inspectorReadout(deviceKind(device), display));
     $("#lab-3d-inspector-reading-note") && ($("#lab-3d-inspector-reading-note").textContent =
-      `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText}`
+      `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText} · ${display.unifiedValue}`
     );
   }
 
@@ -2969,6 +3246,38 @@
     $("#lab-3d-inspector-focus")?.addEventListener("click", () => {
       if (state.inspectorId) setViewPreset("focus");
     });
+    $("#lab-3d-model-import")?.addEventListener("click", () => {
+      $("#lab-3d-model-file")?.click();
+    });
+    $("#lab-3d-model-file")?.addEventListener("change", async (event) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        await importModelFile(file);
+      } catch (error) {
+        state.modelAssetStatus = `模型导入失败：${error.message}`;
+        updateModelAssetStatus();
+      } finally {
+        input.value = "";
+      }
+    });
+    $("#lab-3d-model-export")?.addEventListener("click", async () => {
+      try {
+        await exportCurrentModel();
+      } catch (error) {
+        state.modelAssetStatus = `模型导出失败：${error.message}`;
+        updateModelAssetStatus();
+      }
+    });
+    $("#lab-3d-model-reset")?.addEventListener("click", async () => {
+      try {
+        await resetImportedModel();
+      } catch (error) {
+        state.modelAssetStatus = `模型恢复失败：${error.message}`;
+        updateModelAssetStatus();
+      }
+    });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && state.inspectorId) closeInspector();
     });
@@ -2990,6 +3299,16 @@
     }),
     getDeviceKinds: () => Object.fromEntries(
       [...state.deviceGroups.entries()].map(([id, group]) => [id, group.userData.kind || "generic"])
+    ),
+    getModelState: () => Object.fromEntries(
+      [...state.deviceGroups.entries()].map(([id, lod]) => [
+        id,
+        {
+          source: lod.userData.modelSource || "程序化模型",
+          status: lod.userData.modelStatus || "自动 LOD",
+          levels: lod.levels?.map((entry) => ({ distance: entry.distance })) || []
+        }
+      ])
     ),
     getDeviceParameters(id) {
       const device = state.presetInfo?.devices.find((item) => item.id === id);

@@ -598,7 +598,8 @@ function principleInfo(experiment = currentExperiment()) {
 }
 
 function equipmentProfile(experiment = currentExperiment()) {
-  return window.OPTILAB_EQUIPMENT_PROFILES?.[experiment.sim] || {
+  return window.OptilabEquipmentStore?.getProfile(experiment.sim)
+    || window.OPTILAB_EQUIPMENT_PROFILES?.[experiment.sim] || {
     instruments: [
       { name: "实验仪器与数据采集设备", spec: "量程、精度和校准状态满足课程要求", use: "完成测量和数据采集" }
     ],
@@ -858,6 +859,7 @@ function drawLabFrame(time) {
     experimentId: experiment.id,
     experimentName: experiment.name,
     sim: experiment.sim,
+    experiment,
     annotations: state.annotations,
     beamColor
   };
@@ -2974,11 +2976,14 @@ function updateControlReadouts() {
     `${config.primary.label} ${formatControlValue(state.primary, config.primary)}`;
   const derived = calculateDerivedReading(experiment);
   document.getElementById("derived-reading").textContent = derived.value;
-  document.getElementById("derived-note").textContent = derived.note;
+  document.getElementById("derived-note").textContent =
+    `${derived.note} · 统一计算引擎 ${derived.engineVersion || "local"}`;
   updateSimulationStory();
 }
 
 function calculateDerivedReading(experiment = currentExperiment()) {
+  const unified = window.OptilabPhysics?.calculate(experiment, state.primary, state.secondary);
+  if (unified) return unified;
   const primary = state.primary;
   const secondary = state.secondary;
   switch (experiment.sim) {
@@ -3509,6 +3514,13 @@ function createReportRecord(auto = false) {
       secondaryValue: state.secondary,
       secondaryUnit: controlConfig(experiment).secondary.unit
     },
+    physicsSnapshot: window.OptilabPhysics?.snapshot(experiment, state.primary, state.secondary, {
+      primaryLabel: controlConfig(experiment).primary.label,
+      primaryUnit: controlConfig(experiment).primary.unit,
+      secondaryLabel: controlConfig(experiment).secondary.label,
+      secondaryUnit: controlConfig(experiment).secondary.unit,
+      sourceName: state.data.sourceName
+    }),
     photoInfo: state.photoInfo,
     report: ""
   };
@@ -3601,6 +3613,14 @@ function buildReportText(record) {
     ? `${record.parameters.primaryLabel}：${formatNumber(record.parameters.primaryValue, 3)} ${record.parameters.primaryUnit}
 ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondaryValue, 3)} ${record.parameters.secondaryUnit}`
     : "未保存模型参数，数据解释以导入文件为准。";
+  const physicsBlock = record.physicsSnapshot
+    ? `计算引擎：${record.physicsSnapshot.engineVersion}
+模型：${record.physicsSnapshot.sim}
+基础关系：${record.physicsSnapshot.formula}
+当前推演：${record.physicsSnapshot.derived?.value || "不适用"}
+模型假设：${(record.physicsSnapshot.derived?.assumptions || []).join("；") || "以课程指导书为准"}
+输入哈希：${record.physicsSnapshot.inputHash}`
+    : "该历史报告未保存统一计算链快照，请重新生成报告以补齐来源记录。";
   let citationItems = [];
   try {
     const storedCitations = JSON.parse(localStorage.getItem("optilab_citation_library_v1") || "[]");
@@ -3667,6 +3687,9 @@ ${principle.apparatus}
 
 本次记录对应的参数如下：
 - ${parameterText.replace(/\n/g, "\n- ")}
+
+### 4.1 统一计算链记录
+${physicsBlock}
 
 做真实实验时，还应补上仪器编号、量程、环境温度、湿度、光源功率、采集软件版本和校准日期。
 
@@ -4222,6 +4245,17 @@ window.OptilabBridge = {
   simInfo,
   principleInfo,
   getCurrentData: () => state.data,
+  getPhysicsSnapshot: () => {
+    const experiment = currentExperiment();
+    const config = controlConfig(experiment);
+    return window.OptilabPhysics?.snapshot(experiment, state.primary, state.secondary, {
+      primaryLabel: config.primary.label,
+      primaryUnit: config.primary.unit,
+      secondaryLabel: config.secondary.label,
+      secondaryUnit: config.secondary.unit,
+      sourceName: state.data?.sourceName || "interactive-model"
+    }) || null;
+  },
   loadExternalData: (text, sourceName = "仪器直采数据") => prepareParsedData(text, sourceName),
   getReports: () => state.reports,
   getActiveReport: () => activeReport(),
@@ -4229,7 +4263,8 @@ window.OptilabBridge = {
   escapeHtml,
   formatNumber,
   compactNumber,
-  renderReportHistory
+  renderReportHistory,
+  refreshEquipment: () => renderEquipmentProfile(currentExperiment())
 };
 
 function initialize() {

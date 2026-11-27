@@ -1622,6 +1622,8 @@ ${lines.join("\n\n")}
   }
 
   window.OptilabAdvanced = {
+    callAi,
+    getAiConfig: readAiConfig,
     extractTextStructure,
     knowledgeSimilarity,
     ocrPdfFile,

@@ -562,6 +562,25 @@
     const frequency = clamp(baseFrequency, 10, 250000);
     const combined = hasOptics && hasElectronics ? Math.min(alignment, connectivity) : hasOptics ? alignment : connectivity;
     const snr = clamp(7 + combined * 36 + connectivity * 6 - (1 - alignment) * 12, 3, 58);
+    const unified = window.OptilabPhysics?.computeScene({
+      sim: config.sim,
+      primaryUnit: config.primaryUnit,
+      secondaryUnit: config.secondaryUnit
+    }, {
+      primary: config.primary,
+      secondary: config.secondary,
+      alignment,
+      connectivity,
+      hasOptics,
+      hasElectronics
+    });
+    if (unified?.metrics) {
+      return {
+        ...unified.metrics,
+        opticalDevices: opticalDevices.length,
+        electronicDevices: electronicDevices.length
+      };
+    }
     return {
       alignment,
       connectivity,
