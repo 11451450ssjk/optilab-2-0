@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" id="theme-color" content="#090d10">
+  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <meta name="description" content="面向光电与电子信息本科生和研究生的实验与科研助手，包含实验原理、器材准备、操作演示、科研统计、论文草稿和自动分工。">
   <title>OptiLab | 光电与电子信息本科—研究生实验与科研助手</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="advanced.css">
+  <link rel="stylesheet" href="styles.css?v=20261128-report-cleanup">
+  <link rel="stylesheet" href="advanced.css?v=20261128-report-cleanup">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css">
+  <link rel="stylesheet" href="experience.css?v=20261128-report-cleanup">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -1431,7 +1432,10 @@
             <span class="eyebrow">整理成实验报告</span>
             <h2>报告和以前的版本</h2>
           </div>
-          <p>每份报告都会写清实验、批次、统计结果和时间，可以单独复制或下载后继续修改。</p>
+          <div class="report-heading-side">
+            <p>每份报告都会写清实验、批次、统计结果和时间，可以单独复制或下载后继续修改。</p>
+            <button class="secondary-button" id="open-report-cleanup-top" type="button" data-report-cleanup-open>清理报告历史</button>
+          </div>
         </div>
         <div class="report-studio">
           <article class="advanced-report-panel">
@@ -1461,7 +1465,7 @@
               </div>
               <div class="history-heading-actions">
                 <span id="history-count">0</span>
-                <button class="secondary-button small" id="open-report-cleanup" type="button">清理</button>
+                <button class="secondary-button small" id="open-report-cleanup" type="button" data-report-cleanup-open>清理</button>
               </div>
             </div>
             <div id="report-history-list" class="report-history-list">
@@ -1695,7 +1699,7 @@
   <script src="optilab_equipment.js"></script>
   <script src="equipment_store.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="advanced.js"></script>
+  <script src="advanced.js?v=20261128-report-cleanup"></script>
   <script src="research.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js"></script>

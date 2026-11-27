@@ -2489,6 +2489,22 @@ html[data-theme="day"] .welcome-notebook {
 }
 
 /* Report cleanup */
+.report-heading-side {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.report-heading-side p {
+  max-width: 470px;
+  text-align: right;
+}
+
+.report-heading-side .secondary-button {
+  min-height: 34px;
+}
+
 .history-heading-actions {
   display: flex;
   align-items: center;
@@ -2685,6 +2701,14 @@ html[data-theme="day"] .welcome-notebook {
   .report-cleanup-summary,
   .report-cleanup-options {
     grid-template-columns: 1fr;
+  }
+
+  .report-heading-side {
+    align-items: flex-start;
+  }
+
+  .report-heading-side p {
+    text-align: left;
   }
 }
 

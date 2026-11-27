@@ -4358,10 +4358,12 @@ function setupReportControls() {
   document.getElementById("copy-advanced-report").addEventListener("click", copyActiveReport);
   document.getElementById("download-advanced-report").addEventListener("click", downloadActiveReport);
   const cleanupModal = document.getElementById("report-cleanup-modal");
-  document.getElementById("open-report-cleanup").addEventListener("click", () => {
-    updateReportCleanupUI();
-    cleanupModal.hidden = false;
-    document.body.classList.add("report-cleanup-open");
+  document.querySelectorAll("[data-report-cleanup-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateReportCleanupUI();
+      cleanupModal.hidden = false;
+      document.body.classList.add("report-cleanup-open");
+    });
   });
   document.querySelectorAll("[data-report-cleanup-close]").forEach((button) => {
     button.addEventListener("click", () => {
