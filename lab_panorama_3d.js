@@ -60,7 +60,10 @@
   function formatNumber(value, digits = 2) {
     if (!Number.isFinite(value)) return "—";
     if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(digits)}k`;
-    return Number(value).toFixed(digits).replace(/\.?0+$/, "");
+    const formatted = Number(value).toFixed(digits);
+    return formatted.includes(".")
+      ? formatted.replace(/0+$/, "").replace(/\.$/, "")
+      : formatted;
   }
 
   function colorArrayToHex(color = [216, 172, 95]) {
@@ -2749,6 +2752,51 @@
       scene.dataset.state = score > 0.7 ? "good" : score > 0.4 ? "warn" : "bad";
     }
     refreshInspector();
+    updateLiveMonitor();
+  }
+
+  function updateLiveMonitor() {
+    const monitor = $("#lab-3d-live-monitor");
+    if (!monitor || !state.presetInfo) return;
+    monitor.classList.toggle("is-tuning", Boolean(state.autoTune));
+    const device = state.presetInfo.devices.find((item) => item.id === state.selectedId);
+    if (!device) return;
+    const controls = ensureDeviceControls(device);
+    const definitions = deviceControlDefinitions(device);
+    const group = state.deviceGroups.get(device.id);
+    const origin = state.initialPositions.get(device.id);
+    const deviation = group && origin
+      ? Math.hypot(group.position.x - origin.x, group.position.z - origin.z) * 50
+      : 0;
+    $("#lab-3d-live-device") && ($("#lab-3d-live-device").textContent = device.label);
+    $("#lab-3d-live-state") && ($("#lab-3d-live-state").textContent =
+      state.dragGroup ? "拖动中" : state.orbit ? "旋转视角" : state.autoTune ? "自动调试" : "实时联动"
+    );
+    $("#lab-3d-live-alignment") && ($("#lab-3d-live-alignment").textContent = `${Math.round(state.metrics.alignment * 100)}%`);
+    $("#lab-3d-live-power") && ($("#lab-3d-live-power").textContent =
+      `${formatNumber(state.metrics.power)} ${state.metrics.powerUnit || ""}`
+    );
+    $("#lab-3d-live-frequency") && ($("#lab-3d-live-frequency").textContent =
+      `${formatNumber(state.metrics.frequency, 1)} Hz`
+    );
+    $("#lab-3d-live-snr") && ($("#lab-3d-live-snr").textContent = `${formatNumber(state.metrics.snr, 1)} dB`);
+    $("#lab-3d-live-position") && ($("#lab-3d-live-position").textContent =
+      `偏离目标位 ${formatNumber(deviation, 1)} mm`
+    );
+    $("#lab-3d-live-global") && ($("#lab-3d-live-global").textContent =
+      `${state.config?.primaryLabel || "主参数"} ${formatNumber(Number(state.config?.primary) || 0, 2)} ${state.config?.primaryUnit || ""} · ${state.config?.secondaryLabel || "响应"} ${formatNumber(Number(state.config?.secondary) || 0, 2)} ${state.config?.secondaryUnit || ""}`
+    );
+    const params = $("#lab-3d-live-params");
+    if (params) {
+      params.replaceChildren(...definitions.map((definition) => {
+        const chip = document.createElement("span");
+        const value = document.createElement("b");
+        chip.textContent = `${definition.label} `;
+        value.textContent = controlDisplay(definition, controls[definition.key]);
+        chip.append(value);
+        return chip;
+      }));
+    }
   }
 
   function deviceControlDefinitions(device) {
@@ -2933,6 +2981,7 @@
     }
     const note = $("#lab-3d-scene-note");
     if (note) note.textContent = "正在归位器件、校准参数并重建实验连接";
+    updateLiveMonitor();
     showTooltipPlaceholder("自动调试已启动");
   }
 

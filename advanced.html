@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-autotune-parameters">
+  <link rel="stylesheet" href="experience.css?v=20261128-live-param-monitor">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -930,6 +930,26 @@
                   <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
                   <small>每批最多同时调整 2 个器件</small>
                 </div>
+                <div class="lab-3d-live-monitor" id="lab-3d-live-monitor">
+                  <div class="lab-3d-live-head">
+                    <div>
+                      <span>实时参数监看 · LIVE</span>
+                      <strong id="lab-3d-live-device">可调激光器</strong>
+                    </div>
+                    <i id="lab-3d-live-state">稳定</i>
+                  </div>
+                  <div class="lab-3d-live-metrics">
+                    <div><span>对准</span><strong id="lab-3d-live-alignment">91%</strong></div>
+                    <div><span>功率</span><strong id="lab-3d-live-power">4.19 mW</strong></div>
+                    <div><span>频率</span><strong id="lab-3d-live-frequency">1.5 kHz</strong></div>
+                    <div><span>信噪比</span><strong id="lab-3d-live-snr">41.5 dB</strong></div>
+                  </div>
+                  <div class="lab-3d-live-params" id="lab-3d-live-params"></div>
+                  <div class="lab-3d-live-footer">
+                    <span id="lab-3d-live-position">位置偏差 0 mm</span>
+                    <span id="lab-3d-live-global">—</span>
+                  </div>
+                </div>
                 <div class="lab-3d-tooltip" id="lab-3d-tooltip" hidden></div>
                 <aside class="lab-3d-inspector" id="lab-3d-inspector" hidden aria-labelledby="lab-3d-inspector-title">
                   <div class="lab-3d-inspector-head">
@@ -1715,7 +1735,7 @@
   <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
   <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
   <script src="lab_panorama.js?v=20261128-smooth-autotune"></script>
-  <script src="lab_panorama_3d.js?v=20261128-autotune-parameters"></script>
+  <script src="lab_panorama_3d.js?v=20261128-live-param-monitor"></script>
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>
