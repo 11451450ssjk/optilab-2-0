@@ -174,6 +174,7 @@
       term: semester.term,
       semesterTitle: semester.title,
       semesterId: semester.id,
+      semesterTermLabel: semester.termLabel || "",
       scope: semester.scope,
       degreeYear: semester.degreeYear || null,
       officialCode: semester.officialCode || "",

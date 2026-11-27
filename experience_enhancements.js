@@ -110,7 +110,7 @@
       $("#morning-focus").value = "";
       $("#morning-focus").placeholder = suggestedTask
         ? `建议先做：${suggestedTask.title}`
-        : "例如：完成迈克尔逊干涉第一批重复测量";
+        : "例如：完成光的干涉与衍射第一批重复测量";
       $("#morning-button-label").textContent = "完成今日打卡";
       $("#morning-checkin-button").classList.remove("checked");
       $("#morning-saved").textContent = openTasks.length

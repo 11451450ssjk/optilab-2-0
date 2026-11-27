@@ -435,7 +435,7 @@ const SCENE_GUIDES = {
 };
 
 const state = {
-  experimentId: "michelson",
+  experimentId: EXPERIMENTS[0]?.id || "",
   primary: 632,
   secondary: 1.6,
   paused: false,
@@ -2715,7 +2715,7 @@ function renderYearOverview() {
     return `<button class="year-overview-card" data-jump-year="${year}" data-year="${year}">
       <div class="year-card-top"><span>YEAR ${String(year).padStart(2, "0")}</span><i></i></div>
       <h3>${["先打好基础", "开始上手", "做深一点", "完成一个设计"][year - 1]}</h3>
-      <p>${titles.join("；")}${hustModules ? `；华科必修扩展 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
+      <p>${titles.join("；")}${hustModules ? `；华科本科实验 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
       <small>${totalExperiments} 个实验 · ${semesters.length} 个课程节点</small>
     </button>`;
   }).join("") + `<button class="graduate-overview-card" data-jump-year="graduate">
@@ -2775,13 +2775,15 @@ function renderCatalog() {
     const containsSelected = semester.experiments.some((experiment) => experiment.id === state.experimentId);
     const openByDefault = state.search.trim() ||
       containsSelected ||
+      (state.filterYear === "hust" && semester.scope === "hust") ||
+      (state.filterYear === "graduate" && semester.scope === "graduate") ||
       (state.filterYear !== "all" && state.filterYear !== "hust" && state.filterYear !== "electrical" && state.filterYear !== "graduate" && semester.scope === "general") ||
       (state.filterYear === "graduate" && semester.scope === "graduate");
     const officialCourse = semester.scope === "hust" || semester.scope === "electrical" || semester.scope === "graduate";
     const coursePrefix = semester.scope === "electrical"
       ? "华中科技大学电学扩展 · "
       : semester.scope === "hust"
-        ? "华中科技大学必修实验 · "
+        ? `华科本科实验 · ${semester.termLabel || `大${["一", "二", "三", "四"][semester.year - 1]}${semester.term === 1 ? "上" : "下"}`} · `
         : semester.scope === "graduate"
           ? `研究生 · 研${semester.degreeYear === 2 ? "二" : "一"} · `
           : "";
@@ -2792,11 +2794,11 @@ function renderCatalog() {
           <span class="semester-number">${officialCourse ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
           <div>
             <h3>${coursePrefix || `大${["一", "二", "三", "四"][semester.year - 1]} · ${semester.term === 1 ? "上学期" : "下学期"} · `}${semester.title}</h3>
-            <p>${semester.focus}${officialCourse ? ` · 对应课程 ${semester.officialCredits} 学分 / ${semester.officialHours} 学时` : ""}</p>
+            <p>${semester.focus}${officialCourse ? ` · ${semester.officialCredits} 学分 / ${semester.officialHours}` : ""}${semester.location ? ` · ${semester.location}` : ""}</p>
           </div>
         </div>
         <div class="semester-group-actions">
-          <span>${semester.scope === "hust" ? "HUST 2025 方案 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : semester.scope === "graduate" ? "研究生研究实验 · " : ""}${semester.experiments.length} 个实验</span>
+          <span>${semester.scope === "hust" ? "华科本科实验清单 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : semester.scope === "graduate" ? "研究生研究实验 · " : ""}${semester.experiments.length} 个实验</span>
           <button class="group-toggle" data-group-toggle="${semester.id}" aria-expanded="${openByDefault ? "true" : "false"}">${openByDefault ? "收起" : "展开"}</button>
         </div>
       </div>
@@ -2807,12 +2809,25 @@ function renderCatalog() {
             <h4>${escapeHtml(experiment.name)}</h4>
             <p>${escapeHtml(experiment.description)}</p>
             <span class="experiment-card-formula">${escapeHtml(experiment.formula)}</span>
+            ${experiment.requirement || experiment.evidenceGrade ? `<span class="experiment-card-tags"><b>${escapeHtml(experiment.requirement || "课程项目")}</b><i>${escapeHtml(experiment.evidenceGrade || "证据未标注")}</i></span>` : ""}
           </button>
         `).join("")}
       </div>
     </section>
   `;
   }).join("");
+  const noLabContainer = document.getElementById("hust-no-lab-terms");
+  const yearNames = { 1: "大一", 2: "大二", 3: "大三", 4: "大四" };
+  const visibleNoLabTerms = (window.HUST_EXACT_NO_LAB_TERMS || []).filter((item) =>
+    state.filterYear === "all" ||
+    state.filterYear === "hust" ||
+    (yearNames[state.filterYear] && item.term.includes(yearNames[state.filterYear]))
+  );
+  const showNoLabTerms = !state.search && visibleNoLabTerms.length;
+  noLabContainer.innerHTML = showNoLabTerms
+    ? `<div class="hust-no-lab-heading"><strong>清单中的无实验学期</strong><span>这些行保留在源表中，不作为可点击实验项目。</span></div>
+      ${visibleNoLabTerms.map((item) => `<div class="hust-no-lab-row"><b>${escapeHtml(item.term)}</b><span>${escapeHtml(item.note)}</span><i>${escapeHtml(item.evidence)}</i></div>`).join("")}`
+    : "";
   container.querySelectorAll("[data-experiment-id]").forEach((button) => {
     button.addEventListener("click", () => selectExperiment(button.dataset.experimentId, true));
   });
@@ -3552,6 +3567,9 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
   const reportCourseLevel = experiment.scope === "graduate"
     ? `研${experiment.degreeYear === 2 ? "二" : "一"}`
     : `大${["一", "二", "三", "四"][experiment.year - 1]}`;
+  const reportCoursePosition = experiment.scope === "hust" && experiment.semesterTermLabel
+    ? `${experiment.semesterTermLabel} · ${experiment.semesterTitle}`
+    : `${reportCourseLevel} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}`;
 
   return `# ${experiment.name}实验报告
 
@@ -3559,7 +3577,7 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
 整理时间：${dateText}
 实验批次：${record.batchName}
 数据文件：${record.sourceName}
-课程位置：${reportCourseLevel} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}
+课程位置：${reportCoursePosition}
 报告类型：数据处理、误差分析与结果讨论
 
 ## 摘要
@@ -4109,13 +4127,13 @@ window.OptilabBridge = {
 
 function initialize() {
   const total = EXPERIMENTS.length;
-  if (total !== 208) {
-    console.warn(`实验总数为 ${total}，预期为 208`);
-  }
+  console.info(`OptiLab 当前载入 ${total} 个实验，其中本科 ${window.HUST_UNDERGRADUATE_SOURCE?.experimentCount || 0} 个，研究生 ${total - (window.HUST_UNDERGRADUATE_SOURCE?.experimentCount || 0)} 个。`);
   document.getElementById("hero-experiment-count").textContent = String(total);
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);
+  const undergraduateTotal = EXPERIMENTS.filter((experiment) => experiment.scope === "hust").length;
+  const graduateTotal = EXPERIMENTS.filter((experiment) => experiment.scope === "graduate").length;
   document.getElementById("sidebar-catalog-summary").textContent =
-    `通用实验、华科必修和电学实验已整理 ${total} 个`;
+    `华科本科清单 ${undergraduateTotal} 个 + 研究生 ${graduateTotal} 个，共 ${total} 个`;
   document.getElementById("dossier-status").textContent = `${total} / ${total} 已整理`;
   const initialReportText = `# 实验报告
 
@@ -4133,7 +4151,7 @@ function initialize() {
   renderCatalog();
   loadPersistedReports();
   renderReportHistory();
-  selectExperiment("michelson", false);
+  selectExperiment(EXPERIMENTS[0]?.id, false);
   setupWelcomeScreen();
   setupNavigation();
   setupControls();

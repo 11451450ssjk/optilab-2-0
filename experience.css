@@ -785,9 +785,83 @@ html[data-theme="day"] .theme-toggle-icon {
   border-color: #806742;
 }
 
+.experiment-card-tags {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.experiment-card-tags b,
+.experiment-card-tags i {
+  padding: 3px 6px;
+  border-radius: 99px;
+  font-size: 7.5px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.experiment-card-tags b {
+  color: #d8b57b;
+  background: rgba(193, 148, 77, 0.1);
+}
+
+.experiment-card-tags i {
+  color: #82948a;
+  background: rgba(105, 139, 120, 0.08);
+}
+
 .graduate-course-group .semester-number {
   color: #e0b46d;
   border-color: #665236;
+}
+
+.hust-no-lab-terms {
+  margin-top: 12px;
+  display: grid;
+  gap: 7px;
+}
+
+.hust-no-lab-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  color: #8c958f;
+  font-size: 8.5px;
+}
+
+.hust-no-lab-heading strong {
+  color: #c7a66e;
+}
+
+.hust-no-lab-row {
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 135px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #30383a;
+  border-radius: 9px;
+  color: #929b96;
+  background: #121719;
+  font-size: 8.5px;
+}
+
+.hust-no-lab-row b {
+  color: #d2b076;
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.hust-no-lab-row i {
+  color: #75817a;
+  font-style: normal;
+}
+
+html[data-theme="day"] .advanced-body .hust-no-lab-row {
+  border-color: #d8d3c8;
+  color: #66716b;
+  background: #f8f5ee;
 }
 
 /* Day theme */
@@ -1262,6 +1336,11 @@ html[data-theme="day"] .welcome-notebook {
   .graduate-overview-card {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .hust-no-lab-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 

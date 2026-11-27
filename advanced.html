@@ -73,7 +73,7 @@
       </div>
       <div class="welcome-notebook-page">
         <span class="welcome-note-index">实验笔记 · 01</span>
-        <h2>迈克尔逊干涉</h2>
+        <h2>光的干涉与衍射</h2>
         <p>先找到两束光，再看条纹怎样变化。</p>
         <div class="welcome-lab-sketch">
           <span class="sketch-source">激光</span>
@@ -188,7 +188,7 @@
 
       <section class="advanced-hero" id="overview">
         <div class="advanced-hero-copy">
-          <span class="hero-kicker">本科基础 + 华科培养方案 + 研究生研究实验</span>
+          <span class="hero-kicker">华科本科实验清单 + 研究生研究实验</span>
           <h2>按课程找到实验，<br>知道下一步做什么。</h2>
           <p>先按年级、培养层次或课程找实验，再看原理、器材、操作和观察重点。本科阶段打基础，研究生阶段进入超快光学、量子光子学、微纳器件和智能仪器等研究训练。</p>
           <div class="hero-actions">
@@ -240,7 +240,7 @@
           <form class="morning-form" id="morning-checkin-form">
             <label class="morning-focus-field">
               <span>今天最想推进什么？</span>
-              <input id="morning-focus" type="text" maxlength="120" placeholder="例如：完成迈克尔逊干涉第一批重复测量">
+              <input id="morning-focus" type="text" maxlength="120" placeholder="例如：完成光的干涉与衍射第一批重复测量">
             </label>
             <label>
               <span>预计投入</span>
@@ -337,7 +337,7 @@
               <div class="research-form-grid">
                 <label class="research-field research-field-wide">
                   <span>项目名称</span>
-                  <input id="research-project-title" type="text" maxlength="100" placeholder="例如：基于迈克尔逊干涉的微小位移测量">
+                  <input id="research-project-title" type="text" maxlength="100" placeholder="例如：基于光的干涉与衍射的条纹间距测量">
                 </label>
                 <label class="research-field research-field-wide">
                   <span>研究问题</span>
@@ -920,20 +920,20 @@
             <button data-year="3">大三</button>
             <button data-year="4">大四</button>
             <button data-year="graduate">研究生</button>
-            <button data-year="hust">华科必修</button>
-            <button data-year="electrical">华科电学</button>
+            <button data-year="hust">华科本科实验</button>
           </div>
           <button class="catalog-expand" id="catalog-expand">展开全部</button>
         </div>
-        <a class="official-source-banner" href="https://oei.hust.edu.cn/info/1041/9935.htm" target="_blank" rel="noopener noreferrer">
-          <span>HUST · 2025</span>
+        <a class="official-source-banner" href="hust_undergraduate_experiments.xlsx" download>
+          <span>HUST · 本科实验清单</span>
           <div>
-            <strong>华中科技大学 2025 级光电信息科学与工程专业培养方案</strong>
-            <p>已映射 11 门必修实验/实践课程与 8 组电学扩展课程，共 112 个相关实验。具体项目以学院当年的实验安排为准。</p>
+            <strong>华中科技大学光电本科实验清单</strong>
+            <p>按附件中的 85 行明细重建：13 个实验课程共 83 个实开或待核实项目，另保留 2 个无实验学期记录。页面保留原表备注、地点、教师和证据等级。</p>
           </div>
-          <i>查看官方来源 ↗</i>
+          <i>下载原始清单</i>
         </a>
         <div id="semester-list" class="semester-list"></div>
+        <div id="hust-no-lab-terms" class="hust-no-lab-terms"></div>
       </section>
 
       <section class="lab-section" id="lab-section">
@@ -941,7 +941,7 @@
           <div>
             <span class="eyebrow">可以调参数的演示</span>
             <div class="lab-title-line">
-              <h2 id="lab-title">迈克尔逊干涉</h2>
+              <h2 id="lab-title">光路的调试</h2>
               <span class="lab-year-tag" id="lab-year-tag">大二 · 上</span>
             </div>
             <p id="lab-subtitle">光学干涉 · 拖动参数看看哪里会变</p>
@@ -1058,7 +1058,7 @@
           <div class="principle-grid">
             <article class="principle-card principle-lead">
               <span class="principle-index">01 · 原理概述</span>
-              <h4 id="principle-intro-title">迈克尔逊干涉</h4>
+              <h4 id="principle-intro-title">光路的调试</h4>
               <p id="principle-intro"></p>
             </article>
             <article class="principle-card principle-theory-card">
@@ -1546,6 +1546,7 @@
   <script src="principles.js"></script>
   <script src="hust.js"></script>
   <script src="electrical.js"></script>
+  <script src="hust_exact.js"></script>
   <script src="graduate.js"></script>
   <script src="optilab_equipment.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
