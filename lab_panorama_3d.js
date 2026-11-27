@@ -44,6 +44,7 @@
     autoTour: false,
     autoTourAt: 0,
     autoTune: null,
+    autoTuneBadges: new Map(),
     gltfLoader: null,
     gltfExporter: null,
     modelAssetStatus: "正在检查模型资产",
@@ -1831,6 +1832,7 @@
     state.deviceGroups.clear();
     state.proceduralGroups.clear();
     state.autoTune = null;
+    state.autoTuneBadges.clear();
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
     state.initialPositions.clear();
@@ -2896,6 +2898,7 @@
   function startAutoTune() {
     if (!state.ready || !state.presetInfo || state.autoTune) return;
     window.dispatchEvent(new CustomEvent("optilab:auto-tune-request"));
+    removeAutoTuneBadges();
     const pathOrder = (state.presetInfo.optics || []).flat();
     const orderedIds = [...new Set([
       ...pathOrder,
@@ -2938,6 +2941,88 @@
     if (note) note.textContent = message;
   }
 
+  function createAutoTuneBadge(device) {
+    const THREE = state.three;
+    const group = state.deviceGroups.get(device.id);
+    if (!group) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 192;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    }));
+    sprite.scale.set(2.2, 0.825, 1);
+    sprite.position.set(0, 1.52, 0);
+    sprite.renderOrder = 20;
+    sprite.userData.autoTuneBadge = true;
+    group.add(sprite);
+    const entry = { sprite, canvas, context: canvas.getContext("2d"), texture, deviceId: device.id };
+    state.autoTuneBadges.set(device.id, entry);
+    return entry;
+  }
+
+  function drawAutoTuneBadge(device, controls, targetControls) {
+    const entry = state.autoTuneBadges.get(device.id);
+    if (!entry) return;
+    const { canvas, context, texture } = entry;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "rgba(5, 17, 11, 0.94)";
+    context.beginPath();
+    context.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 22);
+    context.fill();
+    context.strokeStyle = "#78d39a";
+    context.lineWidth = 3;
+    context.stroke();
+    context.fillStyle = "#daf1e1";
+    context.font = '600 24px "Microsoft YaHei UI", sans-serif';
+    context.fillText(device.label.slice(0, 22), 22, 36);
+    const definitions = deviceControlDefinitions(device);
+    const changed = definitions.filter((definition) =>
+      String(controls[definition.key]) !== String(targetControls?.[definition.key])
+    );
+    const rows = (changed.length ? changed : definitions).slice(0, 3);
+    rows.forEach((definition, index) => {
+      const y = 72 + index * 37;
+      context.fillStyle = "#92a99b";
+      context.font = '17px "Microsoft YaHei UI", sans-serif';
+      context.fillText(definition.label.slice(0, 11), 22, y);
+      context.fillStyle = "#f0cd87";
+      context.font = '600 19px "Cascadia Mono", monospace';
+      context.fillText(`${controlDisplay(definition, controls[definition.key])}  →  ${controlDisplay(definition, targetControls?.[definition.key])}`, 210, y);
+    });
+    texture.needsUpdate = true;
+  }
+
+  function removeAutoTuneBadges() {
+    state.autoTuneBadges.forEach((entry, id) => {
+      const group = state.deviceGroups.get(id);
+      group?.remove(entry.sprite);
+      entry.sprite.material?.map?.dispose?.();
+      entry.sprite.material?.dispose?.();
+    });
+    state.autoTuneBadges.clear();
+  }
+
+  function syncAutoTuneHudValues(id) {
+    const tuning = state.autoTune;
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    if (!tuning || !device) return;
+    const controls = state.deviceControls.get(id);
+    const target = tuning.targetControls.get(id);
+    const definitions = deviceControlDefinitions(device);
+    document.querySelectorAll(`[data-autotune-device="${id}"] [data-autotune-control]`).forEach((element) => {
+      const definition = definitions.find((item) => item.key === element.dataset.autotuneControl);
+      if (!definition || !controls || !target) return;
+      element.textContent =
+        `${controlDisplay(definition, controls[definition.key])} → ${controlDisplay(definition, target[definition.key])}`;
+    });
+  }
+
   function startAutoTuneBatch(time) {
     const tuning = state.autoTune;
     if (!tuning) return;
@@ -2967,29 +3052,30 @@
       if (!container) return;
       const card = document.createElement("div");
       card.className = "lab-3d-autotune-device";
+      card.dataset.autotuneDevice = id;
       const title = document.createElement("strong");
       title.textContent = device.label;
       const list = document.createElement("ul");
       const origin = state.initialPositions.get(id);
       const positionChanged = origin && Math.hypot(group.position.x - origin.x, group.position.z - origin.z) > 0.02;
-      if (positionChanged) {
-        const item = document.createElement("li");
-        item.innerHTML = `位置偏差 <b>→ 目标工位</b>`;
-        list.append(item);
-      }
       const definitions = deviceControlDefinitions(device);
       definitions.forEach((definition) => {
         const from = controls[definition.key];
         const to = targetControls[definition.key];
-        if (String(from) === String(to)) return;
         const item = document.createElement("li");
         const label = document.createElement("span");
         const change = document.createElement("b");
         label.textContent = `${definition.label} `;
+        change.dataset.autotuneControl = definition.key;
         change.textContent = `${controlDisplay(definition, from)} → ${controlDisplay(definition, to)}`;
         item.append(label, change);
         list.append(item);
       });
+      if (positionChanged) {
+        const item = document.createElement("li");
+        item.innerHTML = `工位偏差 <b>正在平滑归位</b>`;
+        list.prepend(item);
+      }
       if (!list.children.length) {
         const item = document.createElement("li");
         item.textContent = "位置和参数已达标，仅执行平滑复核";
@@ -2997,6 +3083,8 @@
       }
       card.append(title, list);
       container.append(card);
+      if (!state.autoTuneBadges.has(id)) createAutoTuneBadge(device);
+      drawAutoTuneBadge(device, controls, targetControls);
     });
     const phase = $("#lab-3d-autotune-phase");
     if (phase) {
@@ -3026,6 +3114,7 @@
     if (!state.autoTune) return;
     state.presetInfo.devices.forEach((device) => applyDeviceControls(device.id, false));
     state.autoTune = null;
+    removeAutoTuneBadges();
     rebuildConnections();
     updateHud();
     updateSelectionHelper();
@@ -3099,6 +3188,9 @@
           controls[definition.key] = fromNumber + (toNumber - fromNumber) * progress;
         }
       });
+      const device = state.presetInfo.devices.find((item) => item.id === id);
+      if (device) drawAutoTuneBadge(device, controls, targetControls);
+      syncAutoTuneHudValues(id);
       if (state.inspectorId === id) {
         syncAutoTuneControlInputs(id);
         refreshInspector();
@@ -3724,6 +3816,7 @@
       hideTooltip();
       closeInspector();
       state.autoTune = null;
+      removeAutoTuneBadges();
       const hud = $("#lab-3d-autotune-hud");
       if (hud) hud.hidden = true;
       const button = $("#lab-3d-auto-tune");
