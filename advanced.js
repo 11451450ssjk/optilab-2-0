@@ -455,6 +455,7 @@ const state = {
 };
 
 const labCanvas = document.getElementById("lab-canvas");
+const lab3dCanvas = document.getElementById("lab-3d-canvas");
 const labContext = labCanvas.getContext("2d");
 const chartCanvas = document.getElementById("advanced-chart");
 const chartContext = chartCanvas.getContext("2d");
@@ -842,26 +843,36 @@ function drawBeam(context, x1, y1, x2, y2, color, time, alpha = 1, dotted = true
 }
 
 function drawLabFrame(time) {
+  const experiment = currentExperiment();
+  const control = controlConfig(experiment);
+  const beamColor = experiment.primaryUnit === "nm"
+    ? wavelengthToRgb(clamp(state.primary, 380, 780))
+    : wavelengthToRgb(632);
+  const panoramaConfig = {
+    primary: state.primary,
+    secondary: state.secondary,
+    primaryLabel: control.primary.label,
+    primaryUnit: control.primary.unit,
+    secondaryLabel: control.secondary.label,
+    secondaryUnit: control.secondary.unit,
+    experimentId: experiment.id,
+    experimentName: experiment.name,
+    sim: experiment.sim,
+    annotations: state.annotations,
+    beamColor
+  };
+  if (state.labMode === "3d" && window.OptilabPanorama3D) {
+    window.OptilabPanorama3D.render(time, {
+      ...panoramaConfig,
+      experiment
+    });
+    return;
+  }
   const { width, height } = setCanvasResolution(labCanvas);
   labContext.clearRect(0, 0, width, height);
   if (state.labMode === "overall" && window.OptilabPanorama) {
     window.OptilabPanorama.init(labCanvas);
-    const experiment = currentExperiment();
-    const control = controlConfig(experiment);
-    const beamColor = experiment.primaryUnit === "nm"
-      ? wavelengthToRgb(clamp(state.primary, 380, 780))
-      : wavelengthToRgb(632);
-    window.OptilabPanorama.draw(labContext, width, height, time, {
-      primary: state.primary,
-      secondary: state.secondary,
-      primaryUnit: control.primary.unit,
-      secondaryUnit: control.secondary.unit,
-      experimentId: experiment.id,
-      experimentName: experiment.name,
-      sim: experiment.sim,
-      annotations: state.annotations,
-      beamColor
-    });
+    window.OptilabPanorama.draw(labContext, width, height, time, panoramaConfig);
     return;
   }
   const gradient = labContext.createLinearGradient(0, 0, width, height);
@@ -875,7 +886,6 @@ function drawLabFrame(time) {
   if (state.labMode === "measure") {
     drawMeasurementOverlay(width, height);
   }
-  const experiment = currentExperiment();
   switch (experiment.sim) {
     case "measurement":
       drawMeasurementModel(width, height, time);
@@ -3952,13 +3962,23 @@ function setupNavigation() {
 
 function setupControls() {
   window.OptilabPanorama?.init(labCanvas);
+  window.OptilabPanorama3D?.init(lab3dCanvas);
   const syncOverallMode = (mode) => {
     const overall = mode === "overall";
-    labCanvas.classList.toggle("overall-canvas", overall);
-    document.querySelector(".advanced-canvas-wrap")?.classList.toggle("overall-mode", overall);
+    const spatial = overall || mode === "3d";
+    const threeD = mode === "3d";
+    labCanvas.hidden = threeD;
+    lab3dCanvas.hidden = !threeD;
+    labCanvas.classList.toggle("overall-canvas", !threeD);
+    document.querySelector(".advanced-canvas-wrap")?.classList.toggle("overall-mode", spatial);
     const toolbar = document.getElementById("panorama-toolbar");
-    if (toolbar) toolbar.hidden = !overall;
+    if (toolbar) toolbar.hidden = !spatial;
     window.OptilabPanorama?.setActive(overall);
+    window.OptilabPanorama3D?.setActive(threeD);
+    const loading = document.getElementById("lab-3d-loading");
+    if (loading && !threeD) loading.hidden = true;
+    const overlay = document.getElementById("lab-3d-overlay");
+    if (overlay) overlay.hidden = !threeD;
   };
   syncOverallMode(state.labMode);
   primaryControl.addEventListener("input", (event) => {
@@ -3999,6 +4019,7 @@ function setupControls() {
   document.getElementById("reset-lab").addEventListener("click", () => {
     setPreset("typical");
     window.OptilabPanorama?.resetLayout();
+    window.OptilabPanorama3D?.resetLayout();
   });
   document.querySelectorAll("[data-lab-mode]").forEach((button) => {
     button.addEventListener("click", () => {

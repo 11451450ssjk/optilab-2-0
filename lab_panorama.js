@@ -1482,6 +1482,10 @@
     getMetrics: () => ({ ...state.metrics }),
     getLayout: () => state.devices.map((device) => ({ ...device })),
     getSelected: () => state.selected,
+    getPorts(deviceId) {
+      const device = deviceById(deviceId);
+      return [...(PORT_PROFILES[device?.id] || PORT_PROFILES[device?.type] || ["MEASURE", "GND"])];
+    },
     getPreset: () => state.preset ? {
       id: state.presetId,
       name: state.preset.name,

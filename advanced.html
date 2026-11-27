@@ -887,6 +887,7 @@
             <div class="lab-stage-topbar">
               <div class="lab-tabs">
                 <button class="active" data-lab-mode="overall">全景实验台</button>
+                <button data-lab-mode="3d">3D 实验台</button>
                 <button data-lab-mode="model">单项原理</button>
                 <button data-lab-mode="principle">原理图</button>
                 <button data-lab-mode="measure">测量视图</button>
@@ -900,6 +901,38 @@
             </div>
             <div class="advanced-canvas-wrap">
               <canvas id="lab-canvas" class="overall-canvas" aria-label="可拖动全部器件的真实实验场景"></canvas>
+              <canvas id="lab-3d-canvas" class="lab-3d-canvas" hidden aria-label="可拖动器件的三维实验台"></canvas>
+              <div class="lab-3d-loading" id="lab-3d-loading" hidden>正在加载三维实验场景…</div>
+              <div class="lab-3d-overlay" id="lab-3d-overlay" hidden>
+                <div class="lab-3d-hint">
+                  <span>拖动空白旋转视角</span>
+                  <span>滚轮缩放</span>
+                  <span>点选器材查看端口</span>
+                </div>
+                <div class="lab-3d-view-tools" aria-label="三维视角">
+                  <button type="button" data-3d-view="overview" class="active">总览</button>
+                  <button type="button" data-3d-view="optical">光路视</button>
+                  <button type="button" data-3d-view="top">俯视</button>
+                </div>
+                <div class="lab-3d-tooltip" id="lab-3d-tooltip" hidden></div>
+                <div class="lab-3d-process" id="lab-3d-process">
+                  <div class="lab-3d-process-head">
+                    <span id="lab-3d-step-count">实验过程 01 / 05</span>
+                    <button type="button" id="lab-3d-auto-step" aria-pressed="false">自动演示</button>
+                  </div>
+                  <strong id="lab-3d-step-title">先确认激光安全与实验条件</strong>
+                  <p id="lab-3d-step-detail">检查光源等级、护目镜和急停位置，再固定电源与光学平台。</p>
+                  <div class="lab-3d-progress" aria-hidden="true"><i></i></div>
+                  <div class="lab-3d-process-actions">
+                    <button type="button" id="lab-3d-step-prev">上一步</button>
+                    <button type="button" id="lab-3d-step-next">下一步</button>
+                  </div>
+                </div>
+                <div class="lab-3d-scene-caption">
+                  <span><i></i> 三维校准网格</span>
+                  <span id="lab-3d-scene-note">拖动器件，观察光路和测量值同步变化</span>
+                </div>
+              </div>
               <div class="canvas-meta meta-top-left" id="lab-badge">INTERFEROMETER</div>
               <div class="canvas-meta meta-top-right" id="lab-readout">λ = 632 nm</div>
               <div class="canvas-legend" id="lab-legend">
@@ -1504,6 +1537,7 @@
   <script src="graduate.js"></script>
   <script src="dedupe_catalog.js"></script>
   <script src="lab_panorama.js"></script>
+  <script src="lab_panorama_3d.js"></script>
   <script src="optilab_equipment.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="advanced.js"></script>
