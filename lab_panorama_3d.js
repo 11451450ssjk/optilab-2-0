@@ -20,6 +20,7 @@
     deviceGroups: new Map(),
     proceduralGroups: new Map(),
     deviceControls: new Map(),
+    controlTargets: new Map(),
     initialPositions: new Map(),
     dynamicTextures: [],
     selectionHelper: null,
@@ -54,7 +55,15 @@
       phi: Math.PI * 0.365,
       viewMode: "overview",
       target: { x: 0, y: 0.42, z: 0 }
-    }
+    },
+    cameraActual: {
+      radius: 8.35,
+      theta: Math.PI * 0.38,
+      phi: Math.PI * 0.365,
+      target: { x: 0, y: 0.42, z: 0 }
+    },
+    lastControlFrame: 0,
+    lastControlLinkUpdate: 0
   };
 
   function formatNumber(value, digits = 2) {
@@ -979,8 +988,15 @@
     } else if (kind === "lens") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.46, 16), blackMetal, [0, 0.29, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.22, 0.035, 12, 32), blackMetal, [0, 0.53, 0], [0, Math.PI / 2, 0]);
-      addPart(group, device, new THREE.CircleGeometry(0.195, 32), glassMaterial, [-0.008, 0.53, 0], [0, Math.PI / 2, 0]);
+      const lensElement = addPart(group, device, new THREE.SphereGeometry(0.205, 32, 20), glassMaterial, [0, 0.53, 0]);
+      lensElement.scale.set(0.28, 1, 1);
+      lensElement.rotation.y = Math.PI / 2;
       addPart(group, device, new THREE.TorusGeometry(0.16, 0.006, 6, 32), accentMaterial, [-0.018, 0.53, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.202, 0.012, 8, 32), new THREE.MeshBasicMaterial({
+        color: 0x93d7e5,
+        transparent: true,
+        opacity: 0.34
+      }), [0, 0.53, 0], [0, Math.PI / 2, 0]);
       const focusKnob = addPart(group, device, new THREE.BoxGeometry(0.08, 0.2, 0.06), blackMetal, [0.02, 0.35, 0.17]);
       focusKnob.userData.focusKnob = true;
     } else if (kind === "sample") {
@@ -1503,6 +1519,32 @@
         );
       }
     }
+
+    if (optical) {
+      addPart(group, device, beveledBoxGeometry(0.58, 0.055, 0.46, 0.016), blackMetal, [0, 0.035, 0]);
+      [-0.14, 0.14].forEach((z) => {
+        addPart(group, device, new THREE.BoxGeometry(0.64, 0.018, 0.028), steelMaterial, [0, 0.071, z]);
+      });
+      addPart(group, device, new THREE.CylinderGeometry(0.028, 0.028, 0.07, 14), brassMaterial, [0.28, 0.09, 0.19]);
+      for (let index = 0; index < 9; index += 1) {
+        addPart(
+          group,
+          device,
+          new THREE.BoxGeometry(0.006, 0.004, index % 3 === 0 ? 0.04 : 0.024),
+          steelMaterial,
+          [-0.24 + index * 0.06, 0.067, -0.205]
+        );
+      }
+    }
+    const screwPositions = [
+      [-0.3, 0.09, -0.21],
+      [0.3, 0.09, -0.21],
+      [-0.3, 0.09, 0.21],
+      [0.3, 0.09, 0.21]
+    ];
+    screwPositions.forEach(([x, y, z]) => {
+      addPart(group, device, new THREE.CylinderGeometry(0.014, 0.014, 0.018, 10), steelMaterial, [x, y, z]);
+    });
 
     const ports = window.OptilabPanorama?.getPorts(device.id) || ["MEASURE", "GND"];
     ports.slice(0, 3).forEach((port, index) => {
@@ -2350,10 +2392,21 @@
         depthWrite: false
       })
     );
-    core.userData.connectionType = halo.userData.connectionType = "optical";
+    const outerGlow = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.075, 8, false),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.028,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    core.userData.connectionType = halo.userData.connectionType = outerGlow.userData.connectionType = "optical";
     core.userData.baseOpacity = 0.96;
     halo.userData.baseOpacity = 0.09;
-    state.beamGroup.add(core, halo);
+    outerGlow.userData.baseOpacity = 0.028;
+    state.beamGroup.add(core, halo, outerGlow);
     for (let pulseIndex = 0; pulseIndex < 3; pulseIndex += 1) {
       const pulse = new THREE.Mesh(
         new THREE.SphereGeometry(0.026, 10, 10),
@@ -2887,12 +2940,18 @@
   }
 
   function ensureDeviceControls(device) {
-    if (state.deviceControls.has(device.id)) return state.deviceControls.get(device.id);
+    if (state.deviceControls.has(device.id)) {
+      if (!state.controlTargets.has(device.id)) {
+        state.controlTargets.set(device.id, { ...state.deviceControls.get(device.id) });
+      }
+      return state.deviceControls.get(device.id);
+    }
     const controls = Object.fromEntries(deviceControlDefinitions(device).map((definition) => [
       definition.key,
       definition.type === "select" ? definition.value : Number(definition.value)
     ]));
     state.deviceControls.set(device.id, controls);
+    state.controlTargets.set(device.id, { ...controls });
     return controls;
   }
 
@@ -2904,12 +2963,13 @@
     return `${formatNumber(numeric, definition.step < 0.1 ? 2 : definition.step < 1 ? 1 : 0)}${definition.unit ? ` ${definition.unit}` : ""}`;
   }
 
-  function applyDeviceControls(id, refresh = true) {
+  function applyDeviceControls(id, refresh = true, syncTarget = true) {
     const lod = state.deviceGroups.get(id);
     const device = state.presetInfo?.devices.find((item) => item.id === id);
     const origin = state.initialPositions.get(id);
     if (!lod || !device || !origin) return;
     const controls = ensureDeviceControls(device);
+    if (syncTarget) state.controlTargets.set(id, { ...controls });
     lod.position.x = origin.x + Number(controls.offsetX || 0) * 0.018;
     lod.position.z = origin.z + Number(controls.offsetZ || 0) * 0.018;
     lod.rotation.y = Number(controls.yaw || 0) * Math.PI / 180;
@@ -3270,6 +3330,55 @@
     }
   }
 
+  function updateControlSmoothing(time) {
+    if (state.autoTune) return;
+    const delta = state.lastControlFrame ? clamp(time - state.lastControlFrame, 1, 50) : 16;
+    state.lastControlFrame = time;
+    const blend = 1 - Math.exp(-delta / 82);
+    let changed = false;
+    state.deviceGroups.forEach((group, id) => {
+      const device = state.presetInfo?.devices.find((item) => item.id === id);
+      if (!device) return;
+      const controls = ensureDeviceControls(device);
+      const target = state.controlTargets.get(id);
+      if (!target) return;
+      const definitions = deviceControlDefinitions(device);
+      let deviceChanged = false;
+      definitions.forEach((definition) => {
+        const targetValue = target[definition.key];
+        const currentValue = controls[definition.key];
+        if (definition.type === "select") {
+          if (String(currentValue) !== String(targetValue)) {
+            controls[definition.key] = targetValue;
+            deviceChanged = true;
+          }
+          return;
+        }
+        const difference = (Number(targetValue) || 0) - (Number(currentValue) || 0);
+        const threshold = Math.max(0.0005, Number(definition.step) * 0.015);
+        if (Math.abs(difference) > threshold) {
+          controls[definition.key] = (Number(currentValue) || 0) + difference * blend;
+          deviceChanged = true;
+        } else if (difference !== 0) {
+          controls[definition.key] = Number(targetValue) || 0;
+          deviceChanged = true;
+        }
+      });
+      if (deviceChanged) {
+        changed = true;
+        applyDeviceControls(id, false, false);
+        if (state.inspectorId === id) syncAutoTuneControlInputs(id);
+      }
+    });
+    if (!changed) return;
+    if (time - state.lastControlLinkUpdate > 70) {
+      state.lastControlLinkUpdate = time;
+      rebuildConnections();
+      updateHud();
+    }
+    state.selectionHelper?.update();
+  }
+
   function renderDeviceControls(device) {
     const list = $("#lab-3d-control-list");
     if (!list) return;
@@ -3305,10 +3414,10 @@
       }
       input.dataset.controlKey = definition.key;
       input.addEventListener("input", () => {
-        controls[definition.key] = definition.type === "select" ? input.value : Number(input.value);
-        output.textContent = controlDisplay(definition, controls[definition.key]);
-        applyDeviceControls(device.id);
-        refreshInspector();
+        const target = state.controlTargets.get(device.id) || { ...controls };
+        target[definition.key] = definition.type === "select" ? input.value : Number(input.value);
+        state.controlTargets.set(device.id, target);
+        output.textContent = controlDisplay(definition, target[definition.key]);
       });
       item.append(label, input);
       return item;
@@ -3796,17 +3905,27 @@
     }
   }
 
-  function updateCamera() {
+  function updateCamera(time = performance.now()) {
     const { radius, theta, phi, target } = state.cameraState;
+    const delta = state.lastCameraFrame ? clamp(time - state.lastCameraFrame, 1, 50) : 16;
+    state.lastCameraFrame = time;
+    const smooth = 1 - Math.exp(-delta / 95);
+    const actual = state.cameraActual;
+    actual.radius += (radius - actual.radius) * smooth;
+    actual.theta += (theta - actual.theta) * smooth;
+    actual.phi += (phi - actual.phi) * smooth;
+    actual.target.x += (target.x - actual.target.x) * smooth;
+    actual.target.y += (target.y - actual.target.y) * smooth;
+    actual.target.z += (target.z - actual.target.z) * smooth;
     const aspect = state.camera.aspect || 1;
     const portraitBoost = aspect < 1 ? 1 + (1 - aspect) * 1.12 : 1;
-    const effectiveRadius = radius * portraitBoost;
+    const effectiveRadius = actual.radius * portraitBoost;
     state.camera.position.set(
-      target.x + effectiveRadius * Math.sin(phi) * Math.cos(theta),
-      target.y + effectiveRadius * Math.cos(phi),
-      target.z + effectiveRadius * Math.sin(phi) * Math.sin(theta)
+      actual.target.x + effectiveRadius * Math.sin(actual.phi) * Math.cos(actual.theta),
+      actual.target.y + effectiveRadius * Math.cos(actual.phi),
+      actual.target.z + effectiveRadius * Math.sin(actual.phi) * Math.sin(actual.theta)
     );
-    state.camera.lookAt(target.x, target.y, target.z);
+    state.camera.lookAt(actual.target.x, actual.target.y, actual.target.z);
   }
 
   function render(time, payload) {
@@ -3826,8 +3945,9 @@
       return;
     }
     resize();
-    updateCamera();
+    updateCamera(time);
     updateAutoTune(time);
+    updateControlSmoothing(time);
     if (state.autoTour && time >= state.autoTourAt) {
       setProcessStep(state.processStep + 1);
     }
