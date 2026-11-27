@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-damped-auto-entry">
+  <link rel="stylesheet" href="experience.css?v=20261128-experiment-phenomenon">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -913,6 +913,7 @@
                 </div>
                 <div class="lab-3d-view-tools" aria-label="三维视角">
                   <button type="button" id="lab-3d-auto-tune" class="auto-tune-button" aria-pressed="false">一键搭建调试</button>
+                  <button type="button" id="lab-3d-show-result">实验现象</button>
                   <button type="button" data-3d-view="overview" class="active">总览</button>
                   <button type="button" data-3d-view="optical">光路视</button>
                   <button type="button" data-3d-view="top">俯视</button>
@@ -1048,6 +1049,33 @@
               <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
               <small>逐个摆放：每次只处理 1 个器件，完成后进入下一个</small>
             </div>
+            <section class="lab-3d-result-panel" id="lab-3d-result-panel" hidden aria-labelledby="lab-3d-result-title">
+              <div class="lab-3d-result-head">
+                <div>
+                  <span>实验现象 · 完整结果</span>
+                  <strong id="lab-3d-result-title">实验现象总览</strong>
+                </div>
+                <div class="lab-3d-result-actions">
+                  <button type="button" id="lab-3d-result-data">带入数据分析</button>
+                  <button type="button" id="lab-3d-result-close" aria-label="关闭实验现象">收起</button>
+                </div>
+              </div>
+              <div class="lab-3d-result-grid">
+                <canvas id="lab-3d-result-canvas" aria-label="当前实验的完整现象图"></canvas>
+                <aside class="lab-3d-result-info">
+                  <span id="lab-3d-result-kind">光学现象</span>
+                  <strong id="lab-3d-result-value">等待实验数据</strong>
+                  <p id="lab-3d-result-description">器材搭建完成后显示实验现象。</p>
+                  <div class="lab-3d-result-metrics">
+                    <div><span>对准/连接</span><strong id="lab-3d-result-alignment">—</strong></div>
+                    <div><span>功率</span><strong id="lab-3d-result-power">—</strong></div>
+                    <div><span>频率</span><strong id="lab-3d-result-frequency">—</strong></div>
+                    <div><span>信噪比</span><strong id="lab-3d-result-snr">—</strong></div>
+                  </div>
+                  <small id="lab-3d-result-note">实验现象会随器材位置和参数变化实时更新。</small>
+                </aside>
+              </div>
+            </section>
             <div class="panorama-toolbar" id="panorama-toolbar">
               <div class="panorama-status">
                 <span>综合场景状态</span>
@@ -1735,7 +1763,7 @@
   <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
   <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
   <script src="lab_panorama.js?v=20261128-smooth-autotune"></script>
-  <script src="lab_panorama_3d.js?v=20261128-damped-auto-entry"></script>
+  <script src="lab_panorama_3d.js?v=20261128-experiment-phenomenon"></script>
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>

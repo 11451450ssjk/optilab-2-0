@@ -69,7 +69,8 @@
     lastControlFrame: 0,
     lastControlLinkUpdate: 0,
     lastMotionFrame: 0,
-    lastMotionLinkUpdate: 0
+    lastMotionLinkUpdate: 0,
+    lastResultDraw: 0
   };
 
   function formatNumber(value, digits = 2) {
@@ -1910,6 +1911,7 @@
     if (state.assemblyShelf) state.assemblyShelf.visible = false;
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
+    hideExperimentResult();
     state.initialPositions.clear();
     state.dynamicTextures = [];
     state.animatedObjects = [];
@@ -2899,6 +2901,298 @@
     }
   }
 
+  function phenomenonMeta(sim, experiment) {
+    const name = experiment?.name || state.presetInfo?.name || "当前实验";
+    if (["michelson", "newton", "interference"].includes(sim)) {
+      return { kind: "干涉条纹", description: "观察条纹间距、中心位置、明暗对比以及相位变化，完整结果应与当前波长和光程差一致。" };
+    }
+    if (["double-slit", "diffraction", "grating"].includes(sim)) {
+      return { kind: "衍射图样", description: "中心零级、左右对称级次和强度包络共同构成完整衍射现象。" };
+    }
+    if (sim === "polarization") {
+      return { kind: "偏振响应", description: "透射强度随检偏角变化，应满足余弦平方关系并达到预期的消光比。" };
+    }
+    if (["spectrometer", "grating"].includes(sim)) {
+      return { kind: "光谱现象", description: "不同波长在空间上分离，峰位、峰高、半高宽和背景光共同用于判断结果。" };
+    }
+    if (["circuit", "oscilloscope", "frequency", "oscillator", "sampling", "dsp"].includes(sim)) {
+      return { kind: "时域波形", description: "观察幅值、周期、相位、触发稳定性以及是否出现削顶或异常振荡。" };
+    }
+    if (["fiber", "communication"].includes(sim)) {
+      return { kind: "通信眼图", description: "眼图张开度、抖动、上升沿和噪声共同反映链路质量，需结合误码率判断。" };
+    }
+    if (["photoelectric", "photodiode", "semiconductor"].includes(sim)) {
+      return { kind: "器件特性曲线", description: "线性区、拐点、饱和区与暗态背景共同决定器件工作范围和响应。" };
+    }
+    if (["imaging", "optics", "holography"].includes(sim)) {
+      return { kind: "成像结果", description: "对比中心与边缘清晰度、目标位置和曝光直方图，确认成像与标定状态。" };
+    }
+    if (sim === "laser") {
+      return { kind: "激光模式", description: "观察光斑轮廓、束腰位置、功率稳定性以及空间模式是否对称。" };
+    }
+    if (["mechanics", "measurement"].includes(sim)) {
+      return { kind: "测量曲线", description: "完整显示周期、幅值、趋势和重复测量点，便于与理论关系比较。" };
+    }
+    if (["thermal", "biomedical"].includes(sim)) {
+      return { kind: "响应曲线", description: "完整显示稳定过程、响应峰值、噪声和重复测量差异。" };
+    }
+    return { kind: `${name}·实验现象`, description: "显示当前实验参数下由统一计算引擎生成的结果曲线和测量状态。" };
+  }
+
+  function resizeResultCanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(rect.width * ratio));
+    const height = Math.max(1, Math.round(rect.height * ratio));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    const context = canvas.getContext("2d");
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    return { context, width: rect.width, height: rect.height };
+  }
+
+  function drawResultBackdrop(context, width, height) {
+    const gradient = context.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#07120e");
+    gradient.addColorStop(1, "#030806");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, width, height);
+    context.strokeStyle = "rgba(113, 170, 136, 0.12)";
+    context.lineWidth = 1;
+    for (let x = 24; x < width; x += 32) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, height);
+      context.stroke();
+    }
+    for (let y = 24; y < height; y += 28) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+      context.stroke();
+    }
+  }
+
+  function drawExperimentPhenomenon(time) {
+    const canvas = $("#lab-3d-result-canvas");
+    if (!canvas || $("#lab-3d-result-panel")?.hidden) return;
+    const { context, width, height } = resizeResultCanvas(canvas);
+    const experiment = state.config?.experiment || {};
+    const sim = experiment.sim || "measurement";
+    const primary = Number(state.config?.primary) || 0;
+    const secondary = Number(state.config?.secondary) || 0;
+    const left = 40;
+    const right = width - 24;
+    const top = 26;
+    const bottom = height - 34;
+    const plotWidth = right - left;
+    const plotHeight = bottom - top;
+    drawResultBackdrop(context, width, height);
+    context.save();
+    context.font = '11px "Cascadia Mono", monospace';
+    context.fillStyle = "#8da79a";
+    context.fillText("EXPERIMENT PHENOMENON", 18, 18);
+    context.textAlign = "right";
+    context.fillText(`${state.metrics.alignment * 100 >= 70 ? "STABLE" : "CHECK ALIGNMENT"} · ${state.metrics.frequency.toFixed(0)} Hz`, width - 18, 18);
+    context.restore();
+
+    if (["michelson", "newton", "interference"].includes(sim) || sim === "polarization") {
+      if (sim === "polarization") {
+        context.save();
+        context.translate(width * 0.38, height * 0.52);
+        const radius = Math.min(width, height) * 0.29;
+        context.strokeStyle = "rgba(115, 150, 130, 0.3)";
+        context.beginPath();
+        context.arc(0, 0, radius, 0, Math.PI * 2);
+        context.stroke();
+        context.beginPath();
+        for (let index = 0; index <= 180; index += 2) {
+          const angle = index * Math.PI / 180;
+          const value = Math.abs(Math.cos(angle));
+          const x = Math.cos(angle) * radius * value;
+          const y = Math.sin(angle) * radius * value;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.strokeStyle = "#d9bc77";
+        context.lineWidth = 3;
+        context.stroke();
+        context.restore();
+      } else {
+        const phase = secondary * 2.7 + time * 0.001;
+        const centerX = width * 0.34;
+        const centerY = height * 0.52;
+        const radius = Math.min(plotWidth * 0.28, plotHeight * 0.4);
+        for (let ring = 1; ring < 16; ring += 1) {
+          context.strokeStyle = `rgba(236, 194, 116, ${0.18 + 0.5 * (0.5 + 0.5 * Math.cos(phase + ring * 0.8))})`;
+          context.lineWidth = 2;
+          context.beginPath();
+          context.arc(centerX, centerY, ring * radius / 16, 0, Math.PI * 2);
+          context.stroke();
+        }
+      }
+    } else if (["double-slit", "diffraction", "grating"].includes(sim)) {
+      const centerX = width * 0.32;
+      const centerY = height * 0.52;
+      const stripeWidth = Math.max(3, width * 0.014);
+      for (let index = -18; index <= 18; index += 1) {
+        const intensity = Math.exp(-Math.pow(index / 8, 2)) * (0.5 + 0.5 * Math.cos(index * 1.15 + secondary));
+        context.fillStyle = `rgba(234, 197, 124, ${0.08 + intensity * 0.8})`;
+        context.fillRect(centerX + index * stripeWidth - stripeWidth * 0.35, top, stripeWidth * 0.7, plotHeight);
+      }
+    } else if (["spectrometer"].includes(sim)) {
+      const grad = context.createLinearGradient(left, 0, right, 0);
+      grad.addColorStop(0, "#4f64d9");
+      grad.addColorStop(0.25, "#54bdd5");
+      grad.addColorStop(0.5, "#7dd68b");
+      grad.addColorStop(0.72, "#e7cf65");
+      grad.addColorStop(1, "#d65d55");
+      context.fillStyle = grad;
+      context.fillRect(left, height * 0.4, plotWidth, 3);
+      for (let index = 0; index < 70; index += 1) {
+        const peak = Math.exp(-Math.pow((index - 40) / 5, 2)) + 0.55 * Math.exp(-Math.pow((index - 58) / 7, 2));
+        const barHeight = 8 + peak * plotHeight * 0.65;
+        context.globalAlpha = 0.38 + peak * 0.6;
+        context.fillStyle = grad;
+        context.fillRect(left + index / 70 * plotWidth, bottom - barHeight, 3, barHeight);
+      }
+      context.globalAlpha = 1;
+    } else if (["circuit", "oscilloscope", "frequency", "oscillator"].includes(sim)) {
+      context.strokeStyle = "#83d9a5";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      const cycles = clamp(state.metrics.frequency / 420, 1, 8);
+      for (let x = left; x <= right; x += 2) {
+        const phase = (x - left) / plotWidth * Math.PI * 2 * cycles + time * 0.002;
+        const y = top + plotHeight / 2 + Math.sin(phase) * plotHeight * 0.3 * state.metrics.connectivity;
+        if (x === left) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    } else if (["fiber", "communication"].includes(sim)) {
+      context.strokeStyle = "rgba(111, 225, 159, 0.58)";
+      context.lineWidth = 1.5;
+      for (let trace = 0; trace < 12; trace += 1) {
+        context.beginPath();
+        for (let x = left; x <= right; x += 3) {
+          const eye = (x - left) / Math.max(1, plotWidth * 0.25);
+          const segment = eye % 2;
+          const base = segment < 1 ? Math.sin(segment * Math.PI) : 1 - Math.sin((segment - 1) * Math.PI);
+          const y = top + plotHeight * 0.55 - base * plotHeight * 0.28 + (trace - 6) * 2.2;
+          if (x === left) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.stroke();
+      }
+    } else if (["photoelectric", "photodiode", "semiconductor"].includes(sim)) {
+      context.strokeStyle = "#e0bd79";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      for (let x = left; x <= right; x += 2) {
+        const normalized = (x - left) / plotWidth;
+        const y = bottom - Math.pow(normalized, 2.2) * plotHeight * 0.78 - normalized * plotHeight * 0.12;
+        if (x === left) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    } else if (["imaging", "optics", "holography"].includes(sim)) {
+      const size = Math.min(plotWidth * 0.55, plotHeight * 0.7);
+      const startX = width * 0.25 - size / 2;
+      const startY = top + (plotHeight - size) / 2;
+      for (let row = 0; row < 8; row += 1) {
+        for (let column = 0; column < 8; column += 1) {
+          context.fillStyle = (row + column) % 2 ? "#d9d3c1" : "#151d19";
+          context.fillRect(startX + column * size / 8, startY + row * size / 8, size / 8, size / 8);
+        }
+      }
+      context.strokeStyle = "#e1bd79";
+      context.lineWidth = 2;
+      context.strokeRect(startX, startY, size, size);
+    } else if (sim === "laser") {
+      context.strokeStyle = "#deba76";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      for (let x = left; x <= right; x += 2) {
+        const normalized = (x - plotWidth / 2 - left) / (plotWidth * 0.18);
+        const y = bottom - Math.exp(-normalized * normalized) * plotHeight * 0.74;
+        if (x === left) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    } else if (["mechanics", "thermal", "biomedical", "measurement"].includes(sim)) {
+      context.strokeStyle = "#81d2a2";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      for (let x = left; x <= right; x += 2) {
+        const normalized = (x - left) / plotWidth;
+        const y = top + plotHeight * 0.58 +
+          Math.sin(normalized * Math.PI * 7 + time * 0.0015) * plotHeight * 0.22 * Math.exp(-normalized * 0.35);
+        if (x === left) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    } else {
+      context.strokeStyle = "#8ccdb0";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      for (let x = left; x <= right; x += 2) {
+        const normalized = (x - left) / plotWidth;
+        const y = bottom - normalized * plotHeight * 0.65 - Math.sin(normalized * Math.PI * 5) * plotHeight * 0.08;
+        if (x === left) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    }
+
+    context.strokeStyle = "rgba(123, 153, 135, 0.35)";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(left, top);
+    context.lineTo(left, bottom);
+    context.lineTo(right, bottom);
+    context.stroke();
+    context.fillStyle = "#8ca096";
+    context.font = '10px "Microsoft YaHei UI", sans-serif';
+    context.fillText(state.config?.primaryLabel || "输入参数", left, height - 12);
+    context.textAlign = "right";
+    context.fillText(state.config?.secondaryLabel || "响应量", right, height - 12);
+    context.textAlign = "left";
+  }
+
+  function showExperimentResult() {
+    const panel = $("#lab-3d-result-panel");
+    if (!panel || !state.presetInfo) return;
+    const experiment = state.config?.experiment || {};
+    const meta = phenomenonMeta(experiment.sim, experiment);
+    const derived = window.OptilabPhysics?.calculate(experiment, state.config?.primary, state.config?.secondary);
+    panel.hidden = false;
+    $("#lab-3d-result-title") && ($("#lab-3d-result-title").textContent = experiment.name || state.presetInfo.name);
+    $("#lab-3d-result-kind") && ($("#lab-3d-result-kind").textContent = meta.kind);
+    $("#lab-3d-result-value") && ($("#lab-3d-result-value").textContent = derived?.value || "实验现象已就绪");
+    $("#lab-3d-result-description") && ($("#lab-3d-result-description").textContent = meta.description);
+    $("#lab-3d-result-alignment") && ($("#lab-3d-result-alignment").textContent =
+      `${Math.round(state.metrics.alignment * 100)}%`
+    );
+    $("#lab-3d-result-power") && ($("#lab-3d-result-power").textContent =
+      `${formatNumber(state.metrics.power)} ${state.metrics.powerUnit || ""}`
+    );
+    $("#lab-3d-result-frequency") && ($("#lab-3d-result-frequency").textContent =
+      `${formatNumber(state.metrics.frequency, 1)} Hz`
+    );
+    $("#lab-3d-result-snr") && ($("#lab-3d-result-snr").textContent = `${formatNumber(state.metrics.snr, 1)} dB`);
+    $("#lab-3d-result-note") && ($("#lab-3d-result-note").textContent =
+      "现象根据当前 3D 器材位置、单体参数和统一计算链实时生成；原始数据仍需人工复核。"
+    );
+    drawExperimentPhenomenon(performance.now());
+  }
+
+  function hideExperimentResult() {
+    const panel = $("#lab-3d-result-panel");
+    if (panel) panel.hidden = true;
+  }
+
   function deviceControlDefinitions(device) {
     const kind = deviceKind(device);
     const config = state.config || {};
@@ -3055,6 +3349,7 @@
   function startAutoTune() {
     if (!state.ready || !state.presetInfo || state.autoTune) return;
     window.dispatchEvent(new CustomEvent("optilab:auto-tune-request"));
+    hideExperimentResult();
     removeAutoTuneBadges();
     const pathOrder = (state.presetInfo.optics || []).flat();
     const orderedIds = [...new Set([
@@ -3306,7 +3601,7 @@
     });
   }
 
-  function finishAutoTune(message = "自动调试完成") {
+  function finishAutoTune(message = "自动调试完成", showResult = true) {
     if (!state.autoTune) return;
     state.presetInfo.devices.forEach((device) => applyDeviceControls(device.id, false));
     state.autoTune = null;
@@ -3328,6 +3623,9 @@
     const note = $("#lab-3d-scene-note");
     if (note) note.textContent = message;
     showTooltipPlaceholder(message);
+    if (showResult) {
+      window.setTimeout(showExperimentResult, 180);
+    }
   }
 
   function stopAutoTune() {
@@ -3338,7 +3636,7 @@
       state.deviceControls.set(id, optimalDeviceControls(device));
       applyDeviceControls(id, false);
     });
-    finishAutoTune("自动调试已停止，当前批次已恢复目标参数");
+    finishAutoTune("自动调试已停止，当前批次已恢复目标参数", false);
   }
 
   function updateAutoTune(time) {
@@ -4114,6 +4412,10 @@
       });
       updateHud();
     }
+    if (time - state.lastResultDraw > 100 && !$("#lab-3d-result-panel")?.hidden) {
+      state.lastResultDraw = time;
+      drawExperimentPhenomenon(time);
+    }
     updateSceneAnimations(time);
     state.renderer.render(state.scene, state.camera);
   }
@@ -4143,6 +4445,7 @@
       state.autoTune = null;
       leaveAssemblyPresentation();
       removeAutoTuneBadges();
+      hideExperimentResult();
       if (state.assemblyShelf) state.assemblyShelf.visible = false;
       const hud = $("#lab-3d-autotune-hud");
       if (hud) hud.hidden = true;
@@ -4158,6 +4461,7 @@
   function resetLayout() {
     state.autoTune = null;
     leaveAssemblyPresentation();
+    hideExperimentResult();
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
     if (state.assemblyShelf) state.assemblyShelf.visible = false;
@@ -4217,6 +4521,11 @@
       button.addEventListener("click", () => setViewPreset(button.dataset["3dView"]));
     });
     $("#lab-3d-auto-tune")?.addEventListener("click", startAutoTune);
+    $("#lab-3d-show-result")?.addEventListener("click", showExperimentResult);
+    $("#lab-3d-result-close")?.addEventListener("click", hideExperimentResult);
+    $("#lab-3d-result-data")?.addEventListener("click", () => {
+      document.getElementById("data-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     $("#lab-3d-autotune-stop")?.addEventListener("click", stopAutoTune);
     $("#lab-3d-step-prev")?.addEventListener("click", () => {
       state.autoTour = false;
