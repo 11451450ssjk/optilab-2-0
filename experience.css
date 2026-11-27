@@ -408,12 +408,71 @@ html[data-entered="1"] body.advanced-body {
   backdrop-filter: blur(11px);
 }
 
+.lab-3d-process[hidden] {
+  display: none;
+}
+
 .lab-3d-process-head,
 .lab-3d-process-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.lab-3d-process-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lab-3d-process-reopen {
+  position: absolute;
+  z-index: 4;
+  left: 18px;
+  bottom: 17px;
+  min-height: 34px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(203, 169, 107, 0.42);
+  border-radius: 999px;
+  color: #d9c292;
+  background: rgba(8, 16, 13, 0.9);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.lab-3d-process-reopen[hidden] {
+  display: none;
+}
+
+.lab-3d-process-reopen span,
+.lab-3d-process-reopen strong,
+.lab-3d-process-reopen i {
+  font-size: 8px;
+}
+
+.lab-3d-process-reopen span {
+  color: #bbc5be;
+}
+
+.lab-3d-process-reopen strong {
+  font-family: var(--font-mono);
+  font-size: 7px;
+}
+
+.lab-3d-process-reopen i {
+  color: #e4bd77;
+  font-style: normal;
+}
+
+.lab-3d-process-reopen:hover {
+  border-color: #d5ae68;
+  background: rgba(25, 37, 31, 0.94);
 }
 
 .lab-3d-process-head > span {
@@ -2161,6 +2220,11 @@ html[data-theme="day"] .welcome-notebook {
     bottom: 10px;
     width: calc(100% - 20px);
     padding: 10px 11px;
+  }
+
+  .lab-3d-process-reopen {
+    left: 10px;
+    bottom: 10px;
   }
 
   .lab-3d-process p {

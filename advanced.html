@@ -951,7 +951,10 @@
                 <div class="lab-3d-process" id="lab-3d-process">
                   <div class="lab-3d-process-head">
                     <span id="lab-3d-step-count">实验过程 01 / 05</span>
-                    <button type="button" id="lab-3d-auto-step" aria-pressed="false">自动演示</button>
+                    <div class="lab-3d-process-head-actions">
+                      <button type="button" id="lab-3d-auto-step" aria-pressed="false">自动演示</button>
+                      <button type="button" id="lab-3d-process-collapse" aria-label="收起实验步骤引导">收起</button>
+                    </div>
                   </div>
                   <div class="lab-3d-step-meta">
                     <span id="lab-3d-step-stage">准备</span>
@@ -975,6 +978,11 @@
                     <button type="button" id="lab-3d-step-next">下一步</button>
                   </div>
                 </div>
+                <button class="lab-3d-process-reopen" id="lab-3d-process-reopen" type="button" hidden>
+                  <span>实验步骤</span>
+                  <strong id="lab-3d-process-reopen-count">01 / 07</strong>
+                  <i>展开</i>
+                </button>
                 <div class="lab-3d-scene-caption">
                   <span><i></i> 三维校准网格</span>
                   <span id="lab-3d-scene-note">拖动器件，观察光路和测量值同步变化</span>

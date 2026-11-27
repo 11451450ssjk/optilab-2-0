@@ -38,6 +38,7 @@
     stepMarker: null,
     processSteps: [],
     processStep: 0,
+    processCollapsed: false,
     autoTour: false,
     autoTourAt: 0,
     cameraState: {
@@ -644,6 +645,33 @@
     return mesh;
   }
 
+  function beveledBoxGeometry(width, height, depth, radius = 0.035) {
+    const THREE = state.three;
+    const x = -width / 2;
+    const y = -height / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(x + radius, y);
+    shape.lineTo(x + width - radius, y);
+    shape.quadraticCurveTo(x + width, y, x + width, y + radius);
+    shape.lineTo(x + width, y + height - radius);
+    shape.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    shape.lineTo(x + radius, y + height);
+    shape.quadraticCurveTo(x, y + height, x, y + height - radius);
+    shape.lineTo(x, y + radius);
+    shape.quadraticCurveTo(x, y, x + radius, y);
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth,
+      steps: 1,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      bevelSize: Math.min(radius * 0.35, 0.018),
+      bevelThickness: Math.min(radius * 0.35, 0.018),
+      curveSegments: 5
+    });
+    geometry.center();
+    return geometry;
+  }
+
   const DEVICE_KIND_LABELS = {
     laser: "激光器",
     mirror: "精密镜架",
@@ -824,7 +852,7 @@
       const casingColor = device.variant === "hene" ? 0x8b3f38 :
         device.variant === "solid" ? 0x334c57 : device.variant === "fiber" ? 0x355a4e : 0x303d3b;
       const casing = new THREE.MeshStandardMaterial({ color: casingColor, metalness: 0.64, roughness: 0.3 });
-      addPart(group, device, new THREE.BoxGeometry(0.86, 0.3, 0.44), casing, [0, 0.31, 0]);
+      addPart(group, device, beveledBoxGeometry(0.86, 0.3, 0.44, 0.045), casing, [0, 0.31, 0]);
       for (let index = 0; index < 5; index += 1) {
         addPart(group, device, new THREE.BoxGeometry(0.055, 0.34, 0.47), brassMaterial, [-0.23 + index * 0.115, 0.32, 0]);
       }
@@ -834,6 +862,10 @@
       const panelTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(0.3, 0.14), new THREE.MeshBasicMaterial({ map: panelTexture }), [0, 0.3, 0.225]);
       addPart(group, device, new THREE.SphereGeometry(0.025, 12, 12), new THREE.MeshBasicMaterial({ color: 0x6ee3a2 }), [0.29, 0.42, 0.23]);
+      addPart(group, device, new THREE.CylinderGeometry(0.09, 0.09, 0.018, 24), darkMaterial, [-0.42, 0.32, 0], [0, 0, Math.PI / 2]);
+      for (let index = 0; index < 4; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.22, 0.012, 0.012), darkMaterial, [-0.18, 0.475, -0.18 + index * 0.12]);
+      }
     } else if (kind === "mirror") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.45, 16), blackMetal, [0, 0.29, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.075, 0.44, 0.34), blackMetal, [0, 0.55, 0], [0, 0, -0.14]);
@@ -932,9 +964,9 @@
       }), [0, 0.66, 0.024]);
       addPart(group, device, new THREE.BoxGeometry(0.76, 0.025, 0.055), accentMaterial, [0, 1.15, 0]);
     } else if (kind === "scope") {
-      addPart(group, device, new THREE.BoxGeometry(1.12, 0.58, 0.54), bodyMaterial, [0, 0.34, 0]);
-      addPart(group, device, new THREE.BoxGeometry(1.16, 0.045, 0.58), blackMetal, [0, 0.61, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.96, 0.51, 0.026), blackMetal, [0, 0.36, 0.282]);
+      addPart(group, device, beveledBoxGeometry(1.12, 0.58, 0.54, 0.06), bodyMaterial, [0, 0.34, 0]);
+      addPart(group, device, beveledBoxGeometry(1.16, 0.045, 0.58, 0.025), blackMetal, [0, 0.61, 0]);
+      addPart(group, device, beveledBoxGeometry(0.98, 0.53, 0.035, 0.025), blackMetal, [0, 0.36, 0.282]);
       const panelTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(0.64, 0.39), new THREE.MeshBasicMaterial({ map: panelTexture }), [-0.14, 0.4, 0.3]);
       for (let index = 0; index < 4; index += 1) {
@@ -946,17 +978,37 @@
           [0.36 + (index % 2) * 0.12, 0.48 - Math.floor(index / 2) * 0.18, 0.31],
           [Math.PI / 2, 0, 0]
         );
+        addPart(
+          group,
+          device,
+          new THREE.BoxGeometry(0.012, 0.018, 0.01),
+          accentMaterial,
+          [0.36 + (index % 2) * 0.12, 0.51 - Math.floor(index / 2) * 0.18, 0.337]
+        );
       }
       [-0.3, 0, 0.3].forEach((x) => {
         addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.055, 14), brassMaterial, [x, 0.21, 0.31], [Math.PI / 2, 0, 0]);
+        addPart(group, device, new THREE.TorusGeometry(0.041, 0.008, 8, 16), steelMaterial, [x, 0.21, 0.342], [0, 0, 0]);
       });
       addPart(group, device, new THREE.TorusGeometry(0.28, 0.025, 8, 24, Math.PI), blackMetal, [0, 0.66, 0], [0, 0, Math.PI]);
+      for (let index = 0; index < 8; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.045, 0.008, 0.018), darkMaterial, [-0.28 + index * 0.08, 0.638, -0.12]);
+      }
+      [-0.59, 0.59].forEach((x) => {
+        addPart(group, device, new THREE.TorusGeometry(0.11, 0.018, 8, 20, Math.PI), blackMetal, [x, 0.32, 0], [0, Math.PI / 2, Math.PI / 2]);
+      });
     } else if (kind === "computer") {
-      addPart(group, device, new THREE.BoxGeometry(0.22, 0.25, 0.18), blackMetal, [0, 0.19, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.86, 0.57, 0.07), bodyMaterial, [0, 0.53, 0], [-0.08, 0, 0]);
+      addPart(group, device, beveledBoxGeometry(0.25, 0.08, 0.2, 0.025), blackMetal, [0, 0.16, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.045, 0.25, 16), steelMaterial, [0, 0.28, 0]);
+      addPart(group, device, beveledBoxGeometry(0.86, 0.57, 0.08, 0.035), bodyMaterial, [0, 0.53, 0], [-0.08, 0, 0]);
       const screenTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(0.78, 0.47), new THREE.MeshBasicMaterial({ map: screenTexture }), [0, 0.54, 0.042], [-0.08, 0, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.72, 0.045, 0.28), blackMetal, [0, 0.1, 0.25], [0.08, 0, 0]);
+      addPart(group, device, beveledBoxGeometry(0.72, 0.045, 0.28, 0.02), blackMetal, [0, 0.1, 0.25], [0.08, 0, 0]);
+      for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 10; column += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.045, 0.008, 0.035), steelMaterial, [-0.28 + column * 0.062, 0.127, 0.18 + row * 0.045], [0.08, 0, 0]);
+        }
+      }
     } else if (["detector", "camera", "thermal-camera", "beam-profiler"].includes(kind)) {
       addPart(group, device, new THREE.CylinderGeometry(0.19, 0.17, 0.42, 32), bodyMaterial, [0, 0.39, 0], [0, 0, Math.PI / 2]);
       addPart(group, device, new THREE.TorusGeometry(0.145, 0.025, 10, 28), brassMaterial, [-0.215, 0.39, 0], [0, Math.PI / 2, 0]);
@@ -964,19 +1016,42 @@
       addPart(group, device, new THREE.BoxGeometry(0.14, 0.34, 0.25), blackMetal, [0.22, 0.31, 0]);
       addPart(group, device, new THREE.SphereGeometry(0.03, 12, 12), new THREE.MeshBasicMaterial({ color: 0x6ae3a4 }), [0.24, 0.5, 0.13]);
     } else if (kind === "breadboard") {
-      const boardColor = device.variant === "digital" ? 0x17425c : device.variant === "arduino" ? 0x1d6c59 : 0x174b3a;
-      addPart(group, device, new THREE.BoxGeometry(1.02, 0.08, 0.66), new THREE.MeshStandardMaterial({
-        color: boardColor,
-        metalness: 0.15,
-        roughness: 0.64
-      }), [0, 0.16, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.25, 0.09, 0.22), darkMaterial, [-0.16, 0.245, -0.02]);
-      addPart(group, device, new THREE.BoxGeometry(0.11, 0.035, 0.11), accentMaterial, [0.2, 0.23, -0.1]);
-      for (let index = 0; index < 12; index += 1) {
-        addPart(group, device, new THREE.BoxGeometry(0.025, 0.045, 0.025), brassMaterial, [-0.43 + index * 0.078, 0.225, 0.28]);
+      const boardBase = new THREE.MeshStandardMaterial({ color: 0xb6aa8b, metalness: 0.03, roughness: 0.78 });
+      const breadSurface = new THREE.MeshStandardMaterial({ color: 0xe4dfcf, roughness: 0.72 });
+      addPart(group, device, beveledBoxGeometry(1.08, 0.08, 0.68, 0.035), boardBase, [0, 0.15, 0]);
+      addPart(group, device, beveledBoxGeometry(1.0, 0.025, 0.59, 0.018), breadSurface, [0, 0.2, 0]);
+      addPart(group, device, new THREE.BoxGeometry(1.01, 0.01, 0.035), darkMaterial, [0, 0.218, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.98, 0.006, 0.012), new THREE.MeshBasicMaterial({ color: 0xa84d42 }), [0, 0.221, 0.245]);
+      addPart(group, device, new THREE.BoxGeometry(0.98, 0.006, 0.012), new THREE.MeshBasicMaterial({ color: 0x3b6da8 }), [0, 0.221, -0.245]);
+      const holeMaterial = new THREE.MeshStandardMaterial({ color: 0x3b403b, roughness: 0.72 });
+      const holeGeometry = new THREE.CylinderGeometry(0.006, 0.006, 0.006, 6);
+      const holes = new THREE.InstancedMesh(holeGeometry, holeMaterial, 320);
+      const matrix = new THREE.Matrix4();
+      let instance = 0;
+      for (let bank = 0; bank < 2; bank += 1) {
+        for (let row = 0; row < 10; row += 1) {
+          for (let column = 0; column < 12; column += 1) {
+            matrix.makeTranslation(
+              -0.44 + column * 0.08,
+              0.219,
+              (bank ? 0.05 : -0.05) + (row - 4.5) * 0.035
+            );
+            holes.setMatrixAt(instance, matrix);
+            instance += 1;
+          }
+        }
       }
-      addPart(group, device, new THREE.BoxGeometry(0.2, 0.12, 0.14), steelMaterial, [0.36, 0.26, 0.19]);
-      addPart(group, device, new THREE.BoxGeometry(0.18, 0.1, 0.15), darkMaterial, [-0.42, 0.25, 0.15]);
+      for (let bank = 0; bank < 4; bank += 1) {
+        for (let column = 0; column < 20; column += 1) {
+          matrix.makeTranslation(-0.45 + column * 0.047, 0.219, bank < 2 ? 0.275 - (bank % 2) * 0.035 : -0.275 + (bank % 2) * 0.035);
+          holes.setMatrixAt(instance, matrix);
+          instance += 1;
+        }
+      }
+      holes.instanceMatrix.needsUpdate = true;
+      holes.userData.deviceId = device.id;
+      holes.castShadow = false;
+      group.add(holes);
     } else if (kind === "probe") {
       addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.36, 18), bodyMaterial, [0, 0.42, 0], [0, 0, -0.14]);
       addPart(group, device, new THREE.CylinderGeometry(0.012, 0.004, 0.62, 12), steelMaterial, [-0.065, 0.78, 0], [0, 0, -0.14]);
@@ -1010,7 +1085,8 @@
       });
     } else if (kind === "multimeter") {
       const shell = new THREE.MeshStandardMaterial({ color: 0xd8a844, metalness: 0.18, roughness: 0.58 });
-      addPart(group, device, new THREE.BoxGeometry(0.62, 0.78, 0.24), shell, [0, 0.42, 0], [-0.18, 0, 0]);
+      addPart(group, device, beveledBoxGeometry(0.64, 0.8, 0.25, 0.055), blackMetal, [0, 0.42, -0.006], [-0.18, 0, 0]);
+      addPart(group, device, beveledBoxGeometry(0.6, 0.75, 0.245, 0.05), shell, [0, 0.42, 0.008], [-0.18, 0, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.52, 0.28, 0.025), darkMaterial, [0, 0.62, 0.145], [-0.18, 0, 0]);
       addPart(group, device, new THREE.PlaneGeometry(0.46, 0.22), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.62, 0.16], [-0.18, 0, 0]);
       addPart(group, device, new THREE.CylinderGeometry(0.15, 0.15, 0.045, 32), blackMetal, [0, 0.31, 0.16], [Math.PI / 2, 0, 0]);
@@ -1019,11 +1095,14 @@
         addPart(group, device, new THREE.CylinderGeometry(0.028, 0.028, 0.08, 14), x < 0 ? blackMetal : accentMaterial, [x, 0.12, 0.15], [Math.PI / 2, 0, 0]);
       });
       addPart(group, device, new THREE.BoxGeometry(0.44, 0.035, 0.3), blackMetal, [0, 0.04, 0.18]);
+      for (let index = 0; index < 5; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.29, 0.008, 0.012), darkMaterial, [0.12, 0.45 - index * 0.035, 0.139], [-0.18, 0, 0]);
+      }
     } else if (kind === "power-supply") {
-      addPart(group, device, new THREE.BoxGeometry(1.02, 0.5, 0.54), bodyMaterial, [0, 0.3, 0]);
-      addPart(group, device, new THREE.BoxGeometry(1.04, 0.04, 0.58), steelMaterial, [0, 0.57, 0]);
+      addPart(group, device, beveledBoxGeometry(1.02, 0.5, 0.54, 0.045), bodyMaterial, [0, 0.3, 0]);
+      addPart(group, device, beveledBoxGeometry(1.04, 0.04, 0.58, 0.018), steelMaterial, [0, 0.57, 0]);
       const panel = new THREE.MeshStandardMaterial({ color: 0x161d1b, roughness: 0.66, metalness: 0.22 });
-      addPart(group, device, new THREE.BoxGeometry(0.96, 0.38, 0.025), panel, [0, 0.31, 0.282]);
+      addPart(group, device, beveledBoxGeometry(0.97, 0.39, 0.027, 0.018), panel, [0, 0.31, 0.282]);
       addPart(group, device, new THREE.PlaneGeometry(0.86, 0.28), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.34, 0.3]);
       [-0.34, -0.02].forEach((x) => {
         addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.045, 22), brassMaterial, [x, 0.11, 0.31], [Math.PI / 2, 0, 0]);
@@ -1035,9 +1114,13 @@
       for (let index = 0; index < 5; index += 1) {
         addPart(group, device, new THREE.BoxGeometry(0.42, 0.012, 0.018), darkMaterial, [0.18, 0.13 + index * 0.027, 0.298]);
       }
+      addPart(group, device, new THREE.TorusGeometry(0.19, 0.018, 8, 28, Math.PI), blackMetal, [0, 0.62, 0], [0, 0, Math.PI]);
+      for (let index = 0; index < 7; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.28, 0.01, 0.012), darkMaterial, [-0.28, 0.2 + index * 0.025, -0.285]);
+      }
     } else if (kind === "generator") {
-      addPart(group, device, new THREE.BoxGeometry(0.94, 0.43, 0.5), bodyMaterial, [0, 0.27, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.86, 0.31, 0.025), blackMetal, [0, 0.3, 0.263]);
+      addPart(group, device, beveledBoxGeometry(0.94, 0.43, 0.5, 0.045), bodyMaterial, [0, 0.27, 0]);
+      addPart(group, device, beveledBoxGeometry(0.87, 0.32, 0.027, 0.018), blackMetal, [0, 0.3, 0.263]);
       addPart(group, device, new THREE.PlaneGeometry(0.74, 0.24), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.32, 0.282]);
       addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.04, 22), accentMaterial, [0.35, 0.18, 0.28], [Math.PI / 2, 0, 0]);
       [-0.25, 0, 0.25].forEach((x) => {
@@ -1045,7 +1128,7 @@
       });
       addPart(group, device, new THREE.BoxGeometry(0.2, 0.16, 0.04), darkMaterial, [-0.34, 0.19, 0.275]);
     } else if (kind === "logic-analyzer") {
-      addPart(group, device, new THREE.BoxGeometry(1.1, 0.52, 0.56), bodyMaterial, [0, 0.32, 0]);
+      addPart(group, device, beveledBoxGeometry(1.1, 0.52, 0.56, 0.05), bodyMaterial, [0, 0.32, 0]);
       addPart(group, device, new THREE.PlaneGeometry(0.82, 0.36), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.08, 0.37, 0.3]);
       for (let row = 0; row < 2; row += 1) {
         for (let index = 0; index < 8; index += 1) {
@@ -1068,6 +1151,10 @@
       addPart(group, device, new THREE.CylinderGeometry(0.027, 0.027, 0.028, 16), indexColor(accent, 0.12), [-0.37, 0.235, 0.16]);
       addPart(group, device, new THREE.BoxGeometry(0.15, 0.09, 0.16), blackMetal, [-0.42, 0.23, -0.18]);
       addPart(group, device, new THREE.BoxGeometry(0.17, 0.018, 0.11), brassMaterial, [0.42, 0.225, -0.2]);
+      addPart(group, device, new THREE.CylinderGeometry(0.045, 0.045, 0.025, 16), steelMaterial, [0.02, 0.23, -0.22]);
+      [-0.24, -0.12, 0, 0.12].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.022, 0.022, 0.05, 12), x === 0 ? accentMaterial : brassMaterial, [x, 0.23, 0.18]);
+      });
     } else if (kind === "sensor-module") {
       addPart(group, device, new THREE.BoxGeometry(0.58, 0.045, 0.38), new THREE.MeshStandardMaterial({ color: 0x1b5c4c, roughness: 0.6 }), [0, 0.16, 0]);
       if (/超声/.test(device.label)) {
@@ -1106,7 +1193,7 @@
         }
       }
     } else if (kind === "daq") {
-      addPart(group, device, new THREE.BoxGeometry(0.94, 0.34, 0.5), bodyMaterial, [0, 0.24, 0]);
+      addPart(group, device, beveledBoxGeometry(0.94, 0.34, 0.5, 0.04), bodyMaterial, [0, 0.24, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.88, 0.24, 0.025), blackMetal, [0, 0.25, 0.262]);
       for (let index = 0; index < 8; index += 1) {
         addPart(group, device, new THREE.BoxGeometry(0.06, 0.1, 0.055), index % 3 ? accentMaterial : brassMaterial, [-0.34 + index * 0.1, 0.25, 0.295]);
@@ -1114,7 +1201,7 @@
       addPart(group, device, new THREE.BoxGeometry(0.2, 0.11, 0.16), steelMaterial, [0.33, 0.28, 0.27]);
       addPart(group, device, new THREE.BoxGeometry(0.62, 0.025, 0.04), darkMaterial, [-0.08, 0.42, 0]);
     } else if (kind === "load") {
-      addPart(group, device, new THREE.BoxGeometry(1.0, 0.45, 0.54), bodyMaterial, [0, 0.29, 0]);
+      addPart(group, device, beveledBoxGeometry(1.0, 0.45, 0.54, 0.045), bodyMaterial, [0, 0.29, 0]);
       addPart(group, device, new THREE.PlaneGeometry(0.62, 0.25), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.12, 0.35, 0.295]);
       for (let index = 0; index < 4; index += 1) {
         addPart(group, device, new THREE.CylinderGeometry(0.034, 0.034, 0.06, 16), index < 2 ? brassMaterial : blackMetal, [0.24 + (index % 2) * 0.16, 0.3 - Math.floor(index / 2) * 0.14, 0.29], [Math.PI / 2, 0, 0]);
@@ -1150,14 +1237,26 @@
       }
       addPart(group, device, new THREE.PlaneGeometry(0.28, 0.11), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.31, 0.216]);
     } else if (kind === "spectrometer") {
-      addPart(group, device, new THREE.BoxGeometry(1.02, 0.4, 0.62), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, beveledBoxGeometry(1.02, 0.4, 0.62, 0.05), bodyMaterial, [0, 0.28, 0]);
       addPart(group, device, new THREE.CylinderGeometry(0.25, 0.25, 0.09, 36), blackMetal, [0, 0.53, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.255, 0.018, 8, 40), steelMaterial, [0, 0.58, 0], [Math.PI / 2, 0, 0]);
       addPart(group, device, new THREE.CylinderGeometry(0.13, 0.13, 0.52, 28), bodyMaterial, [-0.43, 0.55, 0], [0, 0, Math.PI / 2]);
       addPart(group, device, new THREE.CylinderGeometry(0.11, 0.13, 0.44, 28), bodyMaterial, [0.42, 0.55, 0], [0, 0, Math.PI / 2]);
       addPart(group, device, new THREE.TorusGeometry(0.11, 0.018, 8, 26), accentMaterial, [-0.7, 0.55, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.09, 0.018, 8, 26), accentMaterial, [0.65, 0.55, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.PlaneGeometry(0.48, 0.2), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.32, 0.315]);
       addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.035, 20), accentMaterial, [0.38, 0.13, 0.315], [Math.PI / 2, 0, 0]);
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index * Math.PI * 2 / 16;
+        addPart(
+          group,
+          device,
+          new THREE.BoxGeometry(index % 4 === 0 ? 0.035 : 0.018, 0.006, 0.012),
+          index % 4 === 0 ? brassMaterial : steelMaterial,
+          [Math.cos(angle) * 0.22, 0.585, Math.sin(angle) * 0.22],
+          [0, -angle, 0]
+        );
+      }
     } else if (["grating", "slit", "polarizer"].includes(kind)) {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.4, 16), blackMetal, [0, 0.26, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.24, 0.03, 12, 36), blackMetal, [0, 0.54, 0], [0, Math.PI / 2, 0]);
@@ -1263,7 +1362,7 @@
       addPart(group, device, new THREE.BoxGeometry(0.32, 0.3, 0.025), new THREE.MeshStandardMaterial({ color: 0xb89a72, roughness: 0.86 }), [0.28, 0.15, 0], [0, 0, -0.12]);
       addPart(group, device, new THREE.TorusGeometry(0.065, 0.01, 8, 24), accentMaterial, [0, 0.21, 0], [Math.PI / 2, 0, 0]);
     } else if (kind === "bioamp") {
-      addPart(group, device, new THREE.BoxGeometry(0.85, 0.42, 0.5), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, beveledBoxGeometry(0.85, 0.42, 0.5, 0.045), bodyMaterial, [0, 0.28, 0]);
       addPart(group, device, new THREE.PlaneGeometry(0.65, 0.27), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.05, 0.33, 0.27]);
       [-0.28, 0, 0.28].forEach((x) => {
         addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.05, 16), x === 0 ? brassMaterial : steelMaterial, [x, 0.12, 0.28], [Math.PI / 2, 0, 0]);
@@ -1300,7 +1399,7 @@
     } else {
       const wide = ["spectrometer", "instrument", "load", "logic-analyzer", "signal", "power"].includes(device.type);
       const width = wide ? 0.92 : 0.7;
-      addPart(group, device, new THREE.BoxGeometry(width, 0.46, 0.48), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, beveledBoxGeometry(width, 0.46, 0.48, 0.045), bodyMaterial, [0, 0.28, 0]);
       addPart(group, device, new THREE.BoxGeometry(width - 0.06, 0.36, 0.025), blackMetal, [0, 0.3, 0.252]);
       const panelTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(width * 0.54, 0.22), new THREE.MeshBasicMaterial({ map: panelTexture }), [-width * 0.12, 0.32, 0.268]);
@@ -1822,7 +1921,20 @@
     }
     const sceneNote = $("#lab-3d-scene-note");
     if (sceneNote) sceneNote.textContent = step.title;
+    syncProcessCollapse();
     state.autoTourAt = performance.now() + 4200;
+  }
+
+  function syncProcessCollapse() {
+    const panel = $("#lab-3d-process");
+    const reopen = $("#lab-3d-process-reopen");
+    const reopenCount = $("#lab-3d-process-reopen-count");
+    if (panel) panel.hidden = state.processCollapsed;
+    if (reopen) reopen.hidden = !state.processCollapsed || !state.active;
+    if (reopenCount) {
+      reopenCount.textContent =
+        `${String(state.processStep + 1).padStart(2, "0")} / ${String(state.processSteps.length || 0).padStart(2, "0")}`;
+    }
   }
 
   function setProcessStep(index, selectDevice = true) {
@@ -2773,6 +2885,7 @@
       });
     }
     if (state.stepMarker) state.stepMarker.visible = state.active && state.ready;
+    syncProcessCollapse();
     if (!state.active) {
       hideTooltip();
       closeInspector();
@@ -2828,6 +2941,29 @@
     $("#lab-3d-auto-step")?.addEventListener("click", () => {
       state.autoTour = !state.autoTour;
       updateProcessUI();
+    });
+    try {
+      state.processCollapsed = localStorage.getItem("optilab-process-collapsed") === "1";
+    } catch {
+      state.processCollapsed = false;
+    }
+    $("#lab-3d-process-collapse")?.addEventListener("click", () => {
+      state.processCollapsed = true;
+      try {
+        localStorage.setItem("optilab-process-collapsed", "1");
+      } catch {
+        // Ignore storage restrictions in private or embedded browsing contexts.
+      }
+      syncProcessCollapse();
+    });
+    $("#lab-3d-process-reopen")?.addEventListener("click", () => {
+      state.processCollapsed = false;
+      try {
+        localStorage.setItem("optilab-process-collapsed", "0");
+      } catch {
+        // Ignore storage restrictions in private or embedded browsing contexts.
+      }
+      syncProcessCollapse();
     });
     $("#lab-3d-inspector-close")?.addEventListener("click", closeInspector);
     $("#lab-3d-inspector-focus")?.addEventListener("click", () => {
