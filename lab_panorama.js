@@ -137,6 +137,13 @@
     "integrated": { name: "综合光电系统", devices: ["laser", "sample", "detector", "daq", "computer", "monitor"], optics: [["laser", "sample", "detector"]], cables: [["detector", "daq"], ["daq", "computer"], ["computer", "monitor"]] }
   };
 
+  const PALETTES = [
+    { bodyTop: "#4d5a55", bodyMid: "#26322f", bodyBottom: "#131b18", accent: "#d9b474", glow: "#7ec59a" },
+    { bodyTop: "#40545d", bodyMid: "#22333b", bodyBottom: "#10191d", accent: "#77b8c4", glow: "#72b6ad" },
+    { bodyTop: "#584e44", bodyMid: "#352b22", bodyBottom: "#18130f", accent: "#d59b64", glow: "#d6ad72" },
+    { bodyTop: "#474d59", bodyMid: "#292f3d", bodyBottom: "#121620", accent: "#9aa7d0", glow: "#8eaecb" }
+  ];
+
   const state = {
     canvas: null,
     context: null,
@@ -150,6 +157,8 @@
     currentConfig: null,
     connectionSpecs: [],
     standardSummary: "",
+    equipmentTraits: [],
+    palette: PALETTES[0],
     defaultPositions: new Map(),
     width: 0,
     height: 0,
@@ -322,6 +331,132 @@
     };
   }
 
+  function decorateExperimentDevices(devices, config = {}, seed = 0) {
+    const name = String(config.experimentName || "");
+    const traits = [];
+    const decorate = (id, changes) => {
+      const device = devices.find((item) => item.id === id);
+      if (device) Object.assign(device, changes);
+    };
+    let laserVariant = "generic";
+    if (/光路的调试|共轴/i.test(name)) traits.push("准直光路 · 光斑位置校准");
+    if (/He-Ne/i.test(name)) {
+      laserVariant = "hene";
+      decorate("laser", { label: "He-Ne 激光器", variant: "hene", symbol: "He-Ne" });
+      traits.push("He-Ne 红光激光管");
+    } else if (/Nd:YVO4|固体激光/i.test(name)) {
+      laserVariant = "solid";
+      decorate("laser", { label: "Nd:YVO₄ 固体激光模块", variant: "solid", symbol: "YVO₄" });
+      traits.push("固体增益介质与泵浦模块");
+    } else if (/激光二极管|半导体激光|LD/i.test(name)) {
+      laserVariant = "diode";
+      decorate("laser", { label: "半导体激光器", variant: "diode", symbol: "LD" });
+      traits.push("恒流驱动与温控封装");
+    } else if (/可调谐|TDLAS/i.test(name)) {
+      laserVariant = "tunable";
+      decorate("laser", { label: "可调谐激光器", variant: "tunable", symbol: "TUNE" });
+      traits.push("波长扫描与控制接口");
+    } else if (/光纤/i.test(name)) {
+      laserVariant = "fiber";
+      decorate("laser", { label: "光纤耦合激光源", variant: "fiber", symbol: "FC" });
+      traits.push("光纤耦合输出");
+    }
+    if (name.includes("红外")) {
+      decorate("ir-camera", { label: "红外热像仪", symbol: "IR", variant: "thermal" });
+      decorate("target", { label: "红外目标", symbol: "IR-T" });
+      traits.push("长波红外探测通道");
+    }
+    if (/Arduino/i.test(name)) {
+      decorate("mcu", { label: "Arduino 控制板", symbol: "UNO", variant: "arduino" });
+      traits.push("5 V 逻辑 · 数字/模拟 IO");
+    } else if (/8086|EMU8086/i.test(name)) {
+      decorate("mcu", { label: "8086 微机实验箱", symbol: "8086", variant: "8086" });
+      traits.push("8086 总线与并行接口");
+    } else if (/单片机|GPIO|ADC|UART|I2C|SPI/i.test(name)) {
+      decorate("mcu", { label: "单片机开发板", symbol: "MCU", variant: "mcu" });
+      traits.push("3.3 V/5 V 数字外设接口");
+    }
+    if (/Verilog|FPGA/i.test(name)) {
+      decorate("mcu", { label: "FPGA 开发板", symbol: "FPGA", variant: "fpga" });
+      decorate("board", { label: "FPGA I/O 扩展板", variant: "digital", symbol: "IO" });
+      traits.push("可编程逻辑与 I/O 时序");
+    }
+    if (/二极管|伏安/i.test(name)) {
+      decorate("diode", { label: "二极管 I–V 测试夹具", variant: "diode", symbol: "PN" });
+      traits.push("限流保护与四线/两线测量");
+    }
+    if (/霍尔|巨磁|磁场/i.test(name)) {
+      decorate("magnet", { label: "电磁铁", symbol: "B", variant: "magnet" });
+      decorate("sample", { label: "磁敏样品", symbol: "HALL" });
+      traits.push("磁场扫描与霍尔电压测量");
+    }
+    if (/分光计/i.test(name)) {
+      decorate("spectrometer", { label: "分光计", symbol: "GON", variant: "goniometer" });
+      decorate("prism", { label: "色散棱镜", symbol: "△" });
+      traits.push("角度读数与棱镜/光栅色散");
+    } else if (/傅里叶变换光谱|FTIR/i.test(name)) {
+      decorate("spectrometer", { label: "FTIR 光谱仪", symbol: "FTIR", variant: "ftir" });
+      traits.push("干涉图傅里叶变换");
+    } else if (/光谱/i.test(name)) {
+      decorate("spectrometer", { label: "光栅光谱仪", symbol: "SPEC", variant: "grating" });
+      traits.push("光栅分光与线阵探测");
+    }
+    if (/太阳|光电池|光伏/i.test(name)) {
+      decorate("sample", { label: "光伏电池组件", symbol: "PV", variant: "solar" });
+      decorate("load", { label: "可调电子负载", symbol: "I–V", variant: "load" });
+      traits.push("I–V 扫描与填充因子");
+    }
+    if (/生物信号/i.test(name)) {
+      decorate("electrode-pad", { label: "生物电电极", symbol: "ECG" });
+      decorate("bioamp", { label: "低噪声生物放大器", symbol: "BIO" });
+      traits.push("高共模抑制生物电前端");
+    }
+    if (/光纤|FBG|EDFA|EDFL|OTDR/i.test(name)) {
+      decorate("fiber-spool", { label: "单模光纤盘", symbol: "FC", variant: "fiber" });
+      decorate("fiber-coupler", { label: "1×2 光纤耦合器", symbol: "Y", variant: "fiber" });
+      traits.push("FC/APC 光纤链路");
+    }
+    if (/示波器/i.test(name)) {
+      decorate("scope", { label: "数字存储示波器", symbol: "DSO", variant: "dso" });
+      traits.push("垂直档位与稳定触发");
+    }
+    if (/逻辑|计数器|触发器|组合逻辑/i.test(name)) {
+      decorate("board", { label: "数字逻辑实验板", symbol: "LOGIC", variant: "digital" });
+      decorate("logic-analyzer", { label: "16 通道逻辑分析仪", symbol: "LA" });
+      traits.push("多位数字总线与时序分析");
+    }
+    if (/电桥|基尔霍夫|戴维南|谐振|三相|互感/i.test(name)) {
+      decorate("board", { label: "电路测试实验板", symbol: "RLC", variant: "analog" });
+      traits.push("四端测量与参考地");
+    }
+    if (/光电效应|弗兰克|探测器|响应度|暗电流/i.test(name)) {
+      decorate("detector", { label: "光电探测头", symbol: "PD", variant: "photoelectric" });
+      traits.push("偏置与微电流测量");
+    }
+    if (/CCD|CMOS|成像|机器视觉/i.test(name)) {
+      decorate("camera", { label: "科学成像相机", symbol: "CCD", variant: "scientific" });
+      traits.push("曝光、增益与像素标定");
+    }
+    if (/全息|相移|剪切/i.test(name)) {
+      decorate("mirror-a", { label: "精密反射镜 A", symbol: "λ/10" });
+      decorate("mirror-b", { label: "精密反射镜 B", symbol: "λ/10" });
+      traits.push("精密位移与波前测量");
+    }
+    if (config.primaryLabel) traits.push(`${config.primaryLabel}：${config.primaryUnit || ""}`);
+    if (config.secondaryLabel) traits.push(`${config.secondaryLabel}：${config.secondaryUnit || ""}`);
+    if (!traits.length) {
+      const primaryDevices = devices.slice(0, 3).map((device) => device.label).join(" + ");
+      traits.push(primaryDevices ? `${primaryDevices} 组合` : "通用测量装置");
+    }
+    devices.forEach((device, index) => {
+      const variant = (seed >>> (index % 8)) & 1;
+      device.accent = PALETTES[(seed + index) % PALETTES.length].accent;
+      device.visualVariant = variant;
+      if (device.id === "laser" && device.variant == null) device.variant = laserVariant;
+    });
+    return [...new Set(traits)].slice(0, 7);
+  }
+
   function applyPreset(presetId, config = {}) {
     const preset = PRESETS[presetId] || PRESETS.measurement;
     const seed = hashString(config.experimentId || config.experimentName || presetId);
@@ -330,6 +465,8 @@
     state.experimentId = config.experimentId || "";
     state.currentConfig = { ...config };
     state.devices = arrangeDevices(preset.devices, seed);
+    state.palette = PALETTES[seed % PALETTES.length];
+    state.equipmentTraits = decorateExperimentDevices(state.devices, config, seed);
     state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
     const connections = createConnectionSpecs(preset, presetId, seed);
     state.connectionSpecs = connections.cableSpecs;
@@ -474,6 +611,10 @@
     const metrics = state.metrics;
     const standard = $("#panorama-standard");
     if (standard) standard.textContent = `接线标准：${state.standardSummary}`;
+    const equipmentTraits = $("#panorama-equipment-traits");
+    if (equipmentTraits) {
+      equipmentTraits.textContent = `器材特征：${state.equipmentTraits.length ? state.equipmentTraits.join(" · ") : state.preset.name}`;
+    }
     const alignmentLabel = $("#panorama-alignment-label");
     const powerLabel = $("#panorama-power-label");
     if (alignmentLabel) alignmentLabel.textContent = metrics.hasOptics ? "光路对准" : "装置对齐";
@@ -695,9 +836,9 @@
 
   function bodyGradient(context, box) {
     const gradient = context.createLinearGradient(box.x, box.y, box.x, box.y + box.height);
-    gradient.addColorStop(0, "#475652");
-    gradient.addColorStop(0.45, "#26322f");
-    gradient.addColorStop(1, "#131c1a");
+    gradient.addColorStop(0, state.palette.bodyTop);
+    gradient.addColorStop(0.45, state.palette.bodyMid);
+    gradient.addColorStop(1, state.palette.bodyBottom);
     return gradient;
   }
 
@@ -715,7 +856,7 @@
     context.stroke();
   }
 
-  function drawLaser(context, box, time) {
+  function drawLaser(context, box, time, device) {
     context.fillStyle = bodyGradient(context, box);
     roundRect(context, box.x, box.y, box.width, box.height, 7);
     context.fill();
@@ -732,9 +873,45 @@
     context.arc(box.x + box.width - 12, box.y + box.height * 0.34, 5, 0, Math.PI * 2);
     context.fill();
     drawKnob(context, box.x + box.width - 12, box.y + box.height * 0.72, 4);
+    const variant = device?.variant || "generic";
+    if (variant === "hene") {
+      context.fillStyle = "rgba(207, 228, 218, 0.18)";
+      roundRect(context, box.x + 10, box.y + box.height * 0.16, box.width * 0.55, box.height * 0.34, 5);
+      context.fill();
+      context.strokeStyle = "rgba(244, 138, 115, 0.72)";
+      context.beginPath();
+      context.moveTo(box.x + 13, box.y + box.height * 0.33);
+      context.lineTo(box.x + box.width * 0.6, box.y + box.height * 0.33);
+      context.stroke();
+    } else if (variant === "solid") {
+      context.fillStyle = "rgba(167, 130, 74, 0.28)";
+      roundRect(context, box.x + box.width * 0.2, box.y + box.height * 0.18, box.width * 0.35, box.height * 0.32, 3);
+      context.fill();
+      context.fillStyle = "rgba(103, 225, 154, 0.72)";
+      context.fillRect(box.x + box.width * 0.34, box.y + box.height * 0.22, 2, box.height * 0.22);
+    } else if (variant === "diode") {
+      context.strokeStyle = "rgba(135, 160, 170, 0.55)";
+      for (let index = 0; index < 5; index += 1) {
+        context.beginPath();
+        context.moveTo(box.x + box.width * 0.18 + index * 5, box.y + box.height * 0.16);
+        context.lineTo(box.x + box.width * 0.18 + index * 5, box.y + box.height * 0.38);
+        context.stroke();
+      }
+    } else if (variant === "tunable") {
+      context.fillStyle = "rgba(8, 17, 16, 0.8)";
+      roundRect(context, box.x + box.width * 0.12, box.y + box.height * 0.15, box.width * 0.32, box.height * 0.24, 2);
+      context.fill();
+      context.fillStyle = device.accent || state.palette.accent;
+      context.font = '6px "Cascadia Mono", monospace';
+      context.fillText("λ", box.x + box.width * 0.22, box.y + box.height * 0.3);
+    }
     const pulse = 0.75 + Math.sin(time * 0.005) * 0.2;
-    context.fillStyle = `rgba(255, 220, 144, ${pulse})`;
-    context.shadowColor = "#f0be70";
+    const apertureColor = variant === "hene" ? [245, 128, 103] :
+      variant === "solid" ? [113, 225, 147] :
+        variant === "diode" ? [99, 168, 232] :
+          variant === "fiber" ? [224, 181, 88] : [255, 220, 144];
+    context.fillStyle = `rgba(${apertureColor[0]}, ${apertureColor[1]}, ${apertureColor[2]}, ${pulse})`;
+    context.shadowColor = `rgb(${apertureColor.join(",")})`;
     context.shadowBlur = 12;
     context.beginPath();
     context.arc(box.x + box.width - 2, box.y + box.height * 0.5, 2.5, 0, Math.PI * 2);
@@ -799,14 +976,20 @@
     context.stroke();
   }
 
-  function drawSample(context, box, time) {
+  function drawSample(context, box, time, device) {
     context.fillStyle = "rgba(31, 43, 39, 0.92)";
     roundRect(context, box.x, box.y + box.height * 0.42, box.width, box.height * 0.48, 4);
     context.fill();
     const grad = context.createLinearGradient(box.x, box.y, box.x + box.width, box.y);
-    grad.addColorStop(0, "rgba(92, 150, 137, 0.42)");
-    grad.addColorStop(0.5, "rgba(216, 198, 150, 0.34)");
-    grad.addColorStop(1, "rgba(201, 128, 83, 0.38)");
+    if (device?.variant === "solar") {
+      grad.addColorStop(0, "rgba(47, 91, 142, 0.78)");
+      grad.addColorStop(0.5, "rgba(68, 123, 178, 0.72)");
+      grad.addColorStop(1, "rgba(28, 58, 93, 0.84)");
+    } else {
+      grad.addColorStop(0, "rgba(92, 150, 137, 0.42)");
+      grad.addColorStop(0.5, "rgba(216, 198, 150, 0.34)");
+      grad.addColorStop(1, "rgba(201, 128, 83, 0.38)");
+    }
     context.fillStyle = grad;
     roundRect(context, box.x + box.width * 0.18, box.y + box.height * 0.12, box.width * 0.64, box.height * 0.68, 4);
     context.fill();
@@ -907,14 +1090,15 @@
     drawKnob(context, box.x + box.width * 0.86, box.y + box.height * 0.72, 4);
   }
 
-  function drawBoard(context, box) {
-    context.fillStyle = "#16372d";
+  function drawBoard(context, box, device) {
+    const variant = device?.variant || "analog";
+    context.fillStyle = variant === "digital" ? "#17324b" : variant === "fpga" ? "#202c4b" : "#16372d";
     roundRect(context, box.x, box.y, box.width, box.height, 5);
     context.fill();
     context.strokeStyle = "rgba(188, 166, 105, 0.4)";
     context.lineWidth = 1;
     context.stroke();
-    context.strokeStyle = "rgba(203, 160, 70, 0.52)";
+    context.strokeStyle = variant === "digital" ? "rgba(102, 169, 214, 0.58)" : "rgba(203, 160, 70, 0.52)";
     context.beginPath();
     for (let index = 0; index < 6; index += 1) {
       const y = box.y + 10 + index * (box.height - 20) / 5;
@@ -924,9 +1108,44 @@
       context.lineTo(box.x + box.width - 8, y + 9);
     }
     context.stroke();
-    context.fillStyle = "#0d1714";
-    roundRect(context, box.x + box.width * 0.38, box.y + box.height * 0.25, box.width * 0.22, box.height * 0.45, 2);
-    context.fill();
+    if (variant === "fpga") {
+      context.fillStyle = "#0a111c";
+      roundRect(context, box.x + box.width * 0.36, box.y + box.height * 0.23, box.width * 0.28, box.height * 0.48, 2);
+      context.fill();
+      context.strokeStyle = "rgba(176, 195, 230, 0.48)";
+      context.stroke();
+      for (let index = 0; index < 8; index += 1) {
+        context.fillStyle = "rgba(205, 185, 119, 0.58)";
+        context.fillRect(box.x + box.width * 0.72, box.y + 8 + index * (box.height - 16) / 7, 5, 3);
+      }
+    } else if (variant === "digital") {
+      context.fillStyle = "#101b24";
+      for (let row = 0; row < 3; row += 1) {
+        for (let col = 0; col < 5; col += 1) {
+          context.fillRect(box.x + 10 + col * 9, box.y + 10 + row * 11, 6, 5);
+        }
+      }
+      context.fillStyle = "rgba(91, 208, 158, 0.9)";
+      for (let index = 0; index < 4; index += 1) {
+        context.beginPath();
+        context.arc(box.x + box.width * 0.75, box.y + 12 + index * 10, 2, 0, Math.PI * 2);
+        context.fill();
+      }
+    } else {
+      context.fillStyle = "#0d1714";
+      roundRect(context, box.x + box.width * 0.38, box.y + box.height * 0.25, box.width * 0.22, box.height * 0.45, 2);
+      context.fill();
+      context.strokeStyle = "rgba(216, 181, 104, 0.62)";
+      context.beginPath();
+      context.arc(box.x + box.width * 0.74, box.y + box.height * 0.35, 6, 0, Math.PI * 2);
+      context.stroke();
+      context.beginPath();
+      context.moveTo(box.x + box.width * 0.7, box.y + box.height * 0.62);
+      context.lineTo(box.x + box.width * 0.78, box.y + box.height * 0.62);
+      context.moveTo(box.x + box.width * 0.74, box.y + box.height * 0.56);
+      context.lineTo(box.x + box.width * 0.74, box.y + box.height * 0.68);
+      context.stroke();
+    }
     for (let index = 0; index < 8; index += 1) {
       context.fillStyle = index % 3 === 0 ? "#c79551" : "#73887c";
       context.fillRect(box.x + 7 + index * (box.width - 15) / 7, box.y + box.height - 8, 4, 3);
@@ -1041,10 +1260,12 @@
       Math.min(5, compact * 0.12)
     );
     context.fill();
-    context.fillStyle = `rgba(218, 190, 133, ${0.68 + Math.sin(time * 0.002 + box.x) * 0.08})`;
+    context.fillStyle = device.accent || state.palette.accent;
+    context.globalAlpha = 0.72 + Math.sin(time * 0.002 + box.x) * 0.08;
     context.font = `${Math.max(7, Math.min(13, compact * 0.28))}px "Cascadia Mono", monospace`;
     context.textAlign = "center";
     context.fillText(device.symbol || "•", box.x + box.width / 2, box.y + box.height * 0.53);
+    context.globalAlpha = 1;
     context.strokeStyle = "rgba(101, 171, 150, 0.45)";
     context.beginPath();
     context.moveTo(box.x + box.width * 0.18, box.y + box.height * 0.72);
@@ -1063,16 +1284,16 @@
     context.shadowBlur = 12;
     context.shadowOffsetY = 5;
     switch (device.type) {
-      case "laser": drawLaser(context, box, time); break;
+      case "laser": drawLaser(context, box, time, device); break;
       case "mirror": drawMirror(context, box); break;
       case "splitter": drawSplitter(context, box); break;
       case "lens": drawLens(context, box); break;
-      case "sample": drawSample(context, box, time); break;
+      case "sample": drawSample(context, box, time, device); break;
       case "screen": drawScreen(context, box, time, config); break;
       case "detector": drawDetector(context, box, time); break;
       case "power": drawPower(context, box); break;
       case "signal": drawSignal(context, box, time); break;
-      case "board": drawBoard(context, box); break;
+      case "board": drawBoard(context, box, device); break;
       case "probe": drawProbe(context, box); break;
       case "scope": drawScope(context, box, time, state.metrics.frequency); break;
       case "computer": drawComputer(context, box, time); break;
@@ -1081,11 +1302,23 @@
     context.restore();
     if (device.id === state.selected) {
       context.save();
-      context.strokeStyle = "rgba(237, 199, 132, 0.9)";
+      context.strokeStyle = state.palette.accent;
       context.lineWidth = 1.4;
       context.setLineDash([3, 4]);
       roundRect(context, box.x - 5, box.y - 5, box.width + 10, box.height + 10, 8);
       context.stroke();
+      const ports = PORT_PROFILES[device.id] || PORT_PROFILES[device.type] || ["MEASURE", "GND"];
+      ports.slice(0, 4).forEach((port, index) => {
+        const x = box.x + box.width * ((index + 1) / (Math.min(4, ports.length) + 1));
+        const y = box.y + box.height + 5;
+        context.fillStyle = "#0b1210";
+        context.strokeStyle = state.palette.accent;
+        context.lineWidth = 1;
+        context.beginPath();
+        context.arc(x, y, 2.8, 0, Math.PI * 2);
+        context.fill();
+        context.stroke();
+      });
       context.restore();
     }
     if (config.annotations) {
@@ -1255,6 +1488,7 @@
       experimentId: state.experimentId,
       devices: [...state.preset.devices],
       standards: state.standardSummary,
+      equipmentTraits: [...state.equipmentTraits],
       connections: state.connectionSpecs.map((item) => ({ ...item }))
     } : null,
     resolvePreset(experiment = {}) {
@@ -1266,6 +1500,14 @@
       const seed = hashString(experiment.id || experiment.name || presetId);
       const devices = arrangeDevices(preset.devices, seed);
       const connections = createConnectionSpecs(preset, presetId, seed);
+      const equipmentTraits = decorateExperimentDevices(devices, {
+        experimentId: experiment.id,
+        experimentName: experiment.name,
+        primaryLabel: experiment.primaryLabel || "",
+        primaryUnit: experiment.primaryUnit || "",
+        secondaryLabel: experiment.secondaryLabel || "",
+        secondaryUnit: experiment.secondaryUnit || ""
+      }, seed);
       return {
         id: presetId,
         name: preset.name,
@@ -1273,8 +1515,12 @@
         optics: preset.optics.map((path) => [...path]),
         cables: preset.cables.map((path) => [...path]),
         standards: connections.summary,
+        equipmentTraits,
+        palette: PALETTES[seed % PALETTES.length],
         connections: connections.cableSpecs.map((item) => ({ ...item })),
-        fingerprint: `${experiment.id}|${presetId}|${devices.map((device) => `${device.id}:${device.x.toFixed(5)}:${device.y.toFixed(5)}`).join(",")}|${connections.summary}`
+        fingerprint: `${experiment.id}|${presetId}|${devices.map((device) =>
+          `${device.id}:${device.label}:${device.variant || "default"}:${device.x.toFixed(5)}:${device.y.toFixed(5)}`
+        ).join(",")}|${connections.summary}|${equipmentTraits.join(";")}`
       };
     }
   };

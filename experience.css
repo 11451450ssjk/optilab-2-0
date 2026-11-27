@@ -182,6 +182,7 @@ html[data-entered="1"] body.advanced-body {
   grid-column: 1 / -1;
   padding-top: 9px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 18px;
   border-top: 1px solid #28322f;
@@ -194,6 +195,11 @@ html[data-entered="1"] body.advanced-body {
 .panorama-connection-info span:last-child {
   color: #b7a177;
   text-align: right;
+}
+
+#panorama-equipment-traits {
+  flex-basis: 100%;
+  color: #a58d68;
 }
 
 html[data-theme="day"] .theme-toggle-icon {
