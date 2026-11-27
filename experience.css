@@ -178,6 +178,24 @@ html[data-entered="1"] body.advanced-body {
   background: rgba(191, 147, 75, 0.12);
 }
 
+.panorama-connection-info {
+  grid-column: 1 / -1;
+  padding-top: 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid #28322f;
+  color: #7f8b84;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.panorama-connection-info span:last-child {
+  color: #b7a177;
+  text-align: right;
+}
+
 html[data-theme="day"] .theme-toggle-icon {
   color: #8c5d19;
   background: rgba(185, 119, 27, 0.13);
@@ -206,6 +224,11 @@ html[data-theme="day"] .advanced-body .panorama-device-list button {
 
 html[data-theme="day"] .advanced-body .panorama-metrics strong {
   color: #865d28;
+}
+
+html[data-theme="day"] .advanced-body .panorama-connection-info {
+  border-top-color: #ded6c9;
+  color: #727a74;
 }
 
 /* Morning research check-in */

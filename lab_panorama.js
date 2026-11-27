@@ -73,6 +73,30 @@
     { id, label, type, zone, symbol: symbol || "" }
   ]));
 
+  const PORT_PROFILES = {
+    laser: ["EMIT", "CTRL/DB9"],
+    scope: ["CH1/BNC50Ω", "CH2/BNC50Ω", "EXT TRIG", "USB-B"],
+    signal: ["OUT/BNC50Ω", "SYNC/BNC"],
+    power: ["+4mm", "−4mm", "GND"],
+    probe: ["TIP", "GND", "BNC50Ω"],
+    detector: ["SIG/BNC", "BIAS"],
+    mcu: ["GPIO", "ADC", "UART", "5V/GND"],
+    sensor: ["VCC", "GND", "SIG"],
+    actuator: ["VCC", "PWM", "GND"],
+    computer: ["USB 2.0", "LAN", "GPIB"],
+    daq: ["AI0/BNC", "AO0/BNC", "USB-B"],
+    multimeter: ["VΩ", "COM", "mA"],
+    spectrometer: ["FC/APC", "USB-B"],
+    "fiber-coupler": ["IN/FC", "OUT1/FC", "OUT2/FC"],
+    "fiber-spool": ["FC/APC IN", "FC/APC OUT"],
+    "optical-tx": ["RF/BNC", "FC/APC OUT"],
+    "optical-rx": ["FC/APC IN", "RF/BNC"],
+    "logic-analyzer": ["CH0–15", "TRIG", "USB-B"],
+    "power-meter": ["SENSOR", "USB-B"],
+    "beam-profiler": ["CCD", "USB-B"],
+    camera: ["USB 3.0", "TRIG"]
+  };
+
   const PRESETS = {
     "professional-light-path": { name: "专业认知 · 光路调试", devices: ["laser", "mirror-a", "lens", "screen", "power-meter"], optics: [["laser", "mirror-a", "lens", "screen"]], cables: [] },
     "professional-arduino": { name: "专业认知 · Arduino 测距", devices: ["mcu", "ultrasonic", "lcd", "alarm", "power", "computer"], optics: [], cables: [["power", "mcu"], ["mcu", "ultrasonic"], ["mcu", "lcd"], ["mcu", "alarm"], ["mcu", "computer"]] },
@@ -122,6 +146,10 @@
     devices: [],
     presetId: "",
     preset: null,
+    experimentId: "",
+    currentConfig: null,
+    connectionSpecs: [],
+    standardSummary: "",
     defaultPositions: new Map(),
     width: 0,
     height: 0,
@@ -138,6 +166,14 @@
 
   const $ = (selector) => document.querySelector(selector);
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const hashString = (value) => {
+    let hash = 2166136261;
+    for (const char of String(value || "")) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  };
   const roundRect = (context, x, y, width, height, radius) => {
     const r = Math.min(radius, width / 2, height / 2);
     context.beginPath();
@@ -219,7 +255,7 @@
     return simMap[sim] || "measurement";
   }
 
-  function arrangeDevices(ids) {
+  function arrangeDevices(ids, seed = 0) {
     const definitions = ids.map((id) => DEVICE_MAP[id]).filter(Boolean);
     const optical = definitions.filter((item) => item.zone === "optical" || item.zone === "mixed");
     const electronic = definitions.filter((item) => item.zone === "electronic");
@@ -234,7 +270,14 @@
         const column = index % maxPerRow;
         const x = (column + 1) / (rowItems.length + 1);
         const y = baseY + row * rowGap;
-        positioned.push({ ...item, x: clamp(x, 0.08, 0.92), y: clamp(y, 0.1, 0.9) });
+        const jitterSeed = seed ^ hashString(`${item.id}:${index}`);
+        const jitterX = ((jitterSeed % 1000) / 999 - 0.5) * 0.032;
+        const jitterY = (((jitterSeed >>> 10) % 1000) / 999 - 0.5) * 0.022;
+        positioned.push({
+          ...item,
+          x: clamp(x + jitterX, 0.08, 0.92),
+          y: clamp(y + jitterY, 0.1, 0.9)
+        });
       });
     };
     placeGroup(optical, 0.22, 0.15);
@@ -246,23 +289,59 @@
     return positioned;
   }
 
-  function applyPreset(presetId) {
+  function inferCableStandard(from, to, presetId) {
+    const ids = `${from?.id || ""} ${to?.id || ""}`;
+    if (/fiber|optical-tx|optical-rx/.test(ids) || presetId === "fiber-lab") return "FC/APC 单模光纤";
+    if (/computer|daq|camera|spectrometer|logic-analyzer/.test(ids)) return "USB 2.0 / 3.0";
+    if (/scope|signal|probe|detector/.test(ids)) return "BNC 50Ω 同轴";
+    if (/power/.test(ids)) return "4 mm 香蕉插头 / DC 5.5 mm";
+    if (/multimeter|board/.test(ids)) return "4 mm 表笔 / 测试引线";
+    if (/mcu|sensor|actuator|ultrasonic|lcd|alarm|keypad/.test(ids)) return "2.54 mm 杜邦线";
+    return "屏蔽信号线";
+  }
+
+  function createConnectionSpecs(preset, presetId, seed) {
+    const opticalStandards = preset.optics.length
+      ? [presetId === "fiber-lab" || presetId === "communication" ? "FC/APC 光纤光路" : "自由空间准直光路"]
+      : [];
+    const cableSpecs = preset.cables.map(([fromId, toId], index) => {
+      const from = DEVICE_MAP[fromId];
+      const to = DEVICE_MAP[toId];
+      return {
+        fromId,
+        toId,
+        standard: inferCableStandard(from, to, presetId),
+        phase: 0.08 + index * 0.13,
+        variant: (seed + index * 17) % 3
+      };
+    });
+    return {
+      opticalStandards,
+      cableSpecs,
+      summary: [...new Set([...opticalStandards, ...cableSpecs.map((item) => item.standard)])].join(" · ") || "无外部接线"
+    };
+  }
+
+  function applyPreset(presetId, config = {}) {
     const preset = PRESETS[presetId] || PRESETS.measurement;
+    const seed = hashString(config.experimentId || config.experimentName || presetId);
     state.presetId = presetId;
     state.preset = preset;
-    state.devices = arrangeDevices(preset.devices);
+    state.experimentId = config.experimentId || "";
+    state.currentConfig = { ...config };
+    state.devices = arrangeDevices(preset.devices, seed);
     state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
+    const connections = createConnectionSpecs(preset, presetId, seed);
+    state.connectionSpecs = connections.cableSpecs;
+    state.standardSummary = connections.summary;
     state.selected = state.devices[0]?.id || "";
     renderDeviceDock();
     updateSelectionHud();
   }
 
   function resetPositions() {
-    if (!state.preset) applyPreset("measurement");
-    state.devices = arrangeDevices(state.preset.devices);
-    state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
-    state.selected = state.devices[0]?.id || "";
-    updateSelectionHud();
+    if (!state.preset) applyPreset("measurement", { experimentName: "基础测量", sim: "measurement" });
+    else applyPreset(state.presetId, state.currentConfig || {});
   }
 
   function deviceById(id) {
@@ -366,10 +445,24 @@
     return Number(value).toFixed(digits).replace(/\.?0+$/, "");
   }
 
+  function fitText(context, text, maxWidth) {
+    if (context.measureText(text).width <= maxWidth) return text;
+    let value = text;
+    while (value.length > 4 && context.measureText(`${value}…`).width > maxWidth) {
+      value = value.slice(0, -1);
+    }
+    return `${value}…`;
+  }
+
   function updateSelectionHud() {
     const selected = deviceById(state.selected);
     const label = $("#panorama-selected");
     if (label && selected) label.textContent = `正在观察：${selected.label}`;
+    const portMap = $("#panorama-port-map");
+    if (portMap) {
+      const ports = PORT_PROFILES[selected?.id] || PORT_PROFILES[selected?.type] || ["MEASURE", "GND"];
+      portMap.textContent = selected ? `端口：${ports.join(" · ")}` : "端口：—";
+    }
     document.querySelectorAll("[data-panorama-device]").forEach((button) => {
       button.classList.toggle("active", button.dataset.panoramaDevice === state.selected);
     });
@@ -379,6 +472,8 @@
     if (time - state.lastHudUpdate < 100) return;
     state.lastHudUpdate = time;
     const metrics = state.metrics;
+    const standard = $("#panorama-standard");
+    if (standard) standard.textContent = `接线标准：${state.standardSummary}`;
     const alignmentLabel = $("#panorama-alignment-label");
     const powerLabel = $("#panorama-power-label");
     if (alignmentLabel) alignmentLabel.textContent = metrics.hasOptics ? "光路对准" : "装置对齐";
@@ -507,16 +602,47 @@
     context.restore();
   }
 
+  function drawConnector(context, pointValue, color, variant = 0) {
+    context.save();
+    context.fillStyle = "#0d1412";
+    context.strokeStyle = color;
+    context.lineWidth = 1.4;
+    if (variant === 1) {
+      roundRect(context, pointValue.x - 4, pointValue.y - 3, 8, 6, 1);
+      context.fill();
+      context.stroke();
+      context.fillStyle = color;
+      context.fillRect(pointValue.x - 2, pointValue.y - 1, 4, 2);
+    } else if (variant === 2) {
+      context.beginPath();
+      context.arc(pointValue.x, pointValue.y, 4, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      context.fillStyle = color;
+      context.beginPath();
+      context.arc(pointValue.x, pointValue.y, 1.6, 0, Math.PI * 2);
+      context.fill();
+    } else {
+      context.beginPath();
+      context.arc(pointValue.x, pointValue.y, 3.5, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
   function drawCables(context, time) {
     if (!state.showCables) return;
     const colors = ["#e7b76f", "#5fbfaa", "#d6d1ba", "#7fa9d8", "#d6a962", "#ac8ad8"];
-    (state.preset?.cables || []).forEach(([fromId, toId], index) => {
-      const fromDevice = deviceById(fromId);
-      const toDevice = deviceById(toId);
+    state.connectionSpecs.forEach((connection, index) => {
+      const fromDevice = deviceById(connection.fromId);
+      const toDevice = deviceById(connection.toId);
       if (!fromDevice || !toDevice) return;
       const from = point(fromDevice, "right");
       const to = point(toDevice, "left");
-      drawCable(context, from, to, colors[index % colors.length], time, 0.08 + index * 0.13);
+      drawCable(context, from, to, colors[index % colors.length], time, connection.phase);
+      drawConnector(context, from, colors[index % colors.length], connection.variant);
+      drawConnector(context, to, colors[index % colors.length], connection.variant);
     });
   }
 
@@ -974,8 +1100,8 @@
 
   function drawScene(config, time) {
     const nextPresetId = presetForExperiment(config);
-    if (nextPresetId !== state.presetId || !state.preset) {
-      applyPreset(nextPresetId);
+    if (nextPresetId !== state.presetId || config.experimentId !== state.experimentId || !state.preset) {
+      applyPreset(nextPresetId, config);
     }
     state.metrics = calculateMetrics(config);
     const context = state.context;
@@ -985,18 +1111,16 @@
     state.devices.forEach((device) => drawDevice(context, device, time, config));
 
     context.save();
+    const titleWidth = Math.min(360, state.width * 0.56);
     context.fillStyle = "rgba(6, 11, 10, 0.76)";
-    roundRect(context, 14, 13, 176, 27, 7);
+    roundRect(context, 14, 13, titleWidth, 27, 7);
     context.fill();
     context.strokeStyle = "rgba(193, 221, 202, 0.12)";
     context.stroke();
     context.fillStyle = "#c9a66d";
     context.font = '8px "Cascadia Mono", monospace';
-    context.fillText(
-      `${state.preset.name.toUpperCase()}  ·  ${state.devices.length} DEVICES`,
-      24,
-      30
-    );
+    const sceneTitle = `${config.experimentName || state.preset.name} · ${state.devices.length} 件设备`;
+    context.fillText(fitText(context, sceneTitle, titleWidth - 20), 24, 30);
 
     const statusWidth = Math.min(235, state.width * 0.36);
     context.fillStyle = "rgba(6, 11, 10, 0.72)";
@@ -1125,19 +1249,32 @@
     getMetrics: () => ({ ...state.metrics }),
     getLayout: () => state.devices.map((device) => ({ ...device })),
     getSelected: () => state.selected,
-    getPreset: () => state.preset ? { id: state.presetId, name: state.preset.name, devices: [...state.preset.devices] } : null,
+    getPreset: () => state.preset ? {
+      id: state.presetId,
+      name: state.preset.name,
+      experimentId: state.experimentId,
+      devices: [...state.preset.devices],
+      standards: state.standardSummary,
+      connections: state.connectionSpecs.map((item) => ({ ...item }))
+    } : null,
     resolvePreset(experiment = {}) {
       const presetId = presetForExperiment({
         experimentName: experiment.name,
         sim: experiment.sim
       });
       const preset = PRESETS[presetId] || PRESETS.measurement;
+      const seed = hashString(experiment.id || experiment.name || presetId);
+      const devices = arrangeDevices(preset.devices, seed);
+      const connections = createConnectionSpecs(preset, presetId, seed);
       return {
         id: presetId,
         name: preset.name,
-        devices: [...preset.devices],
+        devices: devices.map((device) => ({ ...device })),
         optics: preset.optics.map((path) => [...path]),
-        cables: preset.cables.map((path) => [...path])
+        cables: preset.cables.map((path) => [...path]),
+        standards: connections.summary,
+        connections: connections.cableSpecs.map((item) => ({ ...item })),
+        fingerprint: `${experiment.id}|${presetId}|${devices.map((device) => `${device.id}:${device.x.toFixed(5)}:${device.y.toFixed(5)}`).join(",")}|${connections.summary}`
       };
     }
   };
