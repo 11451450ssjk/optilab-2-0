@@ -7,14 +7,18 @@
   <meta name="description" content="OptiLab 晨光科研提示页：写下今天的实验或研究重点，然后进入工作台。">
   <title>晨光提示 · OptiLab</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="advanced.css">
-  <link rel="stylesheet" href="experience.css">
-  <link rel="stylesheet" href="checkin.css">
+  <link rel="stylesheet" href="styles.css?v=20261128-auto-entry">
+  <link rel="stylesheet" href="advanced.css?v=20261128-auto-entry">
+  <link rel="stylesheet" href="experience.css?v=20261128-auto-entry">
+  <link rel="stylesheet" href="checkin.css?v=20261128-auto-entry">
   <script>
     try {
       if (localStorage.getItem("optilab_theme_v1") === "day") {
         document.documentElement.dataset.theme = "day";
+      }
+      const checked = JSON.parse(localStorage.getItem("optilab_morning_checkins_v1") || "[]");
+      if (localStorage.getItem("optilab_checkin_auto_entry_v1") === "1" || (Array.isArray(checked) && checked.length)) {
+        document.documentElement.dataset.autoEntry = "1";
       }
     } catch {}
   </script>
@@ -138,6 +142,15 @@
       <span>打卡内容只保存在当前浏览器</span>
     </div>
   </main>
-  <script src="checkin.js"></script>
+  <div class="auto-entry-overlay" id="auto-entry-overlay" role="status" aria-live="polite">
+    <div class="auto-entry-card">
+      <span class="auto-entry-kicker">OPTILAB · READY</span>
+      <strong id="auto-entry-title">晨光记录已完成</strong>
+      <p id="auto-entry-message">正在打开实验工作台，请稍候。</p>
+      <div class="auto-entry-loader" aria-hidden="true"><i></i></div>
+      <small>约 1 秒后自动进入，无需再次点击</small>
+    </div>
+  </div>
+  <script src="checkin.js?v=20261128-auto-entry"></script>
 </body>
 </html>

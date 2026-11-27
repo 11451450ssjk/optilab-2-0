@@ -34,6 +34,8 @@
     inspectorId: "",
     dragStart: null,
     dragMoved: false,
+    motionVelocities: new Map(),
+    motionTargets: new Map(),
     showCables: true,
     metrics: { alignment: 0, connectivity: 0, power: 0, snr: 0, frequency: 0 },
     lastTextureUpdate: 0,
@@ -65,7 +67,9 @@
       target: { x: 0, y: 0.42, z: 0 }
     },
     lastControlFrame: 0,
-    lastControlLinkUpdate: 0
+    lastControlLinkUpdate: 0,
+    lastMotionFrame: 0,
+    lastMotionLinkUpdate: 0
   };
 
   function formatNumber(value, digits = 2) {
@@ -2676,11 +2680,11 @@
       updateRayPointer(event);
       const hit = new state.three.Vector3();
       if (state.raycaster.ray.intersectPlane(state.dragPlane, hit)) {
-        state.dragGroup.position.x = clamp(hit.x, -4.65, 4.65);
-        state.dragGroup.position.z = clamp(hit.z, -2.6, 2.6);
+        state.motionTargets.set(state.selectedId, {
+          x: clamp(hit.x, -4.65, 4.65),
+          z: clamp(hit.z, -2.6, 2.6)
+        });
         state.selectionHelper?.update();
-        rebuildConnections();
-        updateHud();
       }
     } else if (state.orbit) {
       const dx = event.clientX - state.orbit.x;
@@ -3012,6 +3016,8 @@
     const origin = state.initialPositions.get(id);
     if (!lod || !device || !origin) return;
     const controls = ensureDeviceControls(device);
+    state.motionTargets.delete(id);
+    state.motionVelocities.delete(id);
     if (syncTarget) state.controlTargets.set(id, { ...controls });
     lod.position.x = origin.x + Number(controls.offsetX || 0) * 0.018;
     lod.position.z = origin.z + Number(controls.offsetZ || 0) * 0.018;
@@ -3492,6 +3498,40 @@
       updateHud();
     }
     state.selectionHelper?.update();
+  }
+
+  function updateDeviceMotion(time) {
+    if (state.autoTune || !state.motionTargets.size) return;
+    const delta = state.lastMotionFrame ? clamp((time - state.lastMotionFrame, 1, 40) / 1000, 0.001, 0.04) : 0.016;
+    state.lastMotionFrame = time;
+    let changed = false;
+    state.motionTargets.forEach((target, id) => {
+      const group = state.deviceGroups.get(id);
+      if (!group) return;
+      const velocity = state.motionVelocities.get(id) || { x: 0, z: 0 };
+      const dx = target.x - group.position.x;
+      const dz = target.z - group.position.z;
+      velocity.x += (dx * 62 - velocity.x * 16) * delta;
+      velocity.z += (dz * 62 - velocity.z * 16) * delta;
+      group.position.x += velocity.x * delta;
+      group.position.z += velocity.z * delta;
+      if (Math.hypot(dx, dz) < 0.0015 && Math.hypot(velocity.x, velocity.z) < 0.012) {
+        group.position.x = target.x;
+        group.position.z = target.z;
+        state.motionTargets.delete(id);
+        state.motionVelocities.delete(id);
+      } else {
+        state.motionVelocities.set(id, velocity);
+      }
+      changed = true;
+    });
+    if (!changed) return;
+    state.selectionHelper?.update();
+    if (time - state.lastMotionLinkUpdate > 45) {
+      state.lastMotionLinkUpdate = time;
+      rebuildConnections();
+      updateHud();
+    }
   }
 
   function renderDeviceControls(device) {
@@ -4063,6 +4103,7 @@
     updateCamera(time);
     updateAutoTune(time);
     updateControlSmoothing(time);
+    updateDeviceMotion(time);
     if (state.autoTour && time >= state.autoTourAt) {
       setProcessStep(state.processStep + 1);
     }

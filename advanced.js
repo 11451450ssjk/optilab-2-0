@@ -658,6 +658,39 @@ function setupWelcomeScreen() {
     }, 80);
     return;
   }
+  let autoEntry = false;
+  try {
+    const checkins = JSON.parse(localStorage.getItem("optilab_morning_checkins_v1") || "[]");
+    autoEntry = localStorage.getItem("optilab_checkin_auto_entry_v1") === "1"
+      || (Array.isArray(checkins) && checkins.length > 0);
+  } catch {
+    autoEntry = false;
+  }
+  if (autoEntry) {
+    const overlay = document.createElement("div");
+    overlay.className = "auto-entry-overlay is-visible";
+    overlay.setAttribute("role", "status");
+    overlay.setAttribute("aria-live", "polite");
+    overlay.innerHTML = `
+      <div class="auto-entry-card">
+        <span class="auto-entry-kicker">OPTILAB · READY</span>
+        <strong>晨光记录已完成</strong>
+        <p>系统正在恢复实验工作台，无需再次点击打卡。</p>
+        <div class="auto-entry-loader" aria-hidden="true"><i></i></div>
+        <small>约 1 秒后自动进入</small>
+      </div>`;
+    document.body.appendChild(overlay);
+    window.setTimeout(() => {
+      welcome.hidden = true;
+      welcome.classList.remove("leaving");
+      document.body.classList.remove("welcome-locked");
+      const nextTarget = params.get("next") || "catalog-section";
+      document.getElementById(nextTarget)?.scrollIntoView({ behavior: "instant", block: "start" });
+      overlay.classList.add("leaving");
+      window.setTimeout(() => overlay.remove(), 260);
+    }, 1000);
+    return;
+  }
   const openCheckinPage = (targetId = "catalog-section") => {
     if (welcome.hidden) return;
     welcome.classList.add("leaving");

@@ -3,10 +3,12 @@
 (function () {
   const THEME_KEY = "optilab_theme_v1";
   const CHECKIN_KEY = "optilab_morning_checkins_v1";
+  const AUTO_ENTRY_KEY = "optilab_checkin_auto_entry_v1";
   const PROJECT_KEY = "optilab_research_project_v1";
   const params = new URLSearchParams(location.search);
   const nextTarget = params.get("next") || "catalog-section";
   let checkins = [];
+  let autoEntryTimer = null;
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -86,6 +88,39 @@
 
   function workspaceUrl() {
     return `advanced.html?entered=1&next=${encodeURIComponent(nextTarget)}`;
+  }
+
+  function autoEntryEnabled() {
+    try {
+      return localStorage.getItem(AUTO_ENTRY_KEY) === "1" || checkins.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  function prefetchWorkspace() {
+    const href = workspaceUrl();
+    if (document.querySelector(`link[data-workspace-prefetch="${href}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.as = "document";
+    link.href = href;
+    link.dataset.workspacePrefetch = href;
+    document.head.appendChild(link);
+  }
+
+  function showAutoEntry(title, message) {
+    document.documentElement.dataset.autoEntry = "1";
+    const titleElement = $("#auto-entry-title");
+    const messageElement = $("#auto-entry-message");
+    if (titleElement) titleElement.textContent = title;
+    if (messageElement) messageElement.textContent = message;
+    prefetchWorkspace();
+    window.clearTimeout(autoEntryTimer);
+    autoEntryTimer = window.setTimeout(() => {
+      document.body.classList.add("checkin-leaving");
+      window.location.replace(workspaceUrl());
+    }, 1000);
   }
 
   function applyTheme(theme) {
@@ -212,11 +247,10 @@
     else checkins.push(record);
     saveCheckins();
     saveProjectReminder(record);
+    localStorage.setItem(AUTO_ENTRY_KEY, "1");
     render();
-    $("#checkin-form-message").textContent = "已保存，正在进入工作台…";
-    window.setTimeout(() => {
-      location.href = workspaceUrl();
-    }, 420);
+    $("#checkin-form-message").textContent = "已保存，1 秒后自动进入工作台…";
+    showAutoEntry("今天的晨光记录已保存", "工作台已准备就绪，无需再次点击打卡。");
   }
 
   loadCheckins();
@@ -234,4 +268,11 @@
     });
   });
   render();
+  if (autoEntryEnabled()) {
+    const current = todayRecord();
+    showAutoEntry(
+      current ? "今天的晨光记录已存在" : "已完成过晨光打卡",
+      "正在恢复到上次的实验工作台，无需再次填写。"
+    );
+  }
 })();
