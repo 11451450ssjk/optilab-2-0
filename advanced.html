@@ -1459,7 +1459,10 @@
                 <span class="eyebrow">以前保存的</span>
                 <h3>报告记录</h3>
               </div>
-              <span id="history-count">0</span>
+              <div class="history-heading-actions">
+                <span id="history-count">0</span>
+                <button class="secondary-button small" id="open-report-cleanup" type="button">清理</button>
+              </div>
             </div>
             <div id="report-history-list" class="report-history-list">
               <div class="history-empty">
@@ -1635,6 +1638,46 @@
         <input id="equipment-library-file" type="file" accept=".json,application/json" hidden>
       </div>
       <p class="equipment-library-note">参数保存在当前浏览器；导出后可作为课程或实验室统一的器材参数模板。具体实物仍以铭牌和校准证书为准。</p>
+    </div>
+  </section>
+
+  <section class="report-cleanup-modal" id="report-cleanup-modal" hidden aria-labelledby="report-cleanup-title">
+    <div class="report-cleanup-backdrop" data-report-cleanup-close></div>
+    <div class="report-cleanup-dialog" role="dialog" aria-modal="true">
+      <div class="report-cleanup-head">
+        <div>
+          <span class="eyebrow">本地报告管理</span>
+          <h3 id="report-cleanup-title">清理实验报告历史</h3>
+        </div>
+        <button class="report-cleanup-close" type="button" data-report-cleanup-close aria-label="关闭报告清理">×</button>
+      </div>
+      <div class="report-cleanup-summary">
+        <div><span>当前报告</span><strong id="report-cleanup-count">0 份</strong></div>
+        <div><span>本地占用</span><strong id="report-cleanup-size">0 KB</strong></div>
+        <div><span>数据位置</span><strong>仅当前浏览器</strong></div>
+      </div>
+      <div class="report-cleanup-options">
+        <button type="button" data-report-cleanup-mode="active">
+          <strong>删除当前报告</strong>
+          <span>只移除正在查看的一份报告。</span>
+        </button>
+        <button type="button" data-report-cleanup-mode="keep10">
+          <strong>只保留最近 10 份</strong>
+          <span>清理较早的报告，保留最近整理结果。</span>
+        </button>
+        <button type="button" data-report-cleanup-mode="old30">
+          <strong>清理 30 天前报告</strong>
+          <span>删除创建时间早于 30 天的历史记录。</span>
+        </button>
+        <button type="button" data-report-cleanup-mode="all" class="danger">
+          <strong>清空全部报告</strong>
+          <span>删除所有实验报告历史，不影响实验目录和文献。</span>
+        </button>
+      </div>
+      <div class="report-cleanup-footer">
+        <span id="report-cleanup-status" role="status">清理前可随时撤销一次。</span>
+        <button class="secondary-button small" id="report-cleanup-undo" type="button" disabled>撤销上次清理</button>
+      </div>
     </div>
   </section>
 

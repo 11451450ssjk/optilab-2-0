@@ -3,6 +3,7 @@
 const EXPERIMENTS = window.LAB_EXPERIMENTS;
 const CATALOG = window.LAB_CATALOG;
 const REPORT_STORAGE_KEY = "optilab_advanced_reports_v2";
+const REPORT_CLEANUP_BACKUP_KEY = "optilab_reports_cleanup_backup_v1";
 const MAX_REPORTS = 30;
 
 const SIM_INFO = {
@@ -3809,10 +3810,131 @@ function loadPersistedReports() {
   }
 }
 
+function formatStorageSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, 1)} KB`;
+  return `${formatNumber(bytes / (1024 * 1024), 2)} MB`;
+}
+
+function reportCleanupBackup() {
+  try {
+    const backup = JSON.parse(sessionStorage.getItem(REPORT_CLEANUP_BACKUP_KEY) || "null");
+    return backup && Array.isArray(backup.reports) ? backup : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveReportCleanupBackup() {
+  const backup = {
+    reports: state.reports.map((record) => record),
+    activeReportId: state.activeReportId,
+    createdAt: new Date().toISOString()
+  };
+  try {
+    sessionStorage.setItem(REPORT_CLEANUP_BACKUP_KEY, JSON.stringify(backup));
+  } catch {
+    showToast("报告备份空间不足；本次清理仍可执行，但无法使用撤销");
+  }
+  return backup;
+}
+
+function updateReportCleanupUI() {
+  const bytes = new Blob([JSON.stringify(state.reports)]).size;
+  const count = document.getElementById("report-cleanup-count");
+  const size = document.getElementById("report-cleanup-size");
+  const undo = document.getElementById("report-cleanup-undo");
+  if (count) count.textContent = `${state.reports.length} 份`;
+  if (size) size.textContent = formatStorageSize(bytes);
+  if (undo) undo.disabled = !reportCleanupBackup();
+}
+
+function resetReportPreview() {
+  state.activeReportId = null;
+  reportPreview.textContent = `# 实验报告
+
+当前还没有保存的数据报告。
+
+导入 CSV 或 Excel 数据后，系统会自动生成报告；也可以返回实验演示区继续调整参数。`;
+  document.getElementById("active-report-id").textContent = "等待生成报告";
+  document.getElementById("active-report-time").textContent = "—";
+}
+
+function finalizeReportCleanup(message) {
+  state.reports = state.reports.slice(0, MAX_REPORTS);
+  if (!state.reports.some((record) => record.id === state.activeReportId)) {
+    state.activeReportId = state.reports[0]?.id || null;
+  }
+  persistReports();
+  renderReportHistory();
+  if (state.activeReportId) {
+    const record = state.reports.find((item) => item.id === state.activeReportId);
+    if (record) showReportRecord(record);
+    else resetReportPreview();
+  } else {
+    resetReportPreview();
+  }
+  updateReportCleanupUI();
+  const status = document.getElementById("report-cleanup-status");
+  if (status) status.textContent = message;
+  showToast(message);
+}
+
+function cleanReports(mode, targetId = "") {
+  if (!state.reports.length) {
+    showToast("当前没有可清理的报告");
+    return;
+  }
+  let remaining = state.reports;
+  const before = state.reports.length;
+  if (mode === "active") {
+    const id = targetId || state.activeReportId;
+    if (!id) {
+      showToast("请先选择一份报告");
+      return;
+    }
+    remaining = state.reports.filter((record) => record.id !== id);
+  } else if (mode === "keep10") {
+    remaining = state.reports.slice(0, 10);
+  } else if (mode === "old30") {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    remaining = state.reports.filter((record) => new Date(record.createdAt).getTime() >= cutoff);
+  } else if (mode === "all") {
+    if (!window.confirm(`确定清空全部 ${state.reports.length} 份实验报告吗？`)) return;
+    remaining = [];
+  }
+  if (remaining.length === before) {
+    const status = document.getElementById("report-cleanup-status");
+    if (status) status.textContent = "没有符合当前条件的报告。";
+    showToast("没有符合清理条件的报告");
+    return;
+  }
+  saveReportCleanupBackup();
+  state.reports = remaining;
+  finalizeReportCleanup(`已清理 ${before - remaining.length} 份报告；可撤销一次。`);
+}
+
+function undoReportCleanup() {
+  const backup = reportCleanupBackup();
+  if (!backup) {
+    showToast("没有可恢复的清理记录");
+    return;
+  }
+  state.reports = backup.reports.filter((record) => record && record.report).slice(0, MAX_REPORTS);
+  state.activeReportId = backup.activeReportId;
+  try {
+    sessionStorage.removeItem(REPORT_CLEANUP_BACKUP_KEY);
+  } catch {
+    // Ignore storage restrictions.
+  }
+  finalizeReportCleanup(`已恢复清理前的 ${state.reports.length} 份报告。`);
+}
+
 function renderReportHistory() {
   const list = document.getElementById("report-history-list");
   document.getElementById("history-count").textContent = String(state.reports.length);
   document.getElementById("hero-report-count").textContent = String(state.reports.length);
+  updateReportCleanupUI();
   window.dispatchEvent(new CustomEvent("optilab:reports-changed", {
     detail: { reports: state.reports.map((record) => ({
       id: record.id,
@@ -3832,18 +3954,21 @@ function renderReportHistory() {
       minute: "2-digit",
       hour12: false
     });
-    return `<button class="history-item ${record.id === state.activeReportId ? "active" : ""}" data-report-id="${record.id}">
-      <div class="history-item-top">
-        <strong>${escapeHtml(record.experimentName)}</strong>
-        <span>${time}</span>
-      </div>
-      <p>${escapeHtml(record.id)}</p>
-      <div class="history-item-meta">
-        <span>${record.analysis.n} 点</span>
-        <span>质量 ${record.analysis.qualityScore}</span>
-        <span>${escapeHtml(record.batchName)}</span>
-      </div>
-    </button>`;
+    return `<div class="history-row">
+      <button class="history-item ${record.id === state.activeReportId ? "active" : ""}" data-report-id="${record.id}">
+        <div class="history-item-top">
+          <strong>${escapeHtml(record.experimentName)}</strong>
+          <span>${time}</span>
+        </div>
+        <p>${escapeHtml(record.id)}</p>
+        <div class="history-item-meta">
+          <span>${record.analysis.n} 点</span>
+          <span>质量 ${record.analysis.qualityScore}</span>
+          <span>${escapeHtml(record.batchName)}</span>
+        </div>
+      </button>
+      <button class="history-delete" data-delete-report="${record.id}" aria-label="删除报告 ${escapeHtml(record.id)}" title="删除这份报告">×</button>
+    </div>`;
   }).join("");
   list.querySelectorAll("[data-report-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3853,6 +3978,12 @@ function renderReportHistory() {
         renderReportHistory();
         showReportRecord(record);
       }
+    });
+  });
+  list.querySelectorAll("[data-delete-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!window.confirm("确定删除这份实验报告吗？")) return;
+      cleanReports("active", button.dataset.deleteReport);
     });
   });
   refreshMotionTargets();
@@ -4226,6 +4357,28 @@ function setupDataControls() {
 function setupReportControls() {
   document.getElementById("copy-advanced-report").addEventListener("click", copyActiveReport);
   document.getElementById("download-advanced-report").addEventListener("click", downloadActiveReport);
+  const cleanupModal = document.getElementById("report-cleanup-modal");
+  document.getElementById("open-report-cleanup").addEventListener("click", () => {
+    updateReportCleanupUI();
+    cleanupModal.hidden = false;
+    document.body.classList.add("report-cleanup-open");
+  });
+  document.querySelectorAll("[data-report-cleanup-close]").forEach((button) => {
+    button.addEventListener("click", () => {
+      cleanupModal.hidden = true;
+      document.body.classList.remove("report-cleanup-open");
+    });
+  });
+  document.querySelectorAll("[data-report-cleanup-mode]").forEach((button) => {
+    button.addEventListener("click", () => cleanReports(button.dataset.reportCleanupMode));
+  });
+  document.getElementById("report-cleanup-undo").addEventListener("click", undoReportCleanup);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !cleanupModal.hidden) {
+      cleanupModal.hidden = true;
+      document.body.classList.remove("report-cleanup-open");
+    }
+  });
   window.addEventListener("resize", () => {
     drawLabFrame(performance.now());
     drawAdvancedChart();
