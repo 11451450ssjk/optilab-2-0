@@ -28,6 +28,9 @@
     experimentId: "",
     selectedId: "",
     hoveredId: "",
+    inspectorId: "",
+    dragStart: null,
+    dragMoved: false,
     showCables: true,
     metrics: { alignment: 0, connectivity: 0, power: 0, snr: 0, frequency: 0 },
     lastTextureUpdate: 0,
@@ -333,9 +336,82 @@
     return texture;
   }
 
+  function liveDisplayData(device, config = {}) {
+    const primary = Number(config.primary);
+    const secondary = Number(config.secondary);
+    const primaryUnit = config.primaryUnit || "";
+    const secondaryUnit = config.secondaryUnit || "";
+    const safePrimary = Number.isFinite(primary) ? primary : 0;
+    const safeSecondary = Number.isFinite(secondary) ? secondary : 0;
+    const experimentName = String(config.experiment?.name || state.presetInfo?.name || "实验");
+    const unitText = (value, unit, digits = 2) => `${formatNumber(value, digits)}${unit ? ` ${unit}` : ""}`;
+    const primaryIsVoltage = /v(olt)?|伏/i.test(`${config.primaryLabel || ""} ${primaryUnit}`);
+    const secondaryIsVoltage = /v(olt)?|伏/i.test(`${config.secondaryLabel || ""} ${secondaryUnit}`);
+    const primaryIsCurrent = /a(mp|mpere)?|安/i.test(`${config.primaryLabel || ""} ${primaryUnit}`);
+    const secondaryIsCurrent = /a(mp|mpere)?|安/i.test(`${config.secondaryLabel || ""} ${secondaryUnit}`);
+    const frequencyFromConfig = /hz/i.test(primaryUnit) ? safePrimary :
+      /hz/i.test(secondaryUnit) ? safeSecondary :
+        /(^|\s)(ms|s)(\s|$)/i.test(primaryUnit) && safePrimary > 0 ? 1000 / Math.abs(safePrimary) :
+          state.metrics.frequency;
+    const frequency = clamp(Math.abs(frequencyFromConfig) || 1000, 0.01, 250000);
+    const wavelength = /nm/i.test(primaryUnit) ? Math.abs(safePrimary) :
+      device.variant === "hene" ? 632.8 :
+        clamp(430 + Math.abs(safePrimary % 360), 405, 780);
+    const supplyVoltage = primaryIsVoltage ? Math.abs(safePrimary) :
+      secondaryIsVoltage ? Math.abs(safeSecondary) :
+        clamp(5 + Math.abs(safePrimary % 24), 0, 30);
+    const supplyCurrent = primaryIsCurrent ? Math.abs(safePrimary) :
+      secondaryIsCurrent ? Math.abs(safeSecondary) :
+        clamp(state.metrics.power / Math.max(supplyVoltage, 1), 0.01, 5);
+    const scopeFrequency = clamp(frequency, 10, 200000);
+    const scopeTimebase = scopeFrequency >= 1e6 ? "100 ns/div" :
+      scopeFrequency >= 1e3 ? "100 µs/div" : "10 ms/div";
+    const scopeAmplitude = /v/i.test(primaryUnit) ? Math.abs(safePrimary) :
+      /v/i.test(secondaryUnit) ? Math.abs(safeSecondary) :
+        clamp(0.2 + Math.abs(safeSecondary % 4) * 0.45, 0.1, 10);
+    const distanceValue = /cm/i.test(primaryUnit) ? Math.abs(safePrimary) / 100 :
+      /cm/i.test(secondaryUnit) ? Math.abs(safeSecondary) / 100 :
+        /(^|\s)m(\s|$)/i.test(primaryUnit) ? Math.abs(safePrimary) :
+          /(^|\s)m(\s|$)/i.test(secondaryUnit) ? Math.abs(safeSecondary) : 0.428;
+    const distance = clamp(distanceValue, 0.02, 5);
+    const temperatureValue = /°c|℃/i.test(primaryUnit) ? safePrimary :
+      /°c|℃/i.test(secondaryUnit) ? safeSecondary : 25.0;
+    const temperature = clamp(temperatureValue, -20, 150);
+    const peakWavelength = /nm/i.test(primaryUnit) ? clamp(Math.abs(safePrimary), 200, 1100) : 546.1;
+    const exposureMs = /(曝光|积分)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) :
+      clamp(10, 0.1, 100);
+    const gain = /(增益)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) : 1;
+    return {
+      experimentName,
+      primary: safePrimary,
+      secondary: safeSecondary,
+      primaryLabel: config.primaryLabel || "主参数",
+      secondaryLabel: config.secondaryLabel || "响应量",
+      primaryText: unitText(safePrimary, primaryUnit),
+      secondaryText: unitText(safeSecondary, secondaryUnit),
+      frequencyText: unitText(frequency, "Hz", frequency >= 1000 ? 1 : 2),
+      wavelengthText: unitText(wavelength, "nm", 1),
+      powerText: `${formatNumber(state.metrics.power, state.metrics.power < 1 ? 3 : 2)} ${state.metrics.powerUnit || "mW"}`,
+      voltageText: unitText(supplyVoltage, "V", 2),
+      currentText: unitText(supplyCurrent, "A", supplyCurrent < 1 ? 3 : 2),
+      supplyVoltage,
+      supplyCurrent,
+      scopeFrequencyText: unitText(scopeFrequency, "Hz", 1),
+      scopeTimebase,
+      scopeAmplitudeText: unitText(scopeAmplitude, "Vpp", 2),
+      distanceText: unitText(distance, "m", 3),
+      temperatureText: unitText(temperature, "°C", 1),
+      peakWavelengthText: unitText(peakWavelength, "nm", 1),
+      exposureText: unitText(exposureMs, "ms", exposureMs < 1 ? 2 : 1),
+      gainText: `${formatNumber(gain, 1)}×`,
+      snrText: unitText(state.metrics.snr, "dB", 1)
+    };
+  }
+
   function drawPanelTexture(entry, time, config) {
     const { canvas, context, device } = entry;
     const kind = deviceKind(device);
+    const display = liveDisplayData(device, config);
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#07110e";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -351,7 +427,7 @@
       context.strokeStyle = "#6de2a0";
       context.lineWidth = 3;
       context.beginPath();
-      const cycles = clamp((state.metrics.frequency || 500) / 300, 1, 7);
+      const cycles = clamp(display.scopeFrequency / 300, 1, 7);
       for (let x = 12; x < canvas.width - 12; x += 2) {
         const phase = ((x - 12) / (canvas.width - 24)) * Math.PI * 2 * cycles;
         const y = 128 + Math.sin(phase + time * 0.002) * 60 * state.metrics.connectivity;
@@ -374,6 +450,17 @@
           }
           context.stroke();
         });
+        context.fillStyle = "#8fc8af";
+        context.font = '18px "Cascadia Mono", monospace';
+        context.fillText("16 CH  100 MSa/s", 18, 24);
+        context.fillText("TH 1.65 V   AUTO", 338, 24);
+      } else {
+        context.fillStyle = "#8fc8af";
+        context.font = '18px "Cascadia Mono", monospace';
+        context.fillText("CH1  1.00 V/div", 14, 24);
+        context.fillText("TRIG'D  AUTO", 356, 24);
+        context.fillText(display.scopeFrequencyText, 14, 244);
+        context.fillText(display.scopeTimebase, 370, 244);
       }
     } else if (kind === "screen") {
       const phase = Math.abs(Number(config.secondary) || 0) * 2.4;
@@ -393,26 +480,29 @@
       }
     } else if (kind === "laser") {
       context.fillStyle = colorArrayToHex(config.beamColor);
-      context.font = 'bold 58px "Cascadia Mono", monospace';
+      context.font = 'bold 48px "Cascadia Mono", monospace';
       context.textAlign = "center";
-      context.fillText(device.variant === "hene" ? "He-Ne" : device.symbol || "LASER", 256, 135);
+      context.fillText(device.variant === "hene" ? "He-Ne" : device.symbol || "LASER", 256, 112);
+      context.font = '24px "Cascadia Mono", monospace';
+      context.fillText(`${display.wavelengthText}  ·  ${display.powerText}`, 256, 166);
     } else if (kind === "multimeter") {
       context.fillStyle = "#a6e5c0";
-      context.font = 'bold 92px "Cascadia Mono", monospace';
+      context.font = 'bold 78px "Cascadia Mono", monospace';
       context.textAlign = "right";
-      context.fillText(formatNumber(state.metrics.power, 3), 462, 126);
+      context.fillText(formatNumber(display.primary, Math.abs(display.primary) < 10 ? 3 : 2), 462, 120);
       context.font = 'bold 28px "Cascadia Mono", monospace';
       context.textAlign = "left";
-      context.fillText(formatNumber(state.metrics.frequency, 1), 24, 65);
+      context.fillText(`${display.primaryLabel}  ${config.primaryUnit || ""}`, 24, 62);
       context.fillStyle = "#7f9e90";
       context.font = '22px "Cascadia Mono", monospace';
-      context.fillText("AUTO  DC  TRUE RMS", 24, 215);
+      context.fillText("AUTO  DC  TRUE RMS", 24, 206);
+      context.fillText(display.secondaryText, 24, 236);
     } else if (kind === "power-supply") {
       context.fillStyle = "#8be4b3";
       context.font = 'bold 66px "Cascadia Mono", monospace';
       context.textAlign = "left";
-      context.fillText(formatNumber(Math.max(0, Number(config.primary) || 12), 1), 22, 100);
-      context.fillText(formatNumber(Math.max(0, Number(config.secondary) || 1.5), 2), 274, 100);
+      context.fillText(formatNumber(display.supplyVoltage, 2), 22, 100);
+      context.fillText(formatNumber(display.supplyCurrent, 2), 274, 100);
       context.fillStyle = "#c8d6cf";
       context.font = '21px "Cascadia Mono", monospace';
       context.fillText("VOLTAGE  V", 24, 132);
@@ -433,14 +523,14 @@
       context.stroke();
       context.fillStyle = "#d9c593";
       context.font = 'bold 26px "Cascadia Mono", monospace';
-      context.fillText(`${formatNumber(state.metrics.frequency, 1)} Hz`, 24, 206);
-      context.fillText("SINE  1 Vpp", 272, 206);
+      context.fillText(display.frequencyText, 24, 206);
+      context.fillText(`SINE  ${display.scopeAmplitudeText}`, 272, 206);
     } else if (kind === "lcd-module") {
       context.fillStyle = "#9ad77f";
       context.fillRect(18, 55, 476, 145);
       context.fillStyle = "#17321f";
       context.font = 'bold 38px "Cascadia Mono", monospace';
-      context.fillText("DIST  0.428 m", 40, 112);
+      context.fillText(`DIST  ${display.distanceText}`, 40, 112);
       context.fillText("STATE READY", 40, 166);
     } else if (kind === "spectrometer") {
       const gradient = context.createLinearGradient(20, 0, 492, 0);
@@ -458,6 +548,7 @@
       context.globalAlpha = 1;
       context.fillStyle = "#c8d5cd";
       context.font = '20px "Cascadia Mono", monospace';
+      context.fillText(`${display.peakWavelengthText}  ·  RES 0.2 nm`, 18, 24);
       context.fillText("400                          WAVELENGTH / nm                         1000", 18, 244);
     } else if (kind === "computer") {
       context.strokeStyle = "#70d3a0";
@@ -471,7 +562,10 @@
       context.stroke();
       context.fillStyle = "#b7cac0";
       context.font = '22px "Cascadia Mono", monospace';
-      context.fillText("LIVE ANALYSIS · 3 REPEATS", 22, 32);
+      context.fillText(`${display.experimentName.slice(0, 24)} · LIVE`, 22, 32);
+      context.font = '18px "Cascadia Mono", monospace';
+      context.fillText(`${display.primaryLabel}: ${display.primaryText}`, 22, 220);
+      context.fillText(`${display.secondaryLabel}: ${display.secondaryText}`, 22, 244);
     } else if (kind === "camera" || kind === "thermal-camera") {
       for (let row = 0; row < 5; row += 1) {
         for (let column = 0; column < 8; column += 1) {
@@ -484,6 +578,11 @@
           context.fillRect(38 + column * 55, 38 + row * 40, 52, 37);
         }
       }
+      context.fillStyle = "#e5d2a6";
+      context.font = '20px "Cascadia Mono", monospace';
+      context.fillText(kind === "thermal-camera"
+        ? `${display.temperatureText}  ·  ε 0.95`
+        : `${display.exposureText}  ·  GAIN ${display.gainText}`, 20, 238);
     } else if (kind === "bioamp") {
       context.strokeStyle = "#7ce0a2";
       context.lineWidth = 3;
@@ -497,7 +596,21 @@
       context.stroke();
       context.fillStyle = "#d8c693";
       context.font = '24px "Cascadia Mono", monospace';
-      context.fillText("ECG  ·  GAIN 1000  ·  50 Hz", 20, 32);
+      context.fillText(`ECG  ·  GAIN 1000  ·  CMRR 110 dB`, 20, 32);
+      context.font = '18px "Cascadia Mono", monospace';
+      context.fillText(`${display.primaryLabel}: ${display.primaryText}`, 20, 238);
+    } else if (kind === "power-meter") {
+      context.fillStyle = "#94e7b8";
+      context.textAlign = "right";
+      context.font = 'bold 72px "Cascadia Mono", monospace';
+      context.fillText(formatNumber(state.metrics.power, state.metrics.power < 1 ? 3 : 2), 470, 128);
+      context.font = '26px "Cascadia Mono", monospace';
+      context.textAlign = "left";
+      context.fillText(state.metrics.powerUnit || "mW", 24, 82);
+      context.fillText(display.wavelengthText, 24, 218);
+      context.fillStyle = "#7f9e90";
+      context.font = '19px "Cascadia Mono", monospace';
+      context.fillText("RANGE 10 mW  ·  HOLD OFF", 160, 218);
     } else {
       context.strokeStyle = device.accent || "#9cc6b2";
       context.lineWidth = 4;
@@ -1307,6 +1420,7 @@
     state.processStep = 0;
     state.autoTour = false;
     state.processSteps = buildProcessSteps();
+    closeInspector();
     state.cameraState.viewMode = "overview";
     document.querySelectorAll("[data-3d-view]").forEach((button) => {
       button.classList.toggle("active", button.dataset["3dView"] === "overview");
@@ -1721,6 +1835,7 @@
       updateSelectionHelper();
       updateHud();
       if (state.cameraState.viewMode === "focus") setViewPreset("focus");
+      if (state.inspectorId) populateInspector(targetId);
     }
     updateProcessUI();
   }
@@ -1949,7 +2064,7 @@
     const ports = window.OptilabPanorama?.getPorts(id) || ["MEASURE", "GND"];
     const detail = document.createElement("small");
     const modelLabel = DEVICE_KIND_LABELS[deviceKind(device)] || "实验仪器";
-    detail.textContent = `${modelLabel} · ${device.variant ? `型号特征 ${device.variant}` : "标准实验室配置"} · 端口 ${ports.join(" / ")}`;
+    detail.textContent = `${modelLabel} · ${device.variant ? `型号特征 ${device.variant}` : "标准实验室配置"} · 端口 ${ports.join(" / ")} · 单击查看参数`;
     tooltip.replaceChildren(title, detail);
     const rect = state.canvas.getBoundingClientRect();
     const x = clamp(event.clientX - rect.left, 8, Math.max(8, rect.width - 210));
@@ -1964,6 +2079,8 @@
     if (!state.active || !state.ready) return;
     event.preventDefault();
     hideTooltip();
+    state.dragStart = { x: event.clientX, y: event.clientY };
+    state.dragMoved = false;
     updateRayPointer(event);
     const intersections = state.raycaster.intersectObjects([...state.deviceGroups.values()], true);
     const id = deviceIdFromObject(intersections[0]?.object);
@@ -1983,6 +2100,12 @@
     if (!state.active || !state.ready) return;
     if (state.dragGroup) {
       event.preventDefault();
+      const movement = Math.hypot(
+        event.clientX - (state.dragStart?.x ?? event.clientX),
+        event.clientY - (state.dragStart?.y ?? event.clientY)
+      );
+      if (!state.dragMoved && movement < 4) return;
+      state.dragMoved = true;
       updateRayPointer(event);
       const hit = new state.three.Vector3();
       if (state.raycaster.ray.intersectPlane(state.dragPlane, hit)) {
@@ -2009,10 +2132,15 @@
     }
   }
 
-  function pointerUp() {
+  function pointerUp(event) {
+    const openId = event?.type !== "pointercancel" && state.dragGroup && !state.dragMoved
+      ? state.selectedId
+      : "";
     state.dragGroup = null;
     state.orbit = null;
+    state.dragStart = null;
     if (state.canvas) state.canvas.style.cursor = "move";
+    if (openId) openInspector(openId);
   }
 
   function wheel(event) {
@@ -2037,9 +2165,7 @@
       previousConfig?.secondary !== state.config.secondary
     )) {
       state.dynamicTextures.forEach((entry) => {
-        if (entry.type === "screen" || entry.type === "scope") {
-          drawPanelTexture(entry, performance.now(), state.config);
-        }
+        drawPanelTexture(entry, performance.now(), state.config);
       });
     }
   }
@@ -2114,6 +2240,405 @@
           : `${state.presetInfo.name} · 器件偏离，拖动重新对准`;
       scene.dataset.state = score > 0.7 ? "good" : score > 0.4 ? "warn" : "bad";
     }
+    refreshInspector();
+  }
+
+  function inspectorReadout(kind, display) {
+    const readouts = {
+      laser: `${display.wavelengthText} · ${display.powerText}`,
+      mirror: `λ/10 反射面 · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
+      splitter: `分束比 50:50 · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
+      lens: `Φ 25.4 mm · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
+      screen: `条纹可见度 ${Math.round(state.metrics.alignment * 100)}%`,
+      scope: `${display.scopeFrequencyText} · ${display.scopeTimebase}`,
+      "power-meter": `${display.powerText} @ ${display.wavelengthText}`,
+      multimeter: `${display.primaryText} · ${display.secondaryText}`,
+      "power-supply": `${display.voltageText} · ${display.currentText}`,
+      generator: `${display.frequencyText} · ${display.scopeAmplitudeText}`,
+      "logic-analyzer": `16 CH · 100 MSa/s · ${Math.round(state.metrics.connectivity * 100)}%`,
+      breadboard: `830 孔 · 接触状态 ${Math.round(state.metrics.connectivity * 100)}%`,
+      "mcu-board": `3.3 V / 5 V IO · USB ONLINE`,
+      "sensor-module": `采样 ${display.scopeFrequencyText} · ${Math.round(state.metrics.snr)} dB`,
+      "lcd-module": `${display.distanceText} · READY`,
+      alarm: `阈值 0.50 m · ${Math.round(state.metrics.connectivity * 100)}%`,
+      daq: `16 bit · ${display.scopeFrequencyText}`,
+      load: `${display.currentText} · CC MODE`,
+      spectrometer: `峰值 ${display.peakWavelengthText} · RES 0.2 nm`,
+      "thermal-camera": `${display.temperatureText} · ε 0.95`,
+      camera: `${display.exposureText} · GAIN ${display.gainText}`,
+      "power-supply": `${display.voltageText} · ${display.currentText}`,
+      "optical-source": `${display.wavelengthText} · 稳定输出`,
+      "fiber-spool": `1310 / 1550 nm · ${display.powerText}`,
+      "fiber-coupler": `50:50 · 插损 3.6 dB`,
+      "optical-transceiver": `RX ${display.powerText} · LINK OK`,
+      photogate: `计时分辨率 0.1 ms`,
+      "bioamp": `GAIN 1000 · CMRR 110 dB`,
+      pendulum: `周期 ${display.secondaryText}`,
+      heater: `${display.temperatureText} · PID READY`,
+      calorimeter: `${display.temperatureText} · ΔT 测量中`
+    };
+    return readouts[kind] || `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText}`;
+  }
+
+  function deviceInspectorData(device) {
+    const kind = deviceKind(device);
+    const display = liveDisplayData(device, state.config || {});
+    const specs = [];
+    const add = (label, value) => specs.push([label, String(value)]);
+    add("结构类型", DEVICE_KIND_LABELS[kind] || "实验仪器");
+    add("实验场景", display.experimentName);
+    switch (kind) {
+      case "laser":
+        add("工作波长", display.wavelengthText);
+        add("输出功率", display.powerText);
+        add("输出模式", "CW / TEM₀₀");
+        add("预热时间", "15–30 min");
+        add("光束直径", "1.2 mm");
+        add("接口", "DB9 · INTERLOCK");
+        break;
+      case "mirror":
+      case "splitter":
+        add("通光口径", "25.4 mm");
+        add("表面面型", "λ/10 @ 633 nm");
+        add("反射率", "R > 99%");
+        add("调节轴", "θx / θy 二维微调");
+        add("镜架", "M4 锁定 · 三螺钉");
+        add("安装高度", "中心 50 mm");
+        break;
+      case "lens":
+        add("通光口径", "25.4 mm");
+        add("焦距", String(state.config?.secondaryLabel || "").includes("焦距") ? display.secondaryText : "100 mm");
+        add("镀膜", "400–700 nm 增透");
+        add("表面质量", "40–20 scratch-dig");
+        add("安装", "SM1 透镜架");
+        break;
+      case "scope":
+        add("带宽", "100 MHz");
+        add("采样率", "1 GSa/s");
+        add("通道", "CH1 / CH2 · EXT TRIG");
+        add("垂直档位", "1 mV/div – 10 V/div");
+        add("时基", "1 ns/div – 50 s/div");
+        add("输入阻抗", "1 MΩ ∥ 15 pF");
+        add("显示", display.scopeFrequencyText);
+        break;
+      case "multimeter":
+        add("显示位数", "6000 counts");
+        add("直流电压", "0.1 mV – 1000 V");
+        add("交流电压", "1 mV – 750 V");
+        add("电阻", "0.1 Ω – 60 MΩ");
+        add("输入阻抗", "10 MΩ");
+        add("安全等级", "CAT II 600 V");
+        add("当前量程", display.primaryText);
+        break;
+      case "power-supply":
+        add("输出电压", "0–30 V");
+        add("输出电流", "0–5 A");
+        add("电压分辨率", "10 mV");
+        add("电流分辨率", "1 mA");
+        add("纹波", "< 1 mVrms");
+        add("保护", "OVP / OCP / OTP");
+        add("当前输出", `${display.voltageText} · ${display.currentText}`);
+        break;
+      case "generator":
+        add("频率范围", "1 µHz – 20 MHz");
+        add("输出幅度", "1 mVpp – 10 Vpp");
+        add("输出阻抗", "50 Ω");
+        add("波形", "正弦 / 方波 / 三角");
+        add("调制", "AM / FM / Sweep");
+        add("当前频率", display.frequencyText);
+        break;
+      case "power-meter":
+        add("波长范围", "400–1100 nm");
+        add("功率范围", "1 nW – 10 mW");
+        add("显示分辨率", "0.1% FS");
+        add("探头接口", "DB15 / FC");
+        add("校准波长", display.wavelengthText);
+        add("当前读数", display.powerText);
+        break;
+      case "logic-analyzer":
+        add("通道数", "16");
+        add("最大采样率", "100 MSa/s");
+        add("逻辑门限", "1.65 V");
+        add("存储深度", "16 Mpts/ch");
+        add("协议分析", "UART / I²C / SPI");
+        add("触发", "边沿 / 码型");
+        break;
+      case "breadboard":
+        add("孔位", "830 tie-points");
+        add("电源轨", "2 组");
+        add("最大电压", "36 V");
+        add("单孔电流", "< 1 A");
+        add("节距", "2.54 mm");
+        add("当前连接", `${state.metrics.connectivity > 0.7 ? "接触良好" : "需检查"}`);
+        break;
+      case "mcu-board":
+        add("逻辑电平", "3.3 V / 5 V");
+        add("主频", device.variant === "fpga" ? "100 MHz" : "16 MHz");
+        add("ADC", "10 bit / 12 bit");
+        add("接口", "GPIO / UART / I²C / SPI");
+        add("下载口", "USB / SWD / JTAG");
+        add("供电", "5 V DC");
+        break;
+      case "sensor-module":
+        add("工作电压", "3.3–5 V");
+        add("接口", "模拟 / I²C / 数字");
+        add("量程", /超声/.test(device.label) ? "2 cm – 400 cm" : "按模块铭牌");
+        add("分辨率", /超声/.test(device.label) ? "3 mm" : "12 bit");
+        add("采样间隔", display.scopeFrequencyText);
+        break;
+      case "lcd-module":
+        add("显示格式", "16 × 2 字符");
+        add("接口", "I²C / 4-bit 并口");
+        add("供电", "5 V");
+        add("对比度", "电位器可调");
+        add("当前显示", display.distanceText);
+        break;
+      case "spectrometer":
+        add("波长范围", "200–1100 nm");
+        add("光学分辨率", "0.2 nm");
+        add("探测器", "CCD 线阵");
+        add("接口", "USB 2.0");
+        add("入口", "SMA / 自由空间");
+        add("当前峰值", display.peakWavelengthText);
+        break;
+      case "grating":
+      case "slit":
+        add("通光尺寸", kind === "grating" ? "25 × 25 mm" : "狭缝可调");
+        add("参数", kind === "grating" ? "300 lines/mm" : "0.02–2 mm");
+        add("调节", "旋转 + 横向位移");
+        add("安装", "精密光学调整架");
+        add("当前对准", `${Math.round(state.metrics.alignment * 100)}%`);
+        break;
+      case "polarizer":
+        add("通光口径", "25.4 mm");
+        add("消光比", "> 1000:1");
+        add("波段", "400–700 nm");
+        add("旋转刻度", "1°");
+        add("当前角度", display.primaryText);
+        break;
+      case "camera":
+      case "thermal-camera":
+        add("传感器", kind === "thermal-camera" ? "长波红外阵列" : "CMOS");
+        add("分辨率", kind === "thermal-camera" ? "256 × 192" : "1920 × 1080");
+        add("像元", kind === "thermal-camera" ? "12 µm" : "5.86 µm");
+        add("帧率", kind === "thermal-camera" ? "25 fps" : "60 fps");
+        add("当前曝光", display.exposureText);
+        add("当前增益", display.gainText);
+        add("接口", "USB 3.0");
+        if (kind === "thermal-camera") {
+          add("温度范围", "-20–150°C");
+          add("热灵敏度", "< 50 mK");
+        }
+        break;
+      case "detector":
+      case "beam-profiler":
+        add("有效面积", kind === "beam-profiler" ? "11 × 11 mm" : "3.6 × 3.6 mm");
+        add("响应波段", "320–1100 nm");
+        add("响应度", "0.45 A/W @ 633 nm");
+        add("暗电流", "< 2 nA");
+        add("接口", "BNC 50 Ω");
+        add("当前功率", display.powerText);
+        break;
+      case "fiber-spool":
+        add("光纤类型", "SMF-28 单模");
+        add("纤芯 / 包层", "9 / 125 µm");
+        add("连接头", "FC/APC");
+        add("工作波长", "1310 / 1550 nm");
+        add("长度", "2.0 km");
+        add("最小弯曲半径", "30 mm");
+        break;
+      case "fiber-coupler":
+        add("分光比", "50:50");
+        add("附加损耗", "0.15 dB");
+        add("插损", "3.6 dB");
+        add("方向性", "> 50 dB");
+        add("接口", "FC/APC");
+        break;
+      case "optical-transceiver":
+        add("工作波长", "1310 / 1550 nm");
+        add("速率", "1.25 Gbit/s");
+        add("输出功率", "-3–0 dBm");
+        add("接收灵敏度", "-24 dBm");
+        add("接口", "FC/APC · USB");
+        add("链路状态", "LINK OK");
+        break;
+      case "daq":
+        add("模拟输入", "16 通道");
+        add("ADC 分辨率", "16 bit");
+        add("采样率", "1 MSa/s");
+        add("输入范围", "±10 V");
+        add("接口", "USB 2.0 / 接线端子");
+        add("当前采样", display.scopeFrequencyText);
+        break;
+      case "microscope":
+        add("放大倍率", "20× / 40×");
+        add("测量精度", "0.01 mm");
+        add("目镜", "10×");
+        add("照明", "LED 可调");
+        add("载物台", "二维微调");
+        break;
+      case "millikan-chamber":
+        add("极板间距", "5.0 mm");
+        add("最高电压", "500 V");
+        add("照明", "LED 侧照");
+        add("观察", "读数显微镜");
+        add("油滴介质", "低挥发性雾化油");
+        break;
+      case "pendulum":
+        add("摆长", "0.50–1.20 m");
+        add("测角范围", "±15°");
+        add("计时分辨率", "0.1 ms");
+        add("摆球质量", "25–100 g");
+        add("当前周期", display.secondaryText);
+        break;
+      case "vibrator":
+        add("驱动频率", "0.1–20 Hz");
+        add("幅值", "0–20 mm");
+        add("驱动方式", "电磁线圈");
+        add("控制接口", "BNC");
+        break;
+      case "photogate":
+        add("计时分辨率", "0.1 ms");
+        add("遮光宽度", "5 mm");
+        add("输出", "TTL 脉冲");
+        add("接口", "BNC");
+        break;
+      case "heater":
+      case "calorimeter":
+        add("温控范围", "室温–120°C");
+        add("控温精度", "±0.1°C");
+        add("温度采样", "1 s⁻¹");
+        add("传感器", "Pt100");
+        add("当前温度", display.temperatureText);
+        break;
+      case "bioamp":
+        add("增益", "100 / 1000");
+        add("带宽", "0.1–100 Hz");
+        add("共模抑制", "110 dB");
+        add("输入噪声", "< 1 µVrms");
+        add("接口", "3 × 电极 · BNC");
+        break;
+      case "printer":
+        add("成型尺寸", "220 × 220 × 250 mm");
+        add("层高", "0.1–0.3 mm");
+        add("喷头温度", "最高 260°C");
+        add("定位精度", "0.1 mm");
+        add("材料", "PLA / PETG");
+        break;
+      case "caliper":
+        add("量程", "0–150 mm");
+        add("分辨率", "0.01 mm");
+        add("允许误差", "±0.02 mm");
+        add("测量功能", "外径 / 内径 / 深度");
+        break;
+      default:
+        add("供电", "按设备铭牌");
+        add("通信接口", "USB / BNC / 接线端");
+        add("工作环境", "15–30°C · < 80% RH");
+        add("校准周期", "12 个月");
+        add("当前读数", `${display.primaryText} · ${display.secondaryText}`);
+    }
+    const ports = window.OptilabPanorama?.getPorts(device.id) || ["MEASURE", "GND"];
+    const linked = (state.presetInfo?.connections || []).filter((connection) =>
+      connection.fromId === device.id || connection.toId === device.id
+    );
+    const connectionLines = linked.map((connection) => {
+      const from = state.presetInfo.devices.find((item) => item.id === connection.fromId)?.label || connection.fromId;
+      const to = state.presetInfo.devices.find((item) => item.id === connection.toId)?.label || connection.toId;
+      return `${from} → ${to} · ${connection.standard}`;
+    });
+    const opticalPaths = (state.presetInfo?.optics || []).filter((path) => path.includes(device.id));
+    const connectionText = connectionLines.length
+      ? connectionLines.join("；")
+      : opticalPaths.length
+        ? `空间光路：${opticalPaths[0].map((id) =>
+          state.presetInfo.devices.find((item) => item.id === id)?.label || id).join(" → ")}`
+        : "当前无外部线缆；作为独立器件使用";
+    const warningMap = {
+      laser: "禁止直视出光口或镜面反射光；调整光路前必须关闭快门并确认激光等级。",
+      "power-supply": "不得超出额定电压和电流；接线、改线和拆线前先关闭输出。",
+      scope: "输入电压不得超过探头和通道额定值；测量市电必须使用隔离差分探头。",
+      multimeter: "测量前确认档位、插孔和量程；禁止用电流档直接并联电源。",
+      spectrometer: "避免强光使探测器饱和；更换入口或光纤前关闭光源。",
+      "fiber-coupler": "禁止直视裸光纤端面；连接前清洁 FC/APC 端面。",
+      "fiber-spool": "保持光纤弯曲半径大于 30 mm，避免折断或产生额外损耗。",
+      "bioamp": "受试者连接需遵守实验室伦理与电气隔离要求，不得自行进行医疗诊断。",
+      printer: "运行中禁止打开安全罩或接触高温喷头、运动部件。",
+      heater: "高温表面和样品可能造成烫伤，断电后仍需等待冷却。",
+      calorimeter: "高温表面和样品可能造成烫伤，断电后仍需等待冷却。"
+    };
+    return {
+      kind,
+      display,
+      specs,
+      ports,
+      connectionText,
+      warning: warningMap[kind] || "以设备铭牌、校准证书和指导教师要求为准；异常发热、异味或读数跳变时立即停止。",
+      reading: inspectorReadout(kind, display),
+      note: `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText}`,
+      state: /scope|analyzer|computer|daq|sensor/.test(kind) ? "SIGNAL LOCKED" :
+        /power|laser|generator/.test(kind) ? "OUTPUT ON" :
+          /camera|spectrometer/.test(kind) ? "ACQUIRING" : "READY"
+    };
+  }
+
+  function populateInspector(id) {
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    const panel = $("#lab-3d-inspector");
+    if (!device || !panel) return;
+    const data = deviceInspectorData(device);
+    $("#lab-3d-inspector-title") && ($("#lab-3d-inspector-title").textContent = device.label);
+    const variantLabel = device.variant && device.variant !== "generic" ? device.variant : "标准型";
+    $("#lab-3d-inspector-kind") && ($("#lab-3d-inspector-kind").textContent = `${DEVICE_KIND_LABELS[data.kind] || "实验仪器"} · ${variantLabel}`);
+    $("#lab-3d-inspector-state") && ($("#lab-3d-inspector-state").textContent = data.state);
+    $("#lab-3d-inspector-value") && ($("#lab-3d-inspector-value").textContent = data.reading);
+    $("#lab-3d-inspector-reading-note") && ($("#lab-3d-inspector-reading-note").textContent = data.note);
+    $("#lab-3d-inspector-connections") && ($("#lab-3d-inspector-connections").textContent =
+      `${data.connectionText}；端口：${data.ports.join(" / ")}`
+    );
+    $("#lab-3d-inspector-warning") && ($("#lab-3d-inspector-warning").textContent = data.warning);
+    const specs = $("#lab-3d-inspector-specs");
+    if (specs) {
+      specs.replaceChildren(...data.specs.map(([label, value]) => {
+        const cell = document.createElement("div");
+        const key = document.createElement("span");
+        const content = document.createElement("strong");
+        key.textContent = label;
+        content.textContent = value;
+        cell.append(key, content);
+        return cell;
+      }));
+    }
+    panel.hidden = false;
+    state.inspectorId = id;
+  }
+
+  function openInspector(id) {
+    if (!state.deviceGroups.has(id)) return;
+    state.selectedId = id;
+    updateSelectionHelper();
+    updateHud();
+    populateInspector(id);
+  }
+
+  function closeInspector() {
+    state.inspectorId = "";
+    const panel = $("#lab-3d-inspector");
+    if (panel) panel.hidden = true;
+  }
+
+  function refreshInspector() {
+    if (!state.inspectorId) return;
+    const device = state.presetInfo?.devices.find((item) => item.id === state.inspectorId);
+    if (!device) {
+      closeInspector();
+      return;
+    }
+    const display = liveDisplayData(device, state.config || {});
+    $("#lab-3d-inspector-value") && ($("#lab-3d-inspector-value").textContent = inspectorReadout(deviceKind(device), display));
+    $("#lab-3d-inspector-reading-note") && ($("#lab-3d-inspector-reading-note").textContent =
+      `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText}`
+    );
   }
 
   function resize() {
@@ -2222,9 +2747,7 @@
     if (time - state.lastTextureUpdate > 120) {
       state.lastTextureUpdate = time;
       state.dynamicTextures.forEach((entry) => {
-        if (entry.type === "screen" || entry.type === "scope" || entry.type === "computer") {
-          drawPanelTexture(entry, time, state.config || {});
-        }
+        drawPanelTexture(entry, time, state.config || {});
       });
       updateHud();
     }
@@ -2250,7 +2773,10 @@
       });
     }
     if (state.stepMarker) state.stepMarker.visible = state.active && state.ready;
-    if (!state.active) hideTooltip();
+    if (!state.active) {
+      hideTooltip();
+      closeInspector();
+    }
   }
 
   function resetLayout() {
@@ -2280,9 +2806,7 @@
     $("#panorama-device-list")?.addEventListener("click", (event) => {
       const button = event.target.closest?.("[data-panorama-device]");
       if (!button || !state.deviceGroups.has(button.dataset.panoramaDevice)) return;
-      state.selectedId = button.dataset.panoramaDevice;
-      updateSelectionHelper();
-      updateHud();
+      openInspector(button.dataset.panoramaDevice);
       if (state.cameraState.viewMode === "focus") setViewPreset("focus");
     });
     $("#panorama-reset-layout")?.addEventListener("click", resetLayout);
@@ -2305,6 +2829,13 @@
       state.autoTour = !state.autoTour;
       updateProcessUI();
     });
+    $("#lab-3d-inspector-close")?.addEventListener("click", closeInspector);
+    $("#lab-3d-inspector-focus")?.addEventListener("click", () => {
+      if (state.inspectorId) setViewPreset("focus");
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.inspectorId) closeInspector();
+    });
   }
 
   window.OptilabPanorama3D = {
@@ -2324,6 +2855,23 @@
     getDeviceKinds: () => Object.fromEntries(
       [...state.deviceGroups.entries()].map(([id, group]) => [id, group.userData.kind || "generic"])
     ),
+    getDeviceParameters(id) {
+      const device = state.presetInfo?.devices.find((item) => item.id === id);
+      if (!device) return null;
+      const data = deviceInspectorData(device);
+      return {
+        id,
+        label: device.label,
+        kind: data.kind,
+        reading: data.reading,
+        note: data.note,
+        state: data.state,
+        specs: data.specs.map(([label, value]) => ({ label, value })),
+        ports: [...data.ports],
+        connections: data.connectionText,
+        warning: data.warning
+      };
+    },
     getPositions: () => Object.fromEntries(
       [...state.deviceGroups.entries()].map(([id, group]) => [
         id,

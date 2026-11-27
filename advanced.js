@@ -845,7 +845,7 @@ function drawBeam(context, x1, y1, x2, y2, color, time, alpha = 1, dotted = true
 function drawLabFrame(time) {
   const experiment = currentExperiment();
   const control = controlConfig(experiment);
-  const beamColor = experiment.primaryUnit === "nm"
+  const beamColor = control.primary.unit === "nm"
     ? wavelengthToRgb(clamp(state.primary, 380, 780))
     : wavelengthToRgb(632);
   const panoramaConfig = {

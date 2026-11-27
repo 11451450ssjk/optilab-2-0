@@ -183,6 +183,215 @@ html[data-entered="1"] body.advanced-body {
   line-height: 1.5;
 }
 
+.lab-3d-inspector {
+  position: absolute;
+  z-index: 6;
+  top: 86px;
+  right: 18px;
+  bottom: 72px;
+  width: min(286px, calc(100% - 36px));
+  padding: 13px;
+  overflow: auto;
+  border: 1px solid rgba(204, 169, 108, 0.46);
+  border-radius: 13px;
+  color: #d8d4c8;
+  background:
+    linear-gradient(150deg, rgba(13, 24, 21, 0.97), rgba(5, 11, 10, 0.96)),
+    repeating-linear-gradient(90deg, transparent 0 25px, rgba(205, 171, 108, 0.035) 25px 26px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+  scrollbar-width: thin;
+}
+
+.lab-3d-inspector[hidden] {
+  display: none;
+}
+
+.lab-3d-inspector-head,
+.lab-3d-inspector-type,
+.lab-3d-inspector-type span,
+.lab-3d-inspector-reading span {
+  display: flex;
+  align-items: center;
+}
+
+.lab-3d-inspector-head {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lab-3d-inspector-head > div {
+  min-width: 0;
+}
+
+.lab-3d-inspector-head span,
+.lab-3d-inspector-reading span,
+.lab-3d-inspector-section > span {
+  color: #bca676;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.lab-3d-inspector-head strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #f0e5cf;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#lab-3d-inspector-close {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(145, 162, 153, 0.28);
+  border-radius: 50%;
+  color: #aab4ad;
+  background: rgba(6, 13, 11, 0.54);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#lab-3d-inspector-close:hover {
+  border-color: #c8a568;
+  color: #f3d49d;
+}
+
+.lab-3d-inspector-type {
+  gap: 6px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+
+.lab-3d-inspector-type span {
+  min-height: 18px;
+  padding: 0 7px;
+  border: 1px solid rgba(121, 145, 133, 0.24);
+  border-radius: 999px;
+  color: #91a59a;
+  background: rgba(7, 15, 12, 0.58);
+  font-family: var(--font-mono);
+  font-size: 7px;
+}
+
+.lab-3d-inspector-type span:last-child {
+  color: #91cba8;
+}
+
+.lab-3d-inspector-reading {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(120, 172, 139, 0.24);
+  border-radius: 9px;
+  background:
+    linear-gradient(rgba(6, 15, 12, 0.76), rgba(6, 15, 12, 0.76)),
+    repeating-linear-gradient(0deg, transparent 0 14px, rgba(109, 226, 160, 0.08) 14px 15px);
+}
+
+.lab-3d-inspector-reading strong {
+  display: block;
+  margin-top: 5px;
+  color: #93e6b8;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 14px rgba(103, 228, 158, 0.24);
+}
+
+.lab-3d-inspector-reading small {
+  display: block;
+  margin-top: 4px;
+  color: #7d9387;
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.lab-3d-inspector-specs {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.lab-3d-inspector-specs div {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(132, 149, 140, 0.2);
+  border-radius: 7px;
+  background: rgba(7, 14, 12, 0.58);
+}
+
+.lab-3d-inspector-specs span,
+.lab-3d-inspector-specs strong {
+  display: block;
+}
+
+.lab-3d-inspector-specs span {
+  color: #788b80;
+  font-size: 6.8px;
+}
+
+.lab-3d-inspector-specs strong {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: #cfccbf;
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.lab-3d-inspector-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 145, 137, 0.18);
+}
+
+.lab-3d-inspector-section p {
+  margin: 5px 0 0;
+  color: #96a69d;
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.lab-3d-inspector-section.warning p {
+  color: #cfb179;
+}
+
+.lab-3d-inspector-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 9px;
+}
+
+.lab-3d-inspector-actions button {
+  padding: 5px 10px;
+  border: 1px solid rgba(205, 168, 102, 0.48);
+  border-radius: 999px;
+  color: #e3c58c;
+  background: rgba(111, 78, 36, 0.22);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.lab-3d-inspector-actions button:hover {
+  border-color: #e2bd7b;
+  background: rgba(137, 96, 42, 0.32);
+}
+
+.lab-3d-inspector-foot {
+  display: block;
+  margin-top: 9px;
+  color: #68786e;
+  font-size: 6.8px;
+  line-height: 1.45;
+}
+
 .lab-3d-process {
   position: absolute;
   left: 18px;
@@ -1956,6 +2165,13 @@ html[data-theme="day"] .welcome-notebook {
 
   .lab-3d-process p {
     min-height: 0;
+  }
+
+  .lab-3d-inspector {
+    top: 112px;
+    right: 10px;
+    bottom: 72px;
+    width: min(300px, calc(100% - 20px));
   }
 }
 

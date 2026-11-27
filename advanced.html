@@ -908,7 +908,7 @@
                 <div class="lab-3d-hint">
                   <span>拖动空白旋转视角</span>
                   <span>滚轮缩放</span>
-                  <span>点选器材查看端口</span>
+                  <span>点选器材查看详细参数</span>
                 </div>
                 <div class="lab-3d-view-tools" aria-label="三维视角">
                   <button type="button" data-3d-view="overview" class="active">总览</button>
@@ -917,6 +917,37 @@
                   <button type="button" data-3d-view="focus">器材特写</button>
                 </div>
                 <div class="lab-3d-tooltip" id="lab-3d-tooltip" hidden></div>
+                <aside class="lab-3d-inspector" id="lab-3d-inspector" hidden aria-labelledby="lab-3d-inspector-title">
+                  <div class="lab-3d-inspector-head">
+                    <div>
+                      <span>器材参数卡</span>
+                      <strong id="lab-3d-inspector-title">实验器件</strong>
+                    </div>
+                    <button type="button" id="lab-3d-inspector-close" aria-label="关闭器材参数">×</button>
+                  </div>
+                  <div class="lab-3d-inspector-type">
+                    <span id="lab-3d-inspector-kind">仪器结构</span>
+                    <span id="lab-3d-inspector-state">SIGNAL OK</span>
+                  </div>
+                  <div class="lab-3d-inspector-reading">
+                    <span>当前显示 / LIVE</span>
+                    <strong id="lab-3d-inspector-value">等待读数</strong>
+                    <small id="lab-3d-inspector-reading-note">参数变化后实时更新</small>
+                  </div>
+                  <div class="lab-3d-inspector-specs" id="lab-3d-inspector-specs"></div>
+                  <div class="lab-3d-inspector-section">
+                    <span>接口与连接</span>
+                    <p id="lab-3d-inspector-connections">—</p>
+                  </div>
+                  <div class="lab-3d-inspector-section warning">
+                    <span>使用限制</span>
+                    <p id="lab-3d-inspector-warning">以实物铭牌和实验指导书为准。</p>
+                  </div>
+                  <div class="lab-3d-inspector-actions">
+                    <button type="button" id="lab-3d-inspector-focus">查看器材特写</button>
+                  </div>
+                  <small class="lab-3d-inspector-foot">教学仿真参数 · 实物规格以实验室铭牌为准</small>
+                </aside>
                 <div class="lab-3d-process" id="lab-3d-process">
                   <div class="lab-3d-process-head">
                     <span id="lab-3d-step-count">实验过程 01 / 05</span>
