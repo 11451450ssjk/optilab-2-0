@@ -1,4 +1,17 @@
 /* Theme controls */
+html[data-entered="1"] #welcome-screen,
+html[data-entered="1"] .welcome-theme-toggle {
+  display: none !important;
+}
+
+html[data-entered="1"] body.advanced-body {
+  overflow: auto !important;
+}
+
+.advanced-body a.nav-item {
+  text-decoration: none;
+}
+
 .theme-toggle {
   min-height: 34px;
   padding: 0 11px;

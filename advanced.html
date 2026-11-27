@@ -13,6 +13,10 @@
   <link rel="stylesheet" href="experience.css">
   <script>
     try {
+      const entryParams = new URLSearchParams(location.search);
+      if (entryParams.get("entered") === "1") {
+        document.documentElement.dataset.entered = "1";
+      }
       if (localStorage.getItem("optilab_theme_v1") === "day") {
         document.documentElement.dataset.theme = "day";
       }
@@ -57,7 +61,7 @@
         </button>
       </div>
       <div class="welcome-actions">
-        <button class="primary-button" id="enter-optilab">从实验目录开始</button>
+        <button class="primary-button" id="enter-optilab">进入今日提示</button>
         <button class="welcome-secondary" type="button" data-welcome-target="lab-section">先看一个演示</button>
       </div>
       <div class="welcome-notes">
@@ -113,10 +117,10 @@
           <span class="nav-icon">01</span>
           <span>专业概览</span>
         </button>
-        <button class="nav-item" data-target="morning-checkin">
+        <a class="nav-item" href="checkin.html?next=research-workspace">
           <span class="nav-icon">02</span>
           <span>晨光打卡</span>
-        </button>
+        </a>
         <button class="nav-item" data-target="research-workspace">
           <span class="nav-icon">03</span>
           <span>科研项目</span>
@@ -222,82 +226,6 @@
             <path d="M260 70v70M260 300v70M110 220h80M330 220h80M154 141l58 42M366 257l-58-42M366 141l-58 42M154 299l58-42"></path>
           </svg>
         </div>
-      </section>
-
-      <section class="morning-checkin" id="morning-checkin" aria-labelledby="morning-title">
-        <div class="morning-sky" aria-hidden="true">
-          <i class="morning-ray ray-one"></i>
-          <i class="morning-ray ray-two"></i>
-          <i class="morning-ray ray-three"></i>
-          <span class="morning-sun"></span>
-          <span class="morning-horizon"></span>
-        </div>
-        <div class="morning-main">
-          <span class="eyebrow">晨光科研打卡</span>
-          <p class="morning-date" id="morning-date">今天的日期</p>
-          <h2 id="morning-title">早上好，今天先推进一小步。</h2>
-          <p class="morning-copy" id="morning-copy">写下一件真正要做完的事。打卡不是任务完成率，而是给今天的研究留下一个清楚的起点。</p>
-          <form class="morning-form" id="morning-checkin-form">
-            <label class="morning-focus-field">
-              <span>今天最想推进什么？</span>
-              <input id="morning-focus" type="text" maxlength="120" placeholder="例如：完成光的干涉与衍射第一批重复测量">
-            </label>
-            <label>
-              <span>预计投入</span>
-              <select id="morning-minutes">
-                <option value="30">30 分钟</option>
-                <option value="60" selected>1 小时</option>
-                <option value="120">2 小时</option>
-                <option value="180">3 小时</option>
-                <option value="240">4 小时以上</option>
-              </select>
-            </label>
-            <label>
-              <span>现在的心情</span>
-              <select id="morning-mood">
-                <option value="平稳">平稳</option>
-                <option value="有点紧">有点紧</option>
-                <option value="好奇">好奇</option>
-                <option value="疲惫">疲惫</option>
-                <option value="有把握">有把握</option>
-              </select>
-            </label>
-            <label class="morning-note-field">
-              <span>一句提醒自己的话</span>
-              <input id="morning-note" type="text" maxlength="120" placeholder="先核对单位和原始数据，再开始拟合">
-            </label>
-            <button class="morning-checkin-button" id="morning-checkin-button" type="submit">
-              <span class="morning-button-icon">☀</span>
-              <span id="morning-button-label">完成今日打卡</span>
-            </button>
-          </form>
-          <p class="morning-saved" id="morning-saved">今天还没有打卡</p>
-        </div>
-        <aside class="morning-side">
-          <div class="morning-streak-card">
-            <div class="morning-streak-ring" id="morning-streak-ring" style="--streak:0">
-              <strong id="morning-streak-count">0</strong>
-              <span>连续天数</span>
-            </div>
-            <div>
-              <span class="morning-side-kicker">这一周</span>
-              <div class="morning-week" id="morning-week"></div>
-              <p id="morning-week-note">从今天开始，留下一段连续的研究记录。</p>
-            </div>
-          </div>
-          <div class="morning-today-card" id="morning-today-card">
-            <span>今日研究坐标</span>
-            <strong id="morning-today-focus">还没有设定重点</strong>
-            <div class="morning-today-steps">
-              <i class="done"></i><i></i><i></i>
-            </div>
-            <small id="morning-today-meta">完成后会把记录连接到科研项目审阅。</small>
-          </div>
-          <div class="morning-recent" id="morning-recent">
-            <span>最近几天</span>
-            <div class="morning-recent-list"></div>
-          </div>
-        </aside>
       </section>
 
       <section class="research-workspace" id="research-workspace" aria-labelledby="research-title">

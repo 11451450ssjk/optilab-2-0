@@ -500,23 +500,26 @@
   }
 
   function initialize() {
-    readCheckins();
+    const hasInlineCheckin = Boolean($("#morning-checkin-form"));
+    if (hasInlineCheckin) readCheckins();
     applyTheme(document.documentElement.dataset.theme === "day" ? "day" : "dark", false);
     $$("[data-theme-toggle]").forEach((button) => button.addEventListener("click", toggleTheme));
-    $("#morning-checkin-form").addEventListener("submit", submitCheckin);
-    $("#morning-focus").addEventListener("input", () => {
-      const value = $("#morning-focus").value.trim();
-      if (value) $("#morning-today-focus").textContent = value;
-    });
+    if (hasInlineCheckin) {
+      $("#morning-checkin-form").addEventListener("submit", submitCheckin);
+      $("#morning-focus").addEventListener("input", () => {
+        const value = $("#morning-focus").value.trim();
+        if (value) $("#morning-today-focus").textContent = value;
+      });
+    }
     $("#auto-assign-tasks").addEventListener("click", () => assignTasks(false));
     $("#reshuffle-task-assignments").addEventListener("click", () => {
       if (!(research.getProject().tasks || []).length) assignTasks(false);
       else assignTasks(true);
     });
     $("#export-task-csv").addEventListener("click", exportTaskCsv);
-    renderCheckin();
+    if (hasInlineCheckin) renderCheckin();
     renderTasks();
-    window.addEventListener("optilab:reports-changed", renderCheckin);
+    if (hasInlineCheckin) window.addEventListener("optilab:reports-changed", renderCheckin);
   }
 
   window.OptilabExperience = {

@@ -644,22 +644,28 @@ function setupWelcomeScreen() {
     document.body.classList.remove("welcome-locked");
     return;
   }
-  const enterWorkspace = (targetId = "") => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("entered") === "1") {
+    welcome.hidden = true;
+    document.body.classList.remove("welcome-locked");
+    const nextTarget = params.get("next");
+    window.setTimeout(() => {
+      const destination = nextTarget ? document.getElementById(nextTarget) : document.getElementById("top");
+      destination?.scrollIntoView({ behavior: "instant", block: "start" });
+    }, 80);
+    return;
+  }
+  const openCheckinPage = (targetId = "catalog-section") => {
     if (welcome.hidden) return;
     welcome.classList.add("leaving");
     document.body.classList.remove("welcome-locked");
     window.setTimeout(() => {
-      welcome.hidden = true;
-      if (targetId) {
-        document.getElementById(targetId)?.scrollIntoView({ behavior: "instant", block: "start" });
-      } else {
-        document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
-      }
-    }, 420);
+      window.location.href = `checkin.html?next=${encodeURIComponent(targetId || "catalog-section")}`;
+    }, 260);
   };
-  button.addEventListener("click", () => enterWorkspace("catalog-section"));
+  button.addEventListener("click", () => openCheckinPage("catalog-section"));
   document.querySelectorAll("[data-welcome-target]").forEach((targetButton) => {
-    targetButton.addEventListener("click", () => enterWorkspace(targetButton.dataset.welcomeTarget));
+    targetButton.addEventListener("click", () => openCheckinPage(targetButton.dataset.welcomeTarget));
   });
   window.setTimeout(() => button.focus(), 100);
 }
@@ -3894,7 +3900,7 @@ function analyzePhoto(file) {
 }
 
 function setupNavigation() {
-  document.querySelectorAll(".nav-item").forEach((button) => {
+  document.querySelectorAll(".nav-item[data-target]").forEach((button) => {
     button.addEventListener("click", () => {
       document.getElementById(button.dataset.target).scrollIntoView({ behavior: "smooth", block: "start" });
       document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === button));

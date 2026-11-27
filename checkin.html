@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" id="theme-color" content="#090d10">
+  <meta name="description" content="OptiLab 晨光科研提示页：写下今天的实验或研究重点，然后进入工作台。">
+  <title>晨光提示 · OptiLab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="advanced.css">
+  <link rel="stylesheet" href="experience.css">
+  <link rel="stylesheet" href="checkin.css">
+  <script>
+    try {
+      if (localStorage.getItem("optilab_theme_v1") === "day") {
+        document.documentElement.dataset.theme = "day";
+      }
+    } catch {}
+  </script>
+</head>
+<body class="advanced-body morning-page-body">
+  <header class="checkin-page-header">
+    <a class="checkin-page-brand" href="advanced.html" aria-label="返回第一页">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="5"></circle>
+          <path d="M24 4v10M24 34v10M4 24h10M34 24h10M9.9 9.9l7.1 7.1M31 31l7.1 7.1M38.1 9.9 31 17M17 31l-7.1 7.1"></path>
+        </svg>
+      </span>
+      <span>
+        <strong>OptiLab</strong>
+        <small>第二页 · 晨光提示</small>
+      </span>
+    </a>
+    <div class="checkin-page-header-actions">
+      <span class="checkin-page-step">01 欢迎 <b>02 今日提示</b> 03 工作台</span>
+      <button class="theme-toggle" type="button" data-theme-toggle>
+        <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+        <span data-theme-label>日间</span>
+      </button>
+      <a class="checkin-back-link" href="advanced.html">返回第一页</a>
+    </div>
+  </header>
+
+  <main class="checkin-page-shell">
+    <div class="checkin-prompt">
+      <div>
+        <span>不必一次做完</span>
+        <strong>先把今天最想推进的一小步写下来。</strong>
+      </div>
+      <p>这条提示会保存到本机，并连接到科研项目的今日审阅。选错也没关系，进入工作台后随时可以回来修改。</p>
+    </div>
+
+    <section class="morning-checkin checkin-page-card" aria-labelledby="morning-title">
+      <div class="morning-sky" aria-hidden="true">
+        <i class="morning-ray ray-one"></i>
+        <i class="morning-ray ray-two"></i>
+        <i class="morning-ray ray-three"></i>
+        <span class="morning-sun"></span>
+        <span class="morning-horizon"></span>
+      </div>
+      <div class="morning-main">
+        <span class="eyebrow">晨光科研打卡</span>
+        <p class="morning-date" id="morning-date">今天的日期</p>
+        <h1 id="morning-title">早上好，今天先推进一小步。</h1>
+        <p class="morning-copy" id="morning-copy">写下一件真正要做完的事。打卡不是任务完成率，而是给今天的研究留下一个清楚的起点。</p>
+        <form class="morning-form" id="morning-checkin-form">
+          <label class="morning-focus-field">
+            <span>今天最想推进什么？</span>
+            <input id="morning-focus" type="text" maxlength="120" placeholder="例如：完成光的干涉与衍射第一批重复测量" required>
+          </label>
+          <label>
+            <span>预计投入</span>
+            <select id="morning-minutes">
+              <option value="30">30 分钟</option>
+              <option value="60" selected>1 小时</option>
+              <option value="120">2 小时</option>
+              <option value="180">3 小时</option>
+              <option value="240">4 小时以上</option>
+            </select>
+          </label>
+          <label>
+            <span>现在的心情</span>
+            <select id="morning-mood">
+              <option value="平稳">平稳</option>
+              <option value="有点紧">有点紧</option>
+              <option value="好奇">好奇</option>
+              <option value="疲惫">疲惫</option>
+              <option value="有把握">有把握</option>
+            </select>
+          </label>
+          <label class="morning-note-field">
+            <span>一句提醒自己的话</span>
+            <input id="morning-note" type="text" maxlength="120" placeholder="先核对单位和原始数据，再开始拟合">
+          </label>
+          <button class="morning-checkin-button" id="morning-checkin-button" type="submit">
+            <span class="morning-button-icon">☀</span>
+            <span id="morning-button-label">打卡并进入工作台</span>
+          </button>
+        </form>
+        <p class="morning-saved" id="morning-saved">今天还没有打卡</p>
+        <p class="checkin-form-message" id="checkin-form-message" role="status" aria-live="polite"></p>
+      </div>
+      <aside class="morning-side">
+        <div class="morning-streak-card">
+          <div class="morning-streak-ring" id="morning-streak-ring" style="--streak:0">
+            <strong id="morning-streak-count">0</strong>
+            <span>连续天数</span>
+          </div>
+          <div>
+            <span class="morning-side-kicker">这一周</span>
+            <div class="morning-week" id="morning-week"></div>
+            <p id="morning-week-note">从今天开始，留下一段连续的研究记录。</p>
+          </div>
+        </div>
+        <div class="morning-today-card" id="morning-today-card">
+          <span>今日研究坐标</span>
+          <strong id="morning-today-focus">还没有设定重点</strong>
+          <div class="morning-today-steps"><i class="done"></i><i></i><i></i></div>
+          <small id="morning-today-meta">完成后会把记录连接到科研项目审阅。</small>
+        </div>
+        <div class="checkin-reminders">
+          <span>进入实验前，再确认三件事</span>
+          <div><i>01</i><b>实验项目</b><small>和课程指导书一致</small></div>
+          <div><i>02</i><b>单位与重复</b><small>量程、单位和次数明确</small></div>
+          <div><i>03</i><b>原始记录</b><small>先保存数据，再开始修正</small></div>
+        </div>
+        <div class="morning-recent" id="morning-recent">
+          <span>最近几天</span>
+          <div class="morning-recent-list"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="checkin-page-actions">
+      <a class="checkin-skip-link" id="skip-checkin" href="advanced.html?entered=1&amp;next=catalog-section">今天先跳过，直接进入工作台</a>
+      <span>打卡内容只保存在当前浏览器</span>
+    </div>
+  </main>
+  <script src="checkin.js"></script>
+</body>
+</html>
