@@ -787,6 +787,22 @@ html[data-theme="day"] .theme-toggle-icon {
     radial-gradient(circle at 100% 0, rgba(223, 173, 91, 0.1), transparent 22rem);
 }
 
+.hust-exact-course-group {
+  border-color: #5a4730;
+  background:
+    radial-gradient(circle at 100% 0, rgba(221, 173, 96, 0.075), transparent 20rem),
+    #151b1c;
+}
+
+.hust-exact-experiment-card {
+  border-color: #4a3c2a;
+}
+
+.hust-exact-experiment-card:hover {
+  border-color: #a07842;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
 .graduate-experiment-card {
   border-color: #40382d;
   background:
@@ -1216,6 +1232,13 @@ html[data-theme="day"] .advanced-body .graduate-overview-card {
   background:
     radial-gradient(circle at 95% 10%, rgba(205, 148, 60, 0.16), transparent 13rem),
     linear-gradient(120deg, #fff8eb, #f2e8d7);
+}
+
+html[data-theme="day"] .advanced-body .hust-exact-course-group {
+  border-color: #dec6a2;
+  background:
+    radial-gradient(circle at 100% 0, rgba(212, 158, 75, 0.12), transparent 20rem),
+    #fffaf0;
 }
 
 html[data-theme="day"] .advanced-body .graduate-overview-card strong {

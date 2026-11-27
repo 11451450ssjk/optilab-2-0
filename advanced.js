@@ -2710,8 +2710,11 @@ function renderYearOverview() {
   container.innerHTML = [1, 2, 3, 4].map((year) => {
     const semesters = CATALOG.filter((semester) => semester.year === year && semester.scope !== "graduate");
     const generalSemesters = semesters.filter((semester) => !semester.scope || semester.scope === "general");
-    const hustModules = semesters
+    const oldHustModules = semesters
       .filter((semester) => semester.scope === "hust")
+      .reduce((total, semester) => total + semester.experiments.length, 0);
+    const verifiedModules = semesters
+      .filter((semester) => semester.scope === "hust-exact")
       .reduce((total, semester) => total + semester.experiments.length, 0);
     const electricalModules = semesters
       .filter((semester) => semester.scope === "electrical")
@@ -2721,7 +2724,7 @@ function renderYearOverview() {
     return `<button class="year-overview-card" data-jump-year="${year}" data-year="${year}">
       <div class="year-card-top"><span>YEAR ${String(year).padStart(2, "0")}</span><i></i></div>
       <h3>${["先打好基础", "开始上手", "做深一点", "完成一个设计"][year - 1]}</h3>
-      <p>${titles.join("；")}${hustModules ? `；华科本科实验 ${hustModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
+      <p>${titles.join("；")}${oldHustModules ? `；原华科光电本科 ${oldHustModules} 项` : ""}${verifiedModules ? `；华科核验清单 ${verifiedModules} 项` : ""}${electricalModules ? `；华科电学扩展 ${electricalModules} 项` : ""}</p>
       <small>${totalExperiments} 个实验 · ${semesters.length} 个课程节点</small>
     </button>`;
   }).join("") + `<button class="graduate-overview-card" data-jump-year="graduate">
@@ -2749,6 +2752,8 @@ function filteredCatalog() {
   return CATALOG
     .filter((semester) =>
       state.filterYear === "all" ||
+      (state.filterYear === "hust-exact" && semester.scope === "hust-exact") ||
+      (state.filterYear === "general" && (!semester.scope || semester.scope === "general" || semester.scope === "hust")) ||
       (state.filterYear === "graduate" && semester.scope === "graduate") ||
       (state.filterYear === "hust" && semester.scope === "hust") ||
       (state.filterYear === "electrical" && semester.scope === "electrical") ||
@@ -2777,24 +2782,28 @@ function renderCatalog() {
     container.innerHTML = '<div class="catalog-empty">没有匹配的实验。请尝试更短的关键词或切换年级。</div>';
     return;
   }
+  const yearNames = { 1: "大一", 2: "大二", 3: "大三", 4: "大四" };
   container.innerHTML = catalog.map((semester) => {
     const containsSelected = semester.experiments.some((experiment) => experiment.id === state.experimentId);
     const openByDefault = state.search.trim() ||
       containsSelected ||
-      (state.filterYear === "hust" && semester.scope === "hust") ||
+      (state.filterYear === "hust-exact" && semester.scope === "hust-exact") ||
+      (state.filterYear === "general" && (!semester.scope || semester.scope === "general" || semester.scope === "hust")) ||
       (state.filterYear === "graduate" && semester.scope === "graduate") ||
-      (state.filterYear !== "all" && state.filterYear !== "hust" && state.filterYear !== "electrical" && state.filterYear !== "graduate" && semester.scope === "general") ||
-      (state.filterYear === "graduate" && semester.scope === "graduate");
-    const officialCourse = semester.scope === "hust" || semester.scope === "electrical" || semester.scope === "graduate";
+      (state.filterYear === "electrical" && semester.scope === "electrical") ||
+      (yearNames[state.filterYear] && semester.year === Number(state.filterYear));
+    const officialCourse = semester.scope === "hust" || semester.scope === "hust-exact" || semester.scope === "electrical" || semester.scope === "graduate";
     const coursePrefix = semester.scope === "electrical"
       ? "华中科技大学电学扩展 · "
       : semester.scope === "hust"
-        ? `华科本科实验 · ${semester.termLabel || `大${["一", "二", "三", "四"][semester.year - 1]}${semester.term === 1 ? "上" : "下"}`} · `
+        ? "原华科光电本科培养方案 · "
+        : semester.scope === "hust-exact"
+          ? `华科核验清单 · ${semester.termLabel || `大${["一", "二", "三", "四"][semester.year - 1]}${semester.term === 1 ? "上" : "下"}`} · `
         : semester.scope === "graduate"
           ? `研究生 · 研${semester.degreeYear === 2 ? "二" : "一"} · `
           : "";
     return `
-    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""} ${semester.scope === "graduate" ? "graduate-course-group" : ""}">
+    <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "hust-exact" ? "hust-exact-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""} ${semester.scope === "graduate" ? "graduate-course-group" : ""}">
       <div class="semester-header">
         <div>
           <span class="semester-number">${officialCourse ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
@@ -2804,13 +2813,13 @@ function renderCatalog() {
           </div>
         </div>
         <div class="semester-group-actions">
-          <span>${semester.scope === "hust" ? "华科本科实验清单 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : semester.scope === "graduate" ? "研究生研究实验 · " : ""}${semester.experiments.length} 个实验</span>
+          <span>${semester.scope === "hust" ? "原华科光电本科 · " : semester.scope === "hust-exact" ? "华科核验清单 · " : semester.scope === "electrical" ? "HUST 电学扩展 · " : semester.scope === "graduate" ? "研究生研究实验 · " : ""}${semester.experiments.length} 个实验</span>
           <button class="group-toggle" data-group-toggle="${semester.id}" aria-expanded="${openByDefault ? "true" : "false"}">${openByDefault ? "收起" : "展开"}</button>
         </div>
       </div>
       <div class="experiment-card-grid ${openByDefault ? "" : "collapsed"}" data-group-grid="${semester.id}">
         ${semester.experiments.map((experiment, index) => `
-          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""} ${semester.scope === "graduate" ? "graduate-experiment-card" : ""}" data-experiment-id="${experiment.id}">
+          <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "hust-exact" ? "hust-exact-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""} ${semester.scope === "graduate" ? "graduate-experiment-card" : ""}" data-experiment-id="${experiment.id}">
             <span class="experiment-card-index">${officialCourse ? semester.officialCode : "EXP"} ${String(index + 1).padStart(2, "0")}</span>
             <h4>${escapeHtml(experiment.name)}</h4>
             <p>${escapeHtml(experiment.description)}</p>
@@ -2823,10 +2832,10 @@ function renderCatalog() {
   `;
   }).join("");
   const noLabContainer = document.getElementById("hust-no-lab-terms");
-  const yearNames = { 1: "大一", 2: "大二", 3: "大三", 4: "大四" };
   const visibleNoLabTerms = (window.HUST_EXACT_NO_LAB_TERMS || []).filter((item) =>
     state.filterYear === "all" ||
     state.filterYear === "hust" ||
+    state.filterYear === "hust-exact" ||
     (yearNames[state.filterYear] && item.term.includes(yearNames[state.filterYear]))
   );
   const showNoLabTerms = !state.search && visibleNoLabTerms.length;
@@ -3573,7 +3582,7 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
   const reportCourseLevel = experiment.scope === "graduate"
     ? `研${experiment.degreeYear === 2 ? "二" : "一"}`
     : `大${["一", "二", "三", "四"][experiment.year - 1]}`;
-  const reportCoursePosition = experiment.scope === "hust" && experiment.semesterTermLabel
+  const reportCoursePosition = (experiment.scope === "hust" || experiment.scope === "hust-exact") && experiment.semesterTermLabel
     ? `${experiment.semesterTermLabel} · ${experiment.semesterTitle}`
     : `${reportCourseLevel} ${experiment.term === 1 ? "上学期" : "下学期"} · ${experiment.semesterTitle}`;
 
@@ -4136,10 +4145,11 @@ function initialize() {
   console.info(`OptiLab 当前载入 ${total} 个实验，其中本科 ${window.HUST_UNDERGRADUATE_SOURCE?.experimentCount || 0} 个，研究生 ${total - (window.HUST_UNDERGRADUATE_SOURCE?.experimentCount || 0)} 个。`);
   document.getElementById("hero-experiment-count").textContent = String(total);
   document.getElementById("hero-course-count").textContent = String(CATALOG.length);
-  const undergraduateTotal = EXPERIMENTS.filter((experiment) => experiment.scope === "hust").length;
+  const undergraduateTotal = EXPERIMENTS.filter((experiment) => experiment.scope !== "graduate").length;
+  const verifiedTotal = EXPERIMENTS.filter((experiment) => experiment.scope === "hust-exact").length;
   const graduateTotal = EXPERIMENTS.filter((experiment) => experiment.scope === "graduate").length;
   document.getElementById("sidebar-catalog-summary").textContent =
-    `华科本科清单 ${undergraduateTotal} 个 + 研究生 ${graduateTotal} 个，共 ${total} 个`;
+    `本科目录 ${undergraduateTotal} 个（核验清单 ${verifiedTotal} 个）+ 研究生 ${graduateTotal} 个`;
   document.getElementById("dossier-status").textContent = `${total} / ${total} 已整理`;
   const initialReportText = `# 实验报告
 
