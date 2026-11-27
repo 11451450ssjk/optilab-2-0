@@ -8,10 +8,10 @@
   <meta name="description" content="面向光电与电子信息本科生和研究生的实验与科研助手，包含实验原理、器材准备、操作演示、科研统计、论文草稿和自动分工。">
   <title>OptiLab | 光电与电子信息本科—研究生实验与科研助手</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
-  <link rel="stylesheet" href="styles.css?v=20261128-auto-tune">
-  <link rel="stylesheet" href="advanced.css?v=20261128-auto-tune">
+  <link rel="stylesheet" href="styles.css?v=20261128-smooth-autotune">
+  <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-auto-tune">
+  <link rel="stylesheet" href="experience.css?v=20261128-smooth-autotune">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -918,6 +918,18 @@
                   <button type="button" data-3d-view="top">俯视</button>
                   <button type="button" data-3d-view="focus">器材特写</button>
                 </div>
+                <div class="lab-3d-autotune-hud" id="lab-3d-autotune-hud" hidden>
+                  <div class="lab-3d-autotune-head">
+                    <div>
+                      <span id="lab-3d-autotune-phase">自动调试 · 批次 1 / 3</span>
+                      <strong>正在同步器材位置与工作参数</strong>
+                    </div>
+                    <button type="button" id="lab-3d-autotune-stop">停止</button>
+                  </div>
+                  <div class="lab-3d-autotune-devices" id="lab-3d-autotune-devices"></div>
+                  <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
+                  <small>每批最多同时调整 2 个器件</small>
+                </div>
                 <div class="lab-3d-tooltip" id="lab-3d-tooltip" hidden></div>
                 <aside class="lab-3d-inspector" id="lab-3d-inspector" hidden aria-labelledby="lab-3d-inspector-title">
                   <div class="lab-3d-inspector-head">
@@ -1694,26 +1706,26 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="catalog.js?v=20261128-auto-tune"></script>
-  <script src="principles.js?v=20261128-auto-tune"></script>
-  <script src="hust.js?v=20261128-auto-tune"></script>
-  <script src="electrical.js?v=20261128-auto-tune"></script>
-  <script src="hust_exact.js?v=20261128-auto-tune"></script>
-  <script src="graduate.js?v=20261128-auto-tune"></script>
-  <script src="dedupe_catalog.js?v=20261128-auto-tune"></script>
-  <script src="optilab_physics.js?v=20261128-auto-tune"></script>
-  <script src="lab_panorama.js?v=20261128-auto-tune"></script>
-  <script src="lab_panorama_3d.js?v=20261128-auto-tune"></script>
-  <script src="optilab_equipment.js?v=20261128-auto-tune"></script>
-  <script src="equipment_store.js?v=20261128-auto-tune"></script>
+  <script src="catalog.js?v=20261128-smooth-autotune"></script>
+  <script src="principles.js?v=20261128-smooth-autotune"></script>
+  <script src="hust.js?v=20261128-smooth-autotune"></script>
+  <script src="electrical.js?v=20261128-smooth-autotune"></script>
+  <script src="hust_exact.js?v=20261128-smooth-autotune"></script>
+  <script src="graduate.js?v=20261128-smooth-autotune"></script>
+  <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
+  <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
+  <script src="lab_panorama.js?v=20261128-smooth-autotune"></script>
+  <script src="lab_panorama_3d.js?v=20261128-smooth-autotune"></script>
+  <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
+  <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="advanced.js?v=20261128-auto-tune"></script>
-  <script src="research.js?v=20261128-auto-tune"></script>
+  <script src="advanced.js?v=20261128-smooth-autotune"></script>
+  <script src="research.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/jszip.min.js"></script>
-  <script src="research_suite.js?v=20261128-auto-tune"></script>
-  <script src="research_advanced.js?v=20261128-auto-tune"></script>
-  <script src="paper_ai_tools.js?v=20261128-auto-tune"></script>
-  <script src="equipment_library.js?v=20261128-auto-tune"></script>
-  <script src="experience_enhancements.js?v=20261128-auto-tune"></script>
+  <script src="research_suite.js?v=20261128-smooth-autotune"></script>
+  <script src="research_advanced.js?v=20261128-smooth-autotune"></script>
+  <script src="paper_ai_tools.js?v=20261128-smooth-autotune"></script>
+  <script src="equipment_library.js?v=20261128-smooth-autotune"></script>
+  <script src="experience_enhancements.js?v=20261128-smooth-autotune"></script>
 </body>
 </html>
