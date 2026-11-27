@@ -43,6 +43,7 @@
     processCollapsed: false,
     autoTour: false,
     autoTourAt: 0,
+    autoTune: null,
     gltfLoader: null,
     gltfExporter: null,
     modelAssetStatus: "正在检查模型资产",
@@ -814,6 +815,60 @@
     return "generic";
   }
 
+  function sceneLayoutPosition(device) {
+    const info = state.presetInfo;
+    const devices = info?.devices || [];
+    const primaryPath = (info?.optics || []).find((path) => path.includes(device.id)) || [];
+    const pathIndex = primaryPath.indexOf(device.id);
+    if (pathIndex >= 0) {
+      const count = primaryPath.length;
+      if (count <= 1) return { x: 0, z: 0 };
+      if (count === 2) {
+        return {
+          x: pathIndex === 0 ? -2.8 : 2.35,
+          z: pathIndex === 0 ? -0.95 : 0.55
+        };
+      }
+      if (count === 3) {
+        return {
+          x: [-3.45, -0.2, 2.9][pathIndex],
+          z: [-1.2, 0.35, -0.75][pathIndex]
+        };
+      }
+      const bendIndex = Math.max(2, Math.ceil(count * 0.58));
+      if (pathIndex < bendIndex) {
+        const denominator = Math.max(1, bendIndex - 1);
+        return {
+          x: -3.75 + (7.5 * pathIndex) / denominator,
+          z: -1.35 + (pathIndex % 2) * 0.12
+        };
+      }
+      const turnIndex = pathIndex - bendIndex + 1;
+      const turnCount = Math.max(1, count - bendIndex);
+      return {
+        x: 3.55 - (5.2 * turnIndex) / turnCount,
+        z: 0.55 + (0.55 * turnIndex) / turnCount
+      };
+    }
+    const pathIds = new Set(primaryPath);
+    const remaining = devices.filter((item) => !pathIds.has(item.id));
+    const index = Math.max(0, remaining.findIndex((item) => item.id === device.id));
+    const electronic = device.zone === "electronic";
+    const columns = remaining.length <= 4 ? 2 : electronic ? 3 : 3;
+    const row = Math.floor(index / columns);
+    return {
+      x: electronic ? -3.15 + (index % columns) * 3.15 : -2.8 + (index % columns) * 2.8,
+      z: electronic ? -1.15 + row * 1.65 : 1.25 + row * 0.72
+    };
+  }
+
+  function optimalDeviceControls(device) {
+    return Object.fromEntries(deviceControlDefinitions(device).map((definition) => [
+      definition.key,
+      definition.type === "select" ? definition.value : Number(definition.value)
+    ]));
+  }
+
   function createDeviceGroup(device) {
     const THREE = state.three;
     const group = new THREE.Group();
@@ -1479,7 +1534,8 @@
     label.userData.deviceId = device.id;
     group.add(label);
     group.scale.setScalar(1.12);
-    group.position.set((device.x - 0.5) * 9.2, 0.03, (device.y - 0.5) * 5.2);
+    const layout = sceneLayoutPosition(device);
+    group.position.set(layout.x, 0.03, layout.z);
     state.initialPositions.set(device.id, group.position.clone());
     return group;
   }
@@ -1774,6 +1830,7 @@
     });
     state.deviceGroups.clear();
     state.proceduralGroups.clear();
+    state.autoTune = null;
     state.initialPositions.clear();
     state.dynamicTextures = [];
     state.animatedObjects = [];
@@ -2834,6 +2891,92 @@
     state.dynamicTextures.forEach((entry) => drawPanelTexture(entry, performance.now(), state.config || {}));
   }
 
+  function startAutoTune() {
+    if (!state.ready || !state.presetInfo || state.autoTune) return;
+    window.dispatchEvent(new CustomEvent("optilab:auto-tune-request"));
+    const from = new Map();
+    state.deviceGroups.forEach((group, id) => {
+      from.set(id, {
+        x: group.position.x,
+        z: group.position.z,
+        yaw: group.rotation.y
+      });
+      const controls = optimalDeviceControls(state.presetInfo.devices.find((device) => device.id === id) || {});
+      state.deviceControls.set(id, controls);
+    });
+    state.autoTune = {
+      startedAt: performance.now(),
+      duration: 1150,
+      from,
+      lastLinkUpdate: 0
+    };
+    state.dragGroup = null;
+    state.orbit = null;
+    setViewPreset("overview");
+    const button = $("#lab-3d-auto-tune");
+    if (button) {
+      button.classList.add("is-running");
+      button.setAttribute("aria-pressed", "true");
+      button.textContent = "自动调试中 0%";
+    }
+    const note = $("#lab-3d-scene-note");
+    if (note) note.textContent = "正在归位器件、校准参数并重建实验连接";
+    if (state.inspectorId) renderDeviceControls(state.presetInfo.devices.find((device) => device.id === state.inspectorId));
+    showTooltipPlaceholder("自动调试已启动");
+  }
+
+  function showTooltipPlaceholder(message) {
+    const note = $("#panorama-status");
+    if (note) note.textContent = message;
+  }
+
+  function updateAutoTune(time) {
+    if (!state.autoTune) return;
+    const { startedAt, duration, from } = state.autoTune;
+    const rawProgress = clamp((time - startedAt) / duration, 0, 1);
+    const progress = 1 - Math.pow(1 - rawProgress, 3);
+    state.deviceGroups.forEach((group, id) => {
+      const origin = state.initialPositions.get(id);
+      const start = from.get(id);
+      if (!origin || !start) return;
+      group.position.x = start.x + (origin.x - start.x) * progress;
+      group.position.z = start.z + (origin.z - start.z) * progress;
+      group.rotation.y = start.yaw * (1 - progress);
+      const detail = state.proceduralGroups.get(id);
+      if (detail) {
+        detail.position.x *= 1 - progress;
+        detail.position.y *= 1 - progress;
+        detail.position.z *= 1 - progress;
+        detail.rotation.x *= 1 - progress;
+        detail.rotation.z *= 1 - progress;
+        detail.rotation.y *= 1 - progress;
+      }
+    });
+    if (time - state.autoTune.lastLinkUpdate > 90) {
+      state.autoTune.lastLinkUpdate = time;
+      rebuildConnections();
+    }
+    const button = $("#lab-3d-auto-tune");
+    if (button) button.textContent = `自动调试中 ${Math.round(progress * 100)}%`;
+    state.selectionHelper?.update();
+    if (rawProgress < 1) return;
+    state.presetInfo.devices.forEach((device) => applyDeviceControls(device.id, false));
+    state.autoTune = null;
+    rebuildConnections();
+    updateHud();
+    updateSelectionHelper();
+    if (button) {
+      button.classList.remove("is-running");
+      button.setAttribute("aria-pressed", "false");
+      button.textContent = "一键自动调试";
+    }
+    if (state.inspectorId) {
+      populateInspector(state.inspectorId);
+    }
+    const note = $("#lab-3d-scene-note");
+    if (note) note.textContent = "自动调试完成：器件已分区归位并恢复目标参数";
+  }
+
   function renderDeviceControls(device) {
     const list = $("#lab-3d-control-list");
     if (!list) return;
@@ -3391,6 +3534,7 @@
     }
     resize();
     updateCamera();
+    updateAutoTune(time);
     if (state.autoTour && time >= state.autoTourAt) {
       setProcessStep(state.processStep + 1);
     }
@@ -3431,6 +3575,13 @@
   }
 
   function resetLayout() {
+    state.autoTune = null;
+    const autoButton = $("#lab-3d-auto-tune");
+    if (autoButton) {
+      autoButton.classList.remove("is-running");
+      autoButton.setAttribute("aria-pressed", "false");
+      autoButton.textContent = "一键自动调试";
+    }
     state.presetInfo?.devices.forEach((device) => {
       state.deviceControls.set(device.id, Object.fromEntries(
         deviceControlDefinitions(device).map((definition) => [
@@ -3480,6 +3631,7 @@
     document.querySelectorAll("[data-3d-view]").forEach((button) => {
       button.addEventListener("click", () => setViewPreset(button.dataset["3dView"]));
     });
+    $("#lab-3d-auto-tune")?.addEventListener("click", startAutoTune);
     $("#lab-3d-step-prev")?.addEventListener("click", () => {
       state.autoTour = false;
       setProcessStep(state.processStep - 1);

@@ -8,10 +8,10 @@
   <meta name="description" content="面向光电与电子信息本科生和研究生的实验与科研助手，包含实验原理、器材准备、操作演示、科研统计、论文草稿和自动分工。">
   <title>OptiLab | 光电与电子信息本科—研究生实验与科研助手</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/><path d=%22M16 5v6M16 21v6M5 16h6M21 16h6%22 stroke=%22%23b8f0a0%22 stroke-width=%222%22/></svg>">
-  <link rel="stylesheet" href="styles.css?v=20261128-device-controls">
-  <link rel="stylesheet" href="advanced.css?v=20261128-device-controls">
+  <link rel="stylesheet" href="styles.css?v=20261128-auto-tune">
+  <link rel="stylesheet" href="advanced.css?v=20261128-auto-tune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-device-controls">
+  <link rel="stylesheet" href="experience.css?v=20261128-auto-tune">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -912,6 +912,7 @@
                   <span>点选器材查看详细参数</span>
                 </div>
                 <div class="lab-3d-view-tools" aria-label="三维视角">
+                  <button type="button" id="lab-3d-auto-tune" class="auto-tune-button" aria-pressed="false">一键自动调试</button>
                   <button type="button" data-3d-view="overview" class="active">总览</button>
                   <button type="button" data-3d-view="optical">光路视</button>
                   <button type="button" data-3d-view="top">俯视</button>
@@ -1693,26 +1694,26 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="catalog.js"></script>
-  <script src="principles.js"></script>
-  <script src="hust.js"></script>
-  <script src="electrical.js"></script>
-  <script src="hust_exact.js"></script>
-  <script src="graduate.js"></script>
-  <script src="dedupe_catalog.js"></script>
-  <script src="optilab_physics.js"></script>
-  <script src="lab_panorama.js"></script>
-  <script src="lab_panorama_3d.js"></script>
-  <script src="optilab_equipment.js"></script>
-  <script src="equipment_store.js"></script>
+  <script src="catalog.js?v=20261128-auto-tune"></script>
+  <script src="principles.js?v=20261128-auto-tune"></script>
+  <script src="hust.js?v=20261128-auto-tune"></script>
+  <script src="electrical.js?v=20261128-auto-tune"></script>
+  <script src="hust_exact.js?v=20261128-auto-tune"></script>
+  <script src="graduate.js?v=20261128-auto-tune"></script>
+  <script src="dedupe_catalog.js?v=20261128-auto-tune"></script>
+  <script src="optilab_physics.js?v=20261128-auto-tune"></script>
+  <script src="lab_panorama.js?v=20261128-auto-tune"></script>
+  <script src="lab_panorama_3d.js?v=20261128-auto-tune"></script>
+  <script src="optilab_equipment.js?v=20261128-auto-tune"></script>
+  <script src="equipment_store.js?v=20261128-auto-tune"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="advanced.js?v=20261128-device-controls"></script>
-  <script src="research.js"></script>
+  <script src="advanced.js?v=20261128-auto-tune"></script>
+  <script src="research.js?v=20261128-auto-tune"></script>
   <script src="vendor/jszip.min.js"></script>
-  <script src="research_suite.js"></script>
-  <script src="research_advanced.js"></script>
-  <script src="paper_ai_tools.js"></script>
-  <script src="equipment_library.js"></script>
-  <script src="experience_enhancements.js"></script>
+  <script src="research_suite.js?v=20261128-auto-tune"></script>
+  <script src="research_advanced.js?v=20261128-auto-tune"></script>
+  <script src="paper_ai_tools.js?v=20261128-auto-tune"></script>
+  <script src="equipment_library.js?v=20261128-auto-tune"></script>
+  <script src="experience_enhancements.js?v=20261128-auto-tune"></script>
 </body>
 </html>

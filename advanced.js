@@ -4206,6 +4206,18 @@ function setupControls() {
     window.OptilabPanorama?.resetLayout();
     window.OptilabPanorama3D?.resetLayout();
   });
+  window.addEventListener("optilab:auto-tune-request", () => {
+    const config = controlConfig();
+    state.primary = config.primary.value;
+    state.secondary = config.secondary.value;
+    primaryControl.value = state.primary;
+    secondaryControl.value = state.secondary;
+    state.paused = false;
+    state.autoScan = false;
+    document.getElementById("lab-pause").textContent = "暂停";
+    document.getElementById("auto-scan").setAttribute("aria-pressed", "false");
+    updateControlReadouts();
+  });
   document.querySelectorAll("[data-lab-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.labMode = button.dataset.labMode;

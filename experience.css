@@ -147,6 +147,19 @@ html[data-entered="1"] body.advanced-body {
   background: rgba(125, 91, 42, 0.32);
 }
 
+.lab-3d-view-tools .auto-tune-button {
+  border-color: rgba(212, 174, 103, 0.58);
+  color: #eed09a;
+  background: rgba(126, 88, 37, 0.3);
+}
+
+.lab-3d-view-tools .auto-tune-button.is-running {
+  color: #d7f0de;
+  border-color: rgba(112, 205, 145, 0.62);
+  background: rgba(43, 114, 71, 0.32);
+  cursor: progress;
+}
+
 .lab-3d-tooltip {
   position: absolute;
   z-index: 5;
