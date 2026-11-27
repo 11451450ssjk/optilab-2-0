@@ -1,22 +1,117 @@
 "use strict";
 
 (function () {
-  const DEFAULT_DEVICES = [
-    { id: "laser", label: "可调激光器", type: "laser", x: 0.07, y: 0.25 },
-    { id: "mirror-a", label: "反射镜 A", type: "mirror", x: 0.20, y: 0.14 },
-    { id: "splitter", label: "分束镜", type: "splitter", x: 0.34, y: 0.25 },
-    { id: "mirror-b", label: "反射镜 B", type: "mirror", x: 0.48, y: 0.13 },
-    { id: "lens", label: "聚焦透镜", type: "lens", x: 0.61, y: 0.23 },
-    { id: "sample", label: "待测样品", type: "sample", x: 0.74, y: 0.20 },
-    { id: "screen", label: "观察屏", type: "screen", x: 0.90, y: 0.19 },
-    { id: "detector", label: "光电探测器", type: "detector", x: 0.90, y: 0.38 },
-    { id: "power", label: "直流电源", type: "power", x: 0.08, y: 0.69 },
-    { id: "signal", label: "信号发生器", type: "signal", x: 0.25, y: 0.73 },
-    { id: "board", label: "被测电路板", type: "board", x: 0.43, y: 0.72 },
-    { id: "probe", label: "差分探头", type: "probe", x: 0.56, y: 0.67 },
-    { id: "scope", label: "数字示波器", type: "scope", x: 0.71, y: 0.70 },
-    { id: "computer", label: "采集与分析电脑", type: "computer", x: 0.89, y: 0.70 }
+  const DEVICE_LIBRARY = [
+    ["laser", "可调激光器", "laser", "optical"],
+    ["white-source", "宽带光源", "instrument", "optical", "☼"],
+    ["mirror-a", "反射镜 A", "mirror", "optical"],
+    ["mirror-b", "反射镜 B", "mirror", "optical"],
+    ["splitter", "分束镜", "splitter", "optical"],
+    ["lens", "聚焦透镜", "lens", "optical"],
+    ["sample", "待测样品", "sample", "optical"],
+    ["screen", "观察屏", "screen", "optical"],
+    ["detector", "光电探测器", "detector", "optical"],
+    ["slit", "单缝/双缝组件", "instrument", "optical", "Ⅱ"],
+    ["polarizer", "起偏器", "instrument", "optical", "⌁"],
+    ["analyzer", "检偏器", "instrument", "optical", "⌁"],
+    ["grating", "光栅", "instrument", "optical", "▥"],
+    ["prism", "棱镜", "instrument", "optical", "△"],
+    ["spectrometer", "光谱仪", "instrument", "optical", "▤"],
+    ["power-meter", "光功率计", "instrument", "optical", "P"],
+    ["beam-profiler", "光束轮廓仪", "instrument", "optical", "◎"],
+    ["camera", "科学相机", "instrument", "optical", "◉"],
+    ["ir-camera", "红外相机", "instrument", "optical", "◒"],
+    ["stereo-camera", "立体相机", "instrument", "optical", "◫"],
+    ["monitor", "显示与分析屏", "computer", "optical"],
+    ["target", "标定靶/样品", "sample", "optical"],
+    ["slm", "空间光调制器", "instrument", "optical", "▦"],
+    ["fiber-spool", "光纤盘", "instrument", "optical", "◎"],
+    ["fiber-coupler", "光纤耦合器", "instrument", "optical", "⋈"],
+    ["optical-tx", "光发射模块", "instrument", "mixed", "TX"],
+    ["optical-rx", "光接收模块", "instrument", "mixed", "RX"],
+    ["power", "直流电源", "power", "electronic"],
+    ["signal", "信号发生器", "signal", "electronic"],
+    ["board", "被测电路板", "board", "electronic"],
+    ["breadboard", "实验面包板", "board", "electronic"],
+    ["probe", "差分探头", "probe", "electronic"],
+    ["scope", "数字示波器", "scope", "electronic"],
+    ["computer", "采集与分析电脑", "computer", "electronic"],
+    ["daq", "数据采集卡", "instrument", "electronic", "DAQ"],
+    ["multimeter", "数字万用表", "instrument", "electronic", "DMM"],
+    ["diode", "器件测试夹具", "instrument", "electronic", "D"],
+    ["led", "LED/光电器件", "sample", "electronic"],
+    ["led-strip", "LED 灯带", "instrument", "electronic", "LED"],
+    ["logic-analyzer", "逻辑分析仪", "instrument", "electronic", "LA"],
+    ["mcu", "嵌入式开发板", "instrument", "electronic", "MCU"],
+    ["sensor", "传感器模块", "instrument", "electronic", "S"],
+    ["actuator", "执行器模块", "instrument", "electronic", "M"],
+    ["ultrasonic", "超声测距模块", "instrument", "electronic", "US"],
+    ["lcd", "LCD 显示模块", "instrument", "electronic", "LCD"],
+    ["alarm", "蜂鸣器/LED 报警器", "instrument", "electronic", "!"],
+    ["keypad", "门禁输入模块", "instrument", "electronic", "⌨"],
+    ["robot", "机器人/小车平台", "instrument", "electronic", "R"],
+    ["hv-supply", "高压电源", "power", "electronic"],
+    ["heater", "加热与温控装置", "instrument", "electronic", "T"],
+    ["thermometer", "温度传感器", "instrument", "electronic", "θ"],
+    ["calorimeter", "量热/导热装置", "instrument", "electronic", "Q"],
+    ["pendulum", "单摆/三线摆装置", "instrument", "mechanical", "T"],
+    ["photogate", "光电门计时器", "instrument", "electronic", "t"],
+    ["electrode-pad", "生物电传感器", "instrument", "electronic", "ECG"],
+    ["bioamp", "生物信号放大器", "instrument", "electronic", "BIO"],
+    ["transducer", "声/光换能器", "instrument", "electronic", "TX"],
+    ["magnet", "电磁铁/磁体", "instrument", "electronic", "B"],
+    ["vibrator", "受迫振动驱动源", "instrument", "mechanical", "≈"],
+    ["chamber", "密立根油滴室", "instrument", "optical", "•"],
+    ["microscope", "读数显微镜", "instrument", "optical", "M"],
+    ["printer", "数字制造设备", "instrument", "mechanical", "3D"],
+    ["caliper", "精密测量工具", "instrument", "mechanical", "↔"],
+    ["load", "可调电子负载", "instrument", "electronic", "LOAD"]
   ];
+
+  const DEVICE_MAP = Object.fromEntries(DEVICE_LIBRARY.map(([id, label, type, zone, symbol]) => [
+    id,
+    { id, label, type, zone, symbol: symbol || "" }
+  ]));
+
+  const PRESETS = {
+    "professional-light-path": { name: "专业认知 · 光路调试", devices: ["laser", "mirror-a", "lens", "screen", "power-meter"], optics: [["laser", "mirror-a", "lens", "screen"]], cables: [] },
+    "professional-arduino": { name: "专业认知 · Arduino 测距", devices: ["mcu", "ultrasonic", "lcd", "alarm", "power", "computer"], optics: [], cables: [["power", "mcu"], ["mcu", "ultrasonic"], ["mcu", "lcd"], ["mcu", "alarm"], ["mcu", "computer"]] },
+    "professional-instruments": { name: "专业认知 · 光学仪器", devices: ["white-source", "lens", "prism", "spectrometer", "power-meter"], optics: [["white-source", "lens", "prism", "spectrometer"]], cables: [["spectrometer", "power-meter"]] },
+    "professional-modeling": { name: "专业认知 · 数字建模制造", devices: ["computer", "printer", "caliper"], optics: [], cables: [["computer", "printer"], ["caliper", "printer"]] },
+    "professional-stereo": { name: "专业认知 · 立体视频", devices: ["stereo-camera", "target", "monitor", "computer"], optics: [["target", "stereo-camera", "monitor"]], cables: [["stereo-camera", "computer"], ["computer", "monitor"]] },
+    "professional-voice": { name: "专业认知 · 语音光传输", devices: ["white-source", "optical-tx", "fiber-spool", "optical-rx", "scope", "computer"], optics: [["white-source", "optical-tx", "fiber-spool", "optical-rx"]], cables: [["optical-rx", "scope"], ["scope", "computer"]] },
+    "professional-ir": { name: "专业认知 · 红外成像", devices: ["target", "ir-camera", "monitor", "computer"], optics: [["target", "ir-camera", "monitor"]], cables: [["ir-camera", "computer"], ["computer", "monitor"]] },
+    "professional-led": { name: "专业认知 · 电子元器件", devices: ["power", "breadboard", "led", "multimeter"], optics: [], cables: [["power", "breadboard"], ["breadboard", "led"], ["breadboard", "multimeter"]] },
+    "professional-solar": { name: "专业认知 · 太阳能与光学仪器", devices: ["white-source", "sample", "multimeter", "load", "power-meter"], optics: [["white-source", "sample", "power-meter"]], cables: [["sample", "multimeter"], ["sample", "load"]] },
+    "professional-access": { name: "专业认知 · 门禁报警器", devices: ["keypad", "sensor", "mcu", "alarm", "power"], optics: [], cables: [["power", "mcu"], ["keypad", "mcu"], ["sensor", "mcu"], ["mcu", "alarm"]] },
+    "professional-breathing": { name: "专业认知 · 炫彩呼吸灯", devices: ["mcu", "led-strip", "power", "scope"], optics: [], cables: [["power", "mcu"], ["mcu", "led-strip"], ["mcu", "scope"]] },
+    "professional-robot": { name: "专业认知 · 机器人小车", devices: ["mcu", "sensor", "actuator", "robot", "computer"], optics: [], cables: [["mcu", "sensor"], ["mcu", "actuator"], ["actuator", "robot"], ["mcu", "computer"]] },
+    "optical-interference": { name: "光学干涉", devices: ["laser", "mirror-a", "mirror-b", "splitter", "lens", "screen", "detector", "scope"], optics: [["laser", "splitter", "mirror-a", "splitter", "lens", "screen"], ["splitter", "mirror-b", "splitter", "detector"]], cables: [["detector", "scope"]] },
+    "optics-general": { name: "应用光学", devices: ["white-source", "lens", "sample", "screen", "camera", "computer"], optics: [["white-source", "lens", "sample", "screen", "camera"]], cables: [["camera", "computer"]] },
+    "polarization": { name: "偏振光学", devices: ["laser", "polarizer", "sample", "analyzer", "detector", "scope"], optics: [["laser", "polarizer", "sample", "analyzer", "detector"]], cables: [["detector", "scope"]] },
+    "diffraction": { name: "衍射与光谱", devices: ["laser", "slit", "grating", "lens", "screen", "detector", "scope"], optics: [["laser", "slit", "grating", "lens", "screen"], ["screen", "detector"]], cables: [["detector", "scope"]] },
+    "spectrometer": { name: "光谱测量", devices: ["white-source", "sample", "prism", "grating", "spectrometer", "computer"], optics: [["white-source", "sample", "prism", "grating", "spectrometer"]], cables: [["spectrometer", "computer"]] },
+    "laser-lab": { name: "激光实验", devices: ["laser", "mirror-a", "mirror-b", "lens", "power-meter", "beam-profiler", "scope"], optics: [["laser", "mirror-a", "lens", "power-meter"], ["lens", "beam-profiler"]], cables: [["power-meter", "scope"]] },
+    "fiber-lab": { name: "光纤实验", devices: ["laser", "fiber-coupler", "fiber-spool", "power-meter", "detector", "scope", "spectrometer"], optics: [["laser", "fiber-coupler", "fiber-spool", "detector"], ["fiber-spool", "spectrometer"]], cables: [["detector", "scope"]] },
+    "photoelectric": { name: "光电探测", devices: ["white-source", "sample", "detector", "power-meter", "probe", "scope"], optics: [["white-source", "sample", "detector"]], cables: [["detector", "probe"], ["probe", "scope"], ["detector", "power-meter"]] },
+    "imaging": { name: "成像与机器视觉", devices: ["white-source", "target", "lens", "camera", "monitor", "computer"], optics: [["white-source", "target", "lens", "camera"]], cables: [["camera", "computer"], ["computer", "monitor"]] },
+    "circuit": { name: "电路与电子", devices: ["power", "signal", "breadboard", "probe", "scope", "multimeter"], optics: [], cables: [["power", "breadboard"], ["signal", "breadboard"], ["breadboard", "probe"], ["probe", "scope"], ["breadboard", "multimeter"]] },
+    "digital": { name: "数字逻辑", devices: ["power", "signal", "breadboard", "logic-analyzer", "probe", "scope"], optics: [], cables: [["power", "breadboard"], ["signal", "breadboard"], ["breadboard", "logic-analyzer"], ["breadboard", "probe"], ["probe", "scope"]] },
+    "embedded": { name: "嵌入式与接口", devices: ["power", "mcu", "sensor", "actuator", "logic-analyzer", "computer"], optics: [], cables: [["power", "mcu"], ["sensor", "mcu"], ["mcu", "actuator"], ["mcu", "logic-analyzer"], ["mcu", "computer"]] },
+    "communication": { name: "光通信", devices: ["signal", "optical-tx", "fiber-spool", "optical-rx", "scope", "computer"], optics: [["optical-tx", "fiber-spool", "optical-rx"]], cables: [["signal", "optical-tx"], ["optical-rx", "scope"], ["scope", "computer"]] },
+    "fpga": { name: "FPGA 与数字系统", devices: ["power", "signal", "mcu", "logic-analyzer", "scope", "computer"], optics: [], cables: [["power", "mcu"], ["signal", "mcu"], ["mcu", "logic-analyzer"], ["mcu", "scope"], ["mcu", "computer"]] },
+    "measurement": { name: "基础测量", devices: ["sample", "multimeter", "photogate", "daq", "computer"], optics: [], cables: [["sample", "multimeter"], ["photogate", "daq"], ["daq", "computer"]] },
+    "semiconductor": { name: "半导体器件测试", devices: ["power", "diode", "probe", "multimeter", "thermometer", "scope"], optics: [], cables: [["power", "diode"], ["diode", "probe"], ["probe", "multimeter"], ["probe", "scope"], ["thermometer", "daq"]] },
+    "millikan": { name: "密立根油滴", devices: ["hv-supply", "chamber", "microscope", "daq", "computer"], optics: [["chamber", "microscope"]], cables: [["hv-supply", "chamber"], ["microscope", "computer"], ["daq", "computer"]] },
+    "biomedical": { name: "生物信号测量", devices: ["electrode-pad", "bioamp", "daq", "scope", "computer"], optics: [], cables: [["electrode-pad", "bioamp"], ["bioamp", "daq"], ["bioamp", "scope"], ["daq", "computer"]] },
+    "wave-speed": { name: "声速与光速", devices: ["signal", "transducer", "sample", "probe", "scope", "computer"], optics: [["transducer", "sample"]], cables: [["signal", "transducer"], ["probe", "scope"], ["scope", "computer"]] },
+    "magnetic": { name: "磁学与霍尔", devices: ["power", "magnet", "sample", "probe", "multimeter", "computer"], optics: [], cables: [["power", "magnet"], ["probe", "multimeter"], ["multimeter", "computer"]] },
+    "thermal": { name: "热学测量", devices: ["heater", "calorimeter", "thermometer", "daq", "computer"], optics: [], cables: [["heater", "calorimeter"], ["thermometer", "daq"], ["daq", "computer"]] },
+    "mechanics": { name: "力学与振动", devices: ["pendulum", "photogate", "vibrator", "signal", "scope"], optics: [], cables: [["photogate", "scope"], ["signal", "vibrator"]] },
+    "solar": { name: "光伏与光电器件", devices: ["white-source", "sample", "load", "multimeter", "daq", "computer"], optics: [["white-source", "sample"]], cables: [["sample", "load"], ["sample", "multimeter"], ["load", "daq"], ["daq", "computer"]] },
+    "holography": { name: "全息与相位", devices: ["laser", "splitter", "mirror-a", "mirror-b", "sample", "camera", "computer"], optics: [["laser", "splitter", "mirror-a", "sample", "camera"], ["splitter", "mirror-b", "sample"]], cables: [["camera", "computer"]] },
+    "integrated": { name: "综合光电系统", devices: ["laser", "sample", "detector", "daq", "computer", "monitor"], optics: [["laser", "sample", "detector"]], cables: [["detector", "daq"], ["daq", "computer"], ["computer", "monitor"]] }
+  };
 
   const state = {
     canvas: null,
@@ -25,6 +120,9 @@
     dragging: null,
     selected: "laser",
     devices: [],
+    presetId: "",
+    preset: null,
+    defaultPositions: new Map(),
     width: 0,
     height: 0,
     lastHudUpdate: 0,
@@ -51,9 +149,119 @@
     context.closePath();
   };
 
+  function presetForExperiment(config = {}) {
+    const name = String(config.experimentName || "");
+    const sim = String(config.sim || "");
+    const rules = [
+      [/Arduino|超声测距/i, "professional-arduino"],
+      [/光路的调试|共轴/i, "professional-light-path"],
+      [/光学仪器的认知/i, "professional-instruments"],
+      [/数字建模|增材/i, "professional-modeling"],
+      [/立体视频/i, "professional-stereo"],
+      [/语音光信号/i, "professional-voice"],
+      [/红外成像/i, "professional-ir"],
+      [/电子元器件.*LED|LED.*认识/i, "professional-led"],
+      [/太阳能与光学仪器/i, "professional-solar"],
+      [/门禁报警/i, "professional-access"],
+      [/呼吸灯/i, "professional-breathing"],
+      [/机器人|小车/i, "professional-robot"],
+      [/密立根/i, "millikan"],
+      [/人体生物信号/i, "biomedical"],
+      [/声速与光速/i, "wave-speed"],
+      [/伏安特性|二极管|霍尔|巨磁|核磁|磁滞|晶体管输入/i, "semiconductor"],
+      [/迈克尔逊|牛顿环|相移干涉|剪切干涉/i, "optical-interference"],
+      [/双缝|单缝|干涉与衍射|衍射|涡旋|莫尔|泰伯/i, "diffraction"],
+      [/偏振|马吕斯/i, "polarization"],
+      [/光栅|分光计|光谱|傅里叶变换光谱/i, "spectrometer"],
+      [/激光|He-Ne|调 ?Q|倍频|外差|线宽|脉冲剪裁/i, "laser-lab"],
+      [/光纤|EDFA|EDFL|OTDR|FBG|波分/i, "fiber-lab"],
+      [/光电效应|弗兰克|光电探测|响应度|SPAD|APD|探测器/i, "photoelectric"],
+      [/成像|相机|机器视觉|全息|超分辨|Hough/i, "imaging"],
+      [/热导|比热|温度|量热/i, "thermal"],
+      [/转动惯量|单摆|三线摆|杨氏模量|振动|共振|混沌/i, "mechanics"],
+      [/光电池|太阳能电池|填充因子/i, "solar"],
+      [/全息|相位恢复/i, "holography"]
+    ];
+    const matched = rules.find(([pattern]) => pattern.test(name));
+    if (matched) return matched[1];
+    const simMap = {
+      circuit: "circuit",
+      rc: "circuit",
+      oscilloscope: "circuit",
+      digital: "digital",
+      fpga: "fpga",
+      embedded: "embedded",
+      communication: "communication",
+      frequency: "circuit",
+      semiconductor: "semiconductor",
+      measurement: "measurement",
+      photoelectric: "photoelectric",
+      photodiode: "photoelectric",
+      solar: "solar",
+      optics: "optics-general",
+      grating: "spectrometer",
+      polarization: "polarization",
+      michelson: "optical-interference",
+      newton: "optical-interference",
+      "double-slit": "diffraction",
+      diffraction: "diffraction",
+      holography: "holography",
+      fourier: "spectrometer",
+      laser: "laser-lab",
+      fiber: "fiber-lab",
+      imaging: "imaging",
+      integrated: "integrated",
+      amplifier: "circuit",
+      oscillator: "circuit",
+      sampling: "digital",
+      dsp: "digital"
+    };
+    return simMap[sim] || "measurement";
+  }
+
+  function arrangeDevices(ids) {
+    const definitions = ids.map((id) => DEVICE_MAP[id]).filter(Boolean);
+    const optical = definitions.filter((item) => item.zone === "optical" || item.zone === "mixed");
+    const electronic = definitions.filter((item) => item.zone === "electronic");
+    const mechanical = definitions.filter((item) => item.zone === "mechanical");
+    const positioned = [];
+    const maxPerRow = state.width < 620 ? 4 : 5;
+    const placeGroup = (items, baseY, rowGap) => {
+      const rows = Math.ceil(items.length / maxPerRow);
+      items.forEach((item, index) => {
+        const row = Math.floor(index / maxPerRow);
+        const rowItems = items.slice(row * maxPerRow, Math.min(items.length, (row + 1) * maxPerRow));
+        const column = index % maxPerRow;
+        const x = (column + 1) / (rowItems.length + 1);
+        const y = baseY + row * rowGap;
+        positioned.push({ ...item, x: clamp(x, 0.08, 0.92), y: clamp(y, 0.1, 0.9) });
+      });
+    };
+    placeGroup(optical, 0.22, 0.15);
+    if (mechanical.length) placeGroup(mechanical, 0.48, 0.12);
+    if (electronic.length) {
+      const base = optical.length ? (mechanical.length ? 0.70 : 0.66) : 0.30;
+      placeGroup(electronic, base, 0.14);
+    }
+    return positioned;
+  }
+
+  function applyPreset(presetId) {
+    const preset = PRESETS[presetId] || PRESETS.measurement;
+    state.presetId = presetId;
+    state.preset = preset;
+    state.devices = arrangeDevices(preset.devices);
+    state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
+    state.selected = state.devices[0]?.id || "";
+    renderDeviceDock();
+    updateSelectionHud();
+  }
+
   function resetPositions() {
-    state.devices = DEFAULT_DEVICES.map((device) => ({ ...device }));
-    state.selected = "laser";
+    if (!state.preset) applyPreset("measurement");
+    state.devices = arrangeDevices(state.preset.devices);
+    state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
+    state.selected = state.devices[0]?.id || "";
     updateSelectionHud();
   }
 
@@ -107,46 +315,48 @@
   }
 
   function calculateMetrics(config = {}) {
-    const laser = point(deviceById("laser"), "right");
-    const splitter = point(deviceById("splitter"));
-    const mirrorA = point(deviceById("mirror-a"));
-    const mirrorB = point(deviceById("mirror-b"));
-    const lens = point(deviceById("lens"));
-    const sample = point(deviceById("sample"));
-    const screen = point(deviceById("screen"), "left");
-    const detector = point(deviceById("detector"));
-    const probe = point(deviceById("probe"), "bottom");
-    const board = point(deviceById("board"), "right");
-    const scope = point(deviceById("scope"), "left");
-    const signal = point(deviceById("signal"), "right");
-    const power = point(deviceById("power"), "right");
-    const computer = point(deviceById("computer"), "left");
-
-    const scale = Math.max(1, Math.min(state.width, state.height));
-    const lensMiss = distanceToSegment(lens.x, lens.y, splitter.x, splitter.y, sample.x, sample.y);
-    const detectorMiss = Math.abs(detector.x - screen.x) + Math.abs(detector.y - screen.y) * 0.18;
-    const electronicsGaps = [
-      Math.hypot(probe.x - board.x, probe.y - board.y),
-      Math.hypot(scope.x - signal.x, scope.y - signal.y),
-      Math.hypot(computer.x - scope.x, computer.y - scope.y)
-    ];
-    const alignment = clamp(0.98 - (lensMiss + detectorMiss) / scale * 1.8, 0.18, 0.99);
-    const connectivity = clamp(1.05 - Math.max(...electronicsGaps) / scale * 0.48, 0.24, 0.98);
+    const opticalDevices = state.devices.filter((device) => device.zone === "optical" || device.zone === "mixed");
+    const electronicDevices = state.devices.filter((device) => device.zone === "electronic");
+    const mechanicalDevices = state.devices.filter((device) => device.zone === "mechanical");
+    const averageDeviation = (devices) => {
+      if (!devices.length) return 0;
+      return devices.reduce((total, device) => {
+        const origin = state.defaultPositions.get(device.id) || device;
+        return total + Math.hypot(device.x - origin.x, device.y - origin.y);
+      }, 0) / devices.length;
+    };
+    const opticalDeviation = averageDeviation(opticalDevices);
+    const electronicDeviation = averageDeviation(electronicDevices);
+    const mechanicalDeviation = averageDeviation(mechanicalDevices);
+    const alignment = opticalDevices.length
+      ? clamp(0.88 - opticalDeviation * 1.75, 0.16, 0.98)
+      : clamp(0.86 - mechanicalDeviation * 1.6, 0.2, 0.97);
+    const connectivity = electronicDevices.length
+      ? clamp(0.89 - electronicDeviation * 1.6, 0.2, 0.98)
+      : 0.72;
     const sourceDrive = clamp(Math.abs(Number(config.primary) || 1) / 20, 0.18, 1);
-    const opticalPower = clamp((0.8 + sourceDrive * 3.6) * alignment, 0.08, 9.9);
+    const hasOptics = opticalDevices.length >= 2;
+    const hasElectronics = electronicDevices.length >= 2;
+    const measurementPower = hasOptics
+      ? clamp((0.8 + sourceDrive * 3.6) * alignment, 0.08, 9.9)
+      : clamp((0.18 + sourceDrive * 4.8) * connectivity, 0.03, 24);
     const baseFrequency = /Hz|hz/.test(String(config.secondaryUnit || ""))
       ? Math.abs(Number(config.secondary) || 1000)
       : 1000 + Math.abs(Number(config.secondary) || 1) * 47;
     const frequency = clamp(baseFrequency, 10, 250000);
-    const snr = clamp(8 + alignment * 31 + connectivity * 8 - (1 - alignment) * 18, 3, 58);
+    const combined = hasOptics && hasElectronics ? Math.min(alignment, connectivity) : hasOptics ? alignment : connectivity;
+    const snr = clamp(7 + combined * 36 + connectivity * 6 - (1 - alignment) * 12, 3, 58);
     return {
       alignment,
       connectivity,
-      power: opticalPower,
+      power: measurementPower,
+      powerUnit: hasOptics ? "mW" : "W",
       frequency,
       snr,
-      lensMiss,
-      detectorMiss
+      hasOptics,
+      hasElectronics,
+      opticalDevices: opticalDevices.length,
+      electronicDevices: electronicDevices.length
     };
   }
 
@@ -169,18 +379,25 @@
     if (time - state.lastHudUpdate < 100) return;
     state.lastHudUpdate = time;
     const metrics = state.metrics;
+    const alignmentLabel = $("#panorama-alignment-label");
+    const powerLabel = $("#panorama-power-label");
+    if (alignmentLabel) alignmentLabel.textContent = metrics.hasOptics ? "光路对准" : "装置对齐";
+    if (powerLabel) powerLabel.textContent = metrics.hasOptics ? "探测器功率" : "电路输出功率";
     $("#panorama-alignment") && ($("#panorama-alignment").textContent = `${Math.round(metrics.alignment * 100)}%`);
-    $("#panorama-power") && ($("#panorama-power").textContent = `${compact(metrics.power, 2)} mW`);
+    $("#panorama-power") && ($("#panorama-power").textContent = `${compact(metrics.power, 2)} ${metrics.powerUnit}`);
     $("#panorama-frequency") && ($("#panorama-frequency").textContent = `${compact(metrics.frequency, 1)} Hz`);
     $("#panorama-snr") && ($("#panorama-snr").textContent = `${compact(metrics.snr, 1)} dB`);
+    const score = metrics.hasOptics && metrics.hasElectronics
+      ? Math.min(metrics.alignment, metrics.connectivity)
+      : metrics.hasOptics ? metrics.alignment : metrics.connectivity;
     $("#panorama-status") && ($("#panorama-status").textContent =
-      metrics.alignment > 0.72 && metrics.connectivity > 0.7
-        ? "光路对准 · 电路连通 · 采集在线"
-        : metrics.alignment > 0.45
-          ? "光路可用，建议继续微调器件位置"
-          : "光路偏离，拖动透镜或反射镜重新对准"
+      score > 0.72
+        ? `${state.preset.name} · 器件关系稳定 · 采集在线`
+        : score > 0.45
+          ? `${state.preset.name} · 装置可用，可继续微调器件`
+          : `${state.preset.name} · 器件偏离，拖动相关装置重新对准`
     );
-    const stateClass = metrics.alignment > 0.7 ? "good" : metrics.alignment > 0.4 ? "warn" : "bad";
+    const stateClass = score > 0.7 ? "good" : score > 0.4 ? "warn" : "bad";
     const scene = $("#panorama-status");
     if (scene) scene.dataset.state = stateClass;
     updateSelectionHud();
@@ -220,13 +437,13 @@
     }
     context.restore();
 
-    const tableTop = state.height * 0.54;
+    const tableTop = state.height * 0.15;
     context.save();
     const mat = context.createLinearGradient(0, tableTop, 0, state.height);
     mat.addColorStop(0, "rgba(37, 50, 44, 0.9)");
     mat.addColorStop(1, "rgba(13, 20, 18, 0.96)");
     context.fillStyle = mat;
-    roundRect(context, state.width * 0.018, tableTop, state.width * 0.964, state.height * 0.43, 14);
+    roundRect(context, state.width * 0.018, tableTop, state.width * 0.964, state.height * 0.82, 14);
     context.fill();
     context.strokeStyle = "rgba(148, 176, 158, 0.12)";
     context.stroke();
@@ -290,28 +507,17 @@
     context.restore();
   }
 
-  function electronicAnchors() {
-    return {
-      power: point(deviceById("power"), "right"),
-      signal: point(deviceById("signal"), "right"),
-      board: point(deviceById("board"), "left"),
-      boardRight: point(deviceById("board"), "right"),
-      probe: point(deviceById("probe"), "bottom"),
-      scope: point(deviceById("scope"), "left"),
-      detector: point(deviceById("detector"), "bottom"),
-      computer: point(deviceById("computer"), "left")
-    };
-  }
-
   function drawCables(context, time) {
     if (!state.showCables) return;
-    const anchors = electronicAnchors();
-    drawCable(context, anchors.power, anchors.board, "#e7b76f", time, 0.05);
-    drawCable(context, anchors.signal, anchors.scope, "#5fbfaa", time, 0.32);
-    drawCable(context, anchors.boardRight, anchors.probe, "#d6d1ba", time, 0.55);
-    drawCable(context, anchors.detector, anchors.scope, "#7fa9d8", time, 0.76);
-    drawCable(context, anchors.scope, anchors.computer, "#d6a962", time, 0.91);
-    drawCable(context, anchors.board, anchors.power, "rgba(122, 144, 135, 0.72)", time, 0.16);
+    const colors = ["#e7b76f", "#5fbfaa", "#d6d1ba", "#7fa9d8", "#d6a962", "#ac8ad8"];
+    (state.preset?.cables || []).forEach(([fromId, toId], index) => {
+      const fromDevice = deviceById(fromId);
+      const toDevice = deviceById(toId);
+      if (!fromDevice || !toDevice) return;
+      const from = point(fromDevice, "right");
+      const to = point(toDevice, "left");
+      drawCable(context, from, to, colors[index % colors.length], time, 0.08 + index * 0.13);
+    });
   }
 
   function drawBeam(context, from, to, time, color, strength = 1, phase = 0) {
@@ -345,23 +551,20 @@
   function drawOpticalPath(context, time, config) {
     const metrics = state.metrics;
     const color = config.beamColor || [216, 172, 95];
-    const laser = point(deviceById("laser"), "right");
-    const splitter = point(deviceById("splitter"));
-    const mirrorA = point(deviceById("mirror-a"));
-    const mirrorB = point(deviceById("mirror-b"));
-    const lens = point(deviceById("lens"));
-    const sample = point(deviceById("sample"));
-    const screen = point(deviceById("screen"), "left");
-    const detector = point(deviceById("detector"));
-    drawBeam(context, laser, splitter, time, color, metrics.alignment, 0.02);
-    drawBeam(context, splitter, mirrorA, time, color, metrics.alignment * 0.85, 0.22);
-    drawBeam(context, mirrorA, splitter, time, color, metrics.alignment * 0.8, 0.37);
-    drawBeam(context, splitter, lens, time, color, metrics.alignment, 0.48);
-    drawBeam(context, lens, sample, time, color, metrics.alignment, 0.61);
-    drawBeam(context, sample, screen, time, color, metrics.alignment * 0.95, 0.72);
-    drawBeam(context, splitter, mirrorB, time, color, metrics.alignment * 0.82, 0.83);
-    drawBeam(context, mirrorB, splitter, time, color, metrics.alignment * 0.74, 0.89);
-    drawBeam(context, sample, detector, time, color, metrics.alignment * 0.68, 0.94);
+    (state.preset?.optics || []).forEach((path, pathIndex) => {
+      const devices = path.map(deviceById).filter(Boolean);
+      for (let index = 0; index < devices.length - 1; index += 1) {
+        drawBeam(
+          context,
+          point(devices[index], "right"),
+          point(devices[index + 1], "left"),
+          time,
+          color,
+          metrics.alignment * (0.9 - index * 0.03),
+          (pathIndex * 0.21 + index * 0.13) % 1
+        );
+      }
+    });
   }
 
   function bodyGradient(context, box) {
@@ -694,6 +897,39 @@
     context.fillRect(box.x + 11, box.y + 17, box.width * 0.38, 2);
   }
 
+  function drawGenericInstrument(context, box, device, time) {
+    context.fillStyle = bodyGradient(context, box);
+    roundRect(context, box.x, box.y, box.width, box.height, 6);
+    context.fill();
+    context.strokeStyle = "rgba(145, 171, 157, 0.32)";
+    context.lineWidth = 1;
+    context.stroke();
+    const compact = Math.min(box.width, box.height);
+    context.fillStyle = "rgba(7, 16, 14, 0.82)";
+    roundRect(
+      context,
+      box.x + box.width * 0.14,
+      box.y + box.height * 0.14,
+      box.width * 0.72,
+      box.height * 0.56,
+      Math.min(5, compact * 0.12)
+    );
+    context.fill();
+    context.fillStyle = `rgba(218, 190, 133, ${0.68 + Math.sin(time * 0.002 + box.x) * 0.08})`;
+    context.font = `${Math.max(7, Math.min(13, compact * 0.28))}px "Cascadia Mono", monospace`;
+    context.textAlign = "center";
+    context.fillText(device.symbol || "•", box.x + box.width / 2, box.y + box.height * 0.53);
+    context.strokeStyle = "rgba(101, 171, 150, 0.45)";
+    context.beginPath();
+    context.moveTo(box.x + box.width * 0.18, box.y + box.height * 0.72);
+    context.lineTo(box.x + box.width * 0.82, box.y + box.height * 0.72);
+    context.stroke();
+    context.fillStyle = "rgba(117, 196, 167, 0.7)";
+    context.beginPath();
+    context.arc(box.x + box.width * 0.82, box.y + box.height * 0.82, Math.max(2, compact * 0.055), 0, Math.PI * 2);
+    context.fill();
+  }
+
   function drawDevice(context, device, time, config) {
     const box = bounds(device);
     context.save();
@@ -714,7 +950,7 @@
       case "probe": drawProbe(context, box); break;
       case "scope": drawScope(context, box, time, state.metrics.frequency); break;
       case "computer": drawComputer(context, box, time); break;
-      default: break;
+      default: drawGenericInstrument(context, box, device, time); break;
     }
     context.restore();
     if (device.id === state.selected) {
@@ -737,6 +973,10 @@
   }
 
   function drawScene(config, time) {
+    const nextPresetId = presetForExperiment(config);
+    if (nextPresetId !== state.presetId || !state.preset) {
+      applyPreset(nextPresetId);
+    }
     state.metrics = calculateMetrics(config);
     const context = state.context;
     drawBackground(context, time);
@@ -752,7 +992,11 @@
     context.stroke();
     context.fillStyle = "#c9a66d";
     context.font = '8px "Cascadia Mono", monospace';
-    context.fillText("PANORAMA LAB  ·  14 DEVICES", 24, 30);
+    context.fillText(
+      `${state.preset.name.toUpperCase()}  ·  ${state.devices.length} DEVICES`,
+      24,
+      30
+    );
 
     const statusWidth = Math.min(235, state.width * 0.36);
     context.fillStyle = "rgba(6, 11, 10, 0.72)";
@@ -880,6 +1124,21 @@
     },
     getMetrics: () => ({ ...state.metrics }),
     getLayout: () => state.devices.map((device) => ({ ...device })),
-    getSelected: () => state.selected
+    getSelected: () => state.selected,
+    getPreset: () => state.preset ? { id: state.presetId, name: state.preset.name, devices: [...state.preset.devices] } : null,
+    resolvePreset(experiment = {}) {
+      const presetId = presetForExperiment({
+        experimentName: experiment.name,
+        sim: experiment.sim
+      });
+      const preset = PRESETS[presetId] || PRESETS.measurement;
+      return {
+        id: presetId,
+        name: preset.name,
+        devices: [...preset.devices],
+        optics: preset.optics.map((path) => [...path]),
+        cables: preset.cables.map((path) => [...path])
+      };
+    }
   };
 })();

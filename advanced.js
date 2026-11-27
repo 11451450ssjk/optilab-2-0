@@ -856,7 +856,9 @@ function drawLabFrame(time) {
       secondary: state.secondary,
       primaryUnit: control.primary.unit,
       secondaryUnit: control.secondary.unit,
+      experimentId: experiment.id,
       experimentName: experiment.name,
+      sim: experiment.sim,
       annotations: state.annotations,
       beamColor
     });
@@ -2901,7 +2903,7 @@ function selectExperiment(experimentId, scrollToLab = false) {
     ? `研${experiment.degreeYear === 2 ? "二" : "一"}`
     : `大${["一", "二", "三", "四"][experiment.year - 1]}`;
   document.getElementById("lab-year-tag").textContent = `${courseLevel} · ${experiment.term === 1 ? "上" : "下"}`;
-  document.getElementById("lab-subtitle").textContent = `${simInfo(experiment).domain} · ${experiment.semesterTitle}，拖动参数看看哪里会变`;
+  document.getElementById("lab-subtitle").textContent = `${simInfo(experiment).domain} · ${experiment.semesterTitle}，拖动器件和参数看看哪里会变`;
   document.getElementById("lab-description").textContent = principle.intro;
   document.getElementById("lab-formula").textContent = experiment.formula;
   document.getElementById("lab-badge").textContent = experiment.sim.replaceAll("-", " ").toUpperCase();
