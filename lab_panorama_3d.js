@@ -46,6 +46,7 @@
     autoTourAt: 0,
     autoTune: null,
     autoTuneBadges: new Map(),
+    assemblyShelf: null,
     gltfLoader: null,
     gltfExporter: null,
     modelAssetStatus: "正在检查模型资产",
@@ -239,6 +240,27 @@
       rail.position.set(x, 0.045, 0);
       scene.add(rail);
     }
+
+    const shelf = new THREE.Group();
+    shelf.visible = false;
+    const shelfBase = new THREE.Mesh(
+      beveledBoxGeometry(9.6, 0.12, 0.56, 0.035),
+      new THREE.MeshStandardMaterial({ color: 0x1d2723, metalness: 0.56, roughness: 0.36 })
+    );
+    shelfBase.position.set(0, 0.08, -2.52);
+    shelfBase.receiveShadow = true;
+    shelf.add(shelfBase);
+    [-0.18, 0.18].forEach((zOffset) => {
+      const shelfRail = new THREE.Mesh(
+        new THREE.BoxGeometry(9.45, 0.025, 0.035),
+        new THREE.MeshStandardMaterial({ color: 0x8d9288, metalness: 0.9, roughness: 0.16 })
+      );
+      shelfRail.position.set(0, 0.15, -2.52 + zOffset);
+      shelfRail.castShadow = true;
+      shelf.add(shelfRail);
+    });
+    state.assemblyShelf = shelf;
+    scene.add(shelf);
 
     const backWall = new THREE.Mesh(
       new THREE.PlaneGeometry(18, 8),
@@ -1878,6 +1900,7 @@
     state.proceduralGroups.clear();
     state.autoTune = null;
     state.autoTuneBadges.clear();
+    if (state.assemblyShelf) state.assemblyShelf.visible = false;
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
     state.initialPositions.clear();
@@ -2439,9 +2462,11 @@
     state.animatedObjects = [];
     state.beamGroup.visible = true;
     state.cableGroup.visible = state.showCables;
+    const assemblyActive = Boolean(state.autoTune?.mode === "assembly");
+    const assemblyReady = (id) => !assemblyActive || state.autoTune.placedIds?.has(id);
     const beamColor = new state.three.Color(colorArrayToHex(state.config?.beamColor));
     state.presetInfo.optics.forEach((path, pathIndex) => {
-      const ids = path.filter((id) => state.deviceGroups.has(id));
+      const ids = path.filter((id) => state.deviceGroups.has(id) && assemblyReady(id));
       for (let index = 0; index < ids.length - 1; index += 1) {
         const from = deviceWorldPoint(ids[index], 0.55);
         const to = deviceWorldPoint(ids[index + 1], 0.55);
@@ -2466,6 +2491,7 @@
       "4 mm 表笔 / 测试引线": 0xb79170
     };
     state.presetInfo.connections.forEach((connection) => {
+      if (!assemblyReady(connection.fromId) || !assemblyReady(connection.toId)) return;
       const from = deviceWorldPoint(connection.fromId, 0.23);
       const to = deviceWorldPoint(connection.toId, 0.23);
       if (!from || !to) return;
@@ -3012,17 +3038,34 @@
       ...pathOrder,
       ...state.presetInfo.devices.map((device) => device.id)
     ])].filter((id) => state.deviceGroups.has(id));
-    const batches = [];
-    for (let index = 0; index < orderedIds.length; index += 2) {
-      batches.push(orderedIds.slice(index, index + 2));
-    }
+    const batches = orderedIds.map((id) => [id]);
+    const stagingFrom = new Map();
+    state.deviceGroups.forEach((group, id) => {
+      stagingFrom.set(id, {
+        position: { x: group.position.x, y: group.position.y, z: group.position.z },
+        rotation: { x: group.rotation.x, y: group.rotation.y, z: group.rotation.z }
+      });
+    });
+    const stagingTargets = new Map();
+    orderedIds.forEach((id, index) => {
+      stagingTargets.set(id, {
+        x: -4.05 + (index % 6) * 1.62,
+        z: -2.32 - Math.floor(index / 6) * 0.24
+      });
+    });
     state.autoTune = {
+      mode: "assembly",
       batches,
       batchIndex: 0,
-      phase: "gap",
-      nextBatchAt: performance.now(),
+      phase: "staging",
+      stagingStartedAt: performance.now(),
+      stagingDuration: 720,
+      stagingFrom,
+      stagingTargets,
+      placedIds: new Set(),
+      nextBatchAt: 0,
       batchStartedAt: 0,
-      batchDuration: 1450,
+      batchDuration: 1250,
       lastLinkUpdate: 0,
       activeIds: [],
       fromStates: new Map(),
@@ -3031,18 +3074,29 @@
     state.dragGroup = null;
     state.orbit = null;
     setViewPreset("overview");
+    if (state.assemblyShelf) state.assemblyShelf.visible = true;
     const hud = $("#lab-3d-autotune-hud");
     if (hud) hud.hidden = false;
+    const phaseLabel = $("#lab-3d-autotune-phase");
+    if (phaseLabel) phaseLabel.textContent = "自动搭建 · 器材准备";
+    const headline = $("#lab-3d-autotune-headline");
+    if (headline) headline.textContent = "正在把全部器材移到后方器材架";
+    const container = $("#lab-3d-autotune-devices");
+    if (container) {
+      container.classList.remove("single");
+      container.innerHTML = '<div class="lab-3d-autotune-device"><strong>器材架准备</strong><ul><li>实验台正在清空，随后将逐个摆放器材</li></ul></div>';
+    }
     const button = $("#lab-3d-auto-tune");
     if (button) {
       button.classList.add("is-running");
       button.setAttribute("aria-pressed", "true");
-      button.textContent = "自动调试中 0%";
+      button.textContent = "器材准备 0%";
     }
     const note = $("#lab-3d-scene-note");
-    if (note) note.textContent = "正在归位器件、校准参数并重建实验连接";
+    if (note) note.textContent = "正在清空实验台并准备后方器材架";
     updateLiveMonitor();
     showTooltipPlaceholder("自动调试已启动");
+    rebuildConnections();
   }
 
   function showTooltipPlaceholder(message) {
@@ -3142,7 +3196,10 @@
     tuning.fromStates.clear();
     tuning.targetControls.clear();
     const container = $("#lab-3d-autotune-devices");
-    if (container) container.replaceChildren();
+    if (container) {
+      container.replaceChildren();
+      container.classList.toggle("single", ids.length === 1);
+    }
     ids.forEach((id) => {
       const device = state.presetInfo.devices.find((item) => item.id === id);
       const group = state.deviceGroups.get(id);
@@ -3182,7 +3239,7 @@
       });
       if (positionChanged) {
         const item = document.createElement("li");
-        item.innerHTML = `工位偏差 <b>正在平滑归位</b>`;
+        item.innerHTML = `器材架 <b>→ 目标工位</b>`;
         list.prepend(item);
       }
       if (!list.children.length) {
@@ -3197,7 +3254,13 @@
     });
     const phase = $("#lab-3d-autotune-phase");
     if (phase) {
-      phase.textContent = `自动调试 · 批次 ${tuning.batchIndex + 1} / ${tuning.batches.length}`;
+      phase.textContent = `器材摆放 ${tuning.batchIndex + 1} / ${tuning.batches.length}`;
+    }
+    const headline = $("#lab-3d-autotune-headline");
+    if (headline) {
+      headline.textContent = `正在放置并校准 ${ids.map((id) =>
+        state.presetInfo.devices.find((device) => device.id === id)?.label || id
+      ).join(" + ")}`;
     }
     if (state.inspectorId && ids.includes(state.inspectorId)) {
       renderDeviceControls(state.presetInfo.devices.find((device) => device.id === state.inspectorId));
@@ -3231,10 +3294,11 @@
     if (button) {
       button.classList.remove("is-running");
       button.setAttribute("aria-pressed", "false");
-      button.textContent = "一键自动调试";
+      button.textContent = "一键搭建调试";
     }
     const hud = $("#lab-3d-autotune-hud");
     if (hud) hud.hidden = true;
+    if (state.assemblyShelf) state.assemblyShelf.visible = false;
     if (state.inspectorId) populateInspector(state.inspectorId);
     const note = $("#lab-3d-scene-note");
     if (note) note.textContent = message;
@@ -3255,6 +3319,37 @@
   function updateAutoTune(time) {
     const tuning = state.autoTune;
     if (!tuning) return;
+    if (tuning.phase === "staging") {
+      const raw = clamp((time - tuning.stagingStartedAt) / tuning.stagingDuration, 0, 1);
+      const progress = raw * raw * (3 - 2 * raw);
+      state.deviceGroups.forEach((group, id) => {
+        const from = tuning.stagingFrom.get(id);
+        const target = tuning.stagingTargets.get(id);
+        if (!from || !target) return;
+        group.position.x = from.position.x + (target.x - from.position.x) * progress;
+        group.position.z = from.position.z + (target.z - from.position.z) * progress;
+        group.rotation.x = from.rotation.x * (1 - progress);
+        group.rotation.y = from.rotation.y * (1 - progress);
+        group.rotation.z = from.rotation.z * (1 - progress);
+        const detail = state.proceduralGroups.get(id);
+        if (detail) {
+          detail.rotation.x *= 1 - progress;
+          detail.rotation.y *= 1 - progress;
+          detail.rotation.z *= 1 - progress;
+          detail.position.x *= 1 - progress;
+          detail.position.z *= 1 - progress;
+        }
+      });
+      const button = $("#lab-3d-auto-tune");
+      if (button) button.textContent = `器材准备 ${Math.round(progress * 100)}%`;
+      const progressBar = $("#lab-3d-autotune-progress-bar");
+      if (progressBar) progressBar.style.width = `${Math.round(progress * 8)}%`;
+      state.selectionHelper?.update();
+      if (raw < 1) return;
+      tuning.phase = "gap";
+      tuning.nextBatchAt = time + 220;
+      return;
+    }
     if (tuning.phase === "gap") {
       if (time < tuning.nextBatchAt) return;
       startAutoTuneBatch(time);
@@ -3318,6 +3413,7 @@
     state.selectionHelper?.update();
     if (rawProgress < 1) return;
     tuning.activeIds.forEach((id) => applyDeviceControls(id, false));
+    tuning.activeIds.forEach((id) => tuning.placedIds.add(id));
     tuning.batchIndex += 1;
     rebuildConnections();
     updateHud();
@@ -3986,13 +4082,14 @@
       closeInspector();
       state.autoTune = null;
       removeAutoTuneBadges();
+      if (state.assemblyShelf) state.assemblyShelf.visible = false;
       const hud = $("#lab-3d-autotune-hud");
       if (hud) hud.hidden = true;
       const button = $("#lab-3d-auto-tune");
       if (button) {
         button.classList.remove("is-running");
         button.setAttribute("aria-pressed", "false");
-        button.textContent = "一键自动调试";
+        button.textContent = "一键搭建调试";
       }
     }
   }
@@ -4001,11 +4098,12 @@
     state.autoTune = null;
     const autoTuneHud = $("#lab-3d-autotune-hud");
     if (autoTuneHud) autoTuneHud.hidden = true;
+    if (state.assemblyShelf) state.assemblyShelf.visible = false;
     const autoButton = $("#lab-3d-auto-tune");
     if (autoButton) {
       autoButton.classList.remove("is-running");
       autoButton.setAttribute("aria-pressed", "false");
-      autoButton.textContent = "一键自动调试";
+      autoButton.textContent = "一键搭建调试";
     }
     state.presetInfo?.devices.forEach((device) => {
       state.deviceControls.set(device.id, Object.fromEntries(
@@ -4175,7 +4273,8 @@
       batchIndex: state.autoTune.batchIndex,
       batchCount: state.autoTune.batches.length,
       activeIds: [...state.autoTune.activeIds],
-      phase: state.autoTune.phase
+      phase: state.autoTune.phase,
+      placedCount: state.autoTune.placedIds?.size || 0
     } : null,
     getDeviceParameters(id) {
       const device = state.presetInfo?.devices.find((item) => item.id === id);
