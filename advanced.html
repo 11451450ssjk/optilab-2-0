@@ -913,6 +913,7 @@
                   <button type="button" data-3d-view="overview" class="active">总览</button>
                   <button type="button" data-3d-view="optical">光路视</button>
                   <button type="button" data-3d-view="top">俯视</button>
+                  <button type="button" data-3d-view="focus">器材特写</button>
                 </div>
                 <div class="lab-3d-tooltip" id="lab-3d-tooltip" hidden></div>
                 <div class="lab-3d-process" id="lab-3d-process">
@@ -920,8 +921,22 @@
                     <span id="lab-3d-step-count">实验过程 01 / 05</span>
                     <button type="button" id="lab-3d-auto-step" aria-pressed="false">自动演示</button>
                   </div>
+                  <div class="lab-3d-step-meta">
+                    <span id="lab-3d-step-stage">准备</span>
+                    <span id="lab-3d-step-duration">约 3–5 分钟</span>
+                    <span id="lab-3d-step-status">待执行</span>
+                  </div>
+                  <div class="lab-3d-step-track" id="lab-3d-step-track" aria-label="实验步骤"></div>
                   <strong id="lab-3d-step-title">先确认激光安全与实验条件</strong>
                   <p id="lab-3d-step-detail">检查光源等级、护目镜和急停位置，再固定电源与光学平台。</p>
+                  <div class="lab-3d-step-note">
+                    <span>观察</span>
+                    <strong id="lab-3d-step-observe">光斑位置、读数稳定性与连接状态</strong>
+                  </div>
+                  <div class="lab-3d-step-guard">
+                    <span>安全</span>
+                    <strong id="lab-3d-step-guard">先断电、后接线；禁止直视激光或带电调整。</strong>
+                  </div>
                   <div class="lab-3d-progress" aria-hidden="true"><i></i></div>
                   <div class="lab-3d-process-actions">
                     <button type="button" id="lab-3d-step-prev">上一步</button>

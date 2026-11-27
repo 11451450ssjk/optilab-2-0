@@ -41,6 +41,7 @@
       radius: 8.35,
       theta: Math.PI * 0.38,
       phi: Math.PI * 0.365,
+      viewMode: "overview",
       target: { x: 0, y: 0.42, z: 0 }
     }
   };
@@ -53,6 +54,10 @@
 
   function colorArrayToHex(color = [216, 172, 95]) {
     return `#${color.map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  function indexColor(color, lightness = 0, saturation = 0) {
+    return new state.three.Color(color).offsetHSL(0, saturation, lightness);
   }
 
   async function loadThree() {
@@ -330,6 +335,7 @@
 
   function drawPanelTexture(entry, time, config) {
     const { canvas, context, device } = entry;
+    const kind = deviceKind(device);
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#07110e";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -341,7 +347,7 @@
       context.lineTo(canvas.width, index * 48);
       context.stroke();
     }
-    if (device.type === "scope") {
+    if (kind === "scope" || kind === "logic-analyzer") {
       context.strokeStyle = "#6de2a0";
       context.lineWidth = 3;
       context.beginPath();
@@ -353,7 +359,23 @@
         else context.lineTo(x, y);
       }
       context.stroke();
-    } else if (device.type === "screen") {
+      if (kind === "logic-analyzer") {
+        const traces = ["#79aef2", "#e4be76", "#de8b83", "#99d7a4"];
+        traces.forEach((color, channel) => {
+          context.strokeStyle = color;
+          context.lineWidth = 2;
+          context.beginPath();
+          for (let step = 0; step < 15; step += 1) {
+            const x = 18 + step * 33;
+            const high = ((step + channel * 3 + Math.floor(time / 520)) % 4) > 1;
+            const y = 48 + channel * 46 + (high ? 0 : 24);
+            if (step === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
+          }
+          context.stroke();
+        });
+      }
+    } else if (kind === "screen") {
       const phase = Math.abs(Number(config.secondary) || 0) * 2.4;
       for (let row = 0; row < 6; row += 1) {
         context.strokeStyle = `rgba(238, 196, 119, ${0.35 + state.metrics.alignment * 0.5})`;
@@ -369,11 +391,113 @@
         }
         context.stroke();
       }
-    } else if (device.type === "laser") {
+    } else if (kind === "laser") {
       context.fillStyle = colorArrayToHex(config.beamColor);
       context.font = 'bold 58px "Cascadia Mono", monospace';
       context.textAlign = "center";
       context.fillText(device.variant === "hene" ? "He-Ne" : device.symbol || "LASER", 256, 135);
+    } else if (kind === "multimeter") {
+      context.fillStyle = "#a6e5c0";
+      context.font = 'bold 92px "Cascadia Mono", monospace';
+      context.textAlign = "right";
+      context.fillText(formatNumber(state.metrics.power, 3), 462, 126);
+      context.font = 'bold 28px "Cascadia Mono", monospace';
+      context.textAlign = "left";
+      context.fillText(formatNumber(state.metrics.frequency, 1), 24, 65);
+      context.fillStyle = "#7f9e90";
+      context.font = '22px "Cascadia Mono", monospace';
+      context.fillText("AUTO  DC  TRUE RMS", 24, 215);
+    } else if (kind === "power-supply") {
+      context.fillStyle = "#8be4b3";
+      context.font = 'bold 66px "Cascadia Mono", monospace';
+      context.textAlign = "left";
+      context.fillText(formatNumber(Math.max(0, Number(config.primary) || 12), 1), 22, 100);
+      context.fillText(formatNumber(Math.max(0, Number(config.secondary) || 1.5), 2), 274, 100);
+      context.fillStyle = "#c8d6cf";
+      context.font = '21px "Cascadia Mono", monospace';
+      context.fillText("VOLTAGE  V", 24, 132);
+      context.fillText("CURRENT  A", 276, 132);
+      context.fillStyle = "#e2bc75";
+      context.fillText("CV", 380, 222);
+      context.fillStyle = "#71d39d";
+      context.fillText("OUTPUT ON", 24, 222);
+    } else if (kind === "generator") {
+      context.strokeStyle = "#78cbe0";
+      context.lineWidth = 4;
+      context.beginPath();
+      for (let x = 18; x < 494; x += 2) {
+        const y = 105 + Math.sin(x * 0.065 + time * 0.003) * 48;
+        if (x === 18) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+      context.fillStyle = "#d9c593";
+      context.font = 'bold 26px "Cascadia Mono", monospace';
+      context.fillText(`${formatNumber(state.metrics.frequency, 1)} Hz`, 24, 206);
+      context.fillText("SINE  1 Vpp", 272, 206);
+    } else if (kind === "lcd-module") {
+      context.fillStyle = "#9ad77f";
+      context.fillRect(18, 55, 476, 145);
+      context.fillStyle = "#17321f";
+      context.font = 'bold 38px "Cascadia Mono", monospace';
+      context.fillText("DIST  0.428 m", 40, 112);
+      context.fillText("STATE READY", 40, 166);
+    } else if (kind === "spectrometer") {
+      const gradient = context.createLinearGradient(20, 0, 492, 0);
+      gradient.addColorStop(0, "#5d6ed8");
+      gradient.addColorStop(0.28, "#61c1d0");
+      gradient.addColorStop(0.5, "#7eda8a");
+      gradient.addColorStop(0.7, "#e2cf67");
+      gradient.addColorStop(1, "#d8675e");
+      for (let index = 0; index < 42; index += 1) {
+        const height = 35 + Math.abs(Math.sin(index * 0.67 + time * 0.0004)) * 92;
+        context.globalAlpha = 0.45 + (index % 5) * 0.1;
+        context.fillStyle = gradient;
+        context.fillRect(22 + index * 11, 220 - height, 6, height);
+      }
+      context.globalAlpha = 1;
+      context.fillStyle = "#c8d5cd";
+      context.font = '20px "Cascadia Mono", monospace';
+      context.fillText("400                          WAVELENGTH / nm                         1000", 18, 244);
+    } else if (kind === "computer") {
+      context.strokeStyle = "#70d3a0";
+      context.lineWidth = 3;
+      context.beginPath();
+      for (let x = 25; x < 490; x += 4) {
+        const y = 184 - Math.max(0, Math.sin((x - 25) * 0.018)) * 104 - (x - 25) * 0.06;
+        if (x === 25) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+      context.fillStyle = "#b7cac0";
+      context.font = '22px "Cascadia Mono", monospace';
+      context.fillText("LIVE ANALYSIS · 3 REPEATS", 22, 32);
+    } else if (kind === "camera" || kind === "thermal-camera") {
+      for (let row = 0; row < 5; row += 1) {
+        for (let column = 0; column < 8; column += 1) {
+          const level = kind === "thermal-camera"
+            ? 90 + ((row * 37 + column * 23) % 130)
+            : 130 + ((row + column) % 2) * 70;
+          context.fillStyle = kind === "thermal-camera"
+            ? `rgb(${level + 80},${Math.max(25, level - 60)},40)`
+            : `rgb(${level},${level},${level})`;
+          context.fillRect(38 + column * 55, 38 + row * 40, 52, 37);
+        }
+      }
+    } else if (kind === "bioamp") {
+      context.strokeStyle = "#7ce0a2";
+      context.lineWidth = 3;
+      context.beginPath();
+      for (let x = 12; x < 500; x += 2) {
+        const beat = Math.exp(-Math.pow(((x % 125) - 34) / 13, 2));
+        const y = 138 - beat * 82 + Math.sin(x * 0.07) * 3;
+        if (x === 12) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+      context.fillStyle = "#d8c693";
+      context.font = '24px "Cascadia Mono", monospace';
+      context.fillText("ECG  ·  GAIN 1000  ·  50 Hz", 20, 32);
     } else {
       context.strokeStyle = device.accent || "#9cc6b2";
       context.lineWidth = 4;
@@ -407,10 +531,126 @@
     return mesh;
   }
 
+  const DEVICE_KIND_LABELS = {
+    laser: "激光器",
+    mirror: "精密镜架",
+    splitter: "分束器",
+    lens: "光学透镜",
+    screen: "观察屏",
+    scope: "数字示波器",
+    computer: "分析工作站",
+    "power-meter": "台式光功率计",
+    multimeter: "手持数字万用表",
+    "power-supply": "直流稳压电源",
+    generator: "信号发生器",
+    "logic-analyzer": "逻辑分析仪",
+    breadboard: "实验面包板",
+    "mcu-board": "嵌入式开发板",
+    "sensor-module": "传感器模块",
+    "lcd-module": "字符显示模块",
+    "acoustic-transducer": "声光换能器",
+    alarm: "声光报警器",
+    keypad: "矩阵键盘",
+    daq: "数据采集卡",
+    load: "可调电子负载",
+    robot: "移动机器人平台",
+    actuator: "执行器",
+    "led-strip": "LED 灯带",
+    "optical-source": "宽带光源",
+    spectrometer: "光谱仪",
+    prism: "色散棱镜",
+    grating: "光栅",
+    slit: "狭缝组件",
+    polarizer: "偏振器",
+    camera: "科学相机",
+    "thermal-camera": "红外热像仪",
+    "beam-profiler": "光束轮廓仪",
+    detector: "光电探测器",
+    "fiber-spool": "光纤盘",
+    "fiber-coupler": "光纤耦合器",
+    "optical-transceiver": "光收发模块",
+    "diode-fixture": "二极管测试夹具",
+    "millikan-chamber": "密立根油滴室",
+    microscope: "读数显微镜",
+    pendulum: "单摆装置",
+    vibrator: "机械振动台",
+    photogate: "光电门",
+    heater: "加热温控装置",
+    calorimeter: "量热装置",
+    electrode: "生物电电极",
+    bioamp: "生物电放大器",
+    printer: "数字制造设备",
+    caliper: "精密量具",
+    magnet: "电磁铁装置",
+    sample: "实验样品",
+    generic: "实验仪器"
+  };
+
+  function deviceKind(device) {
+    const token = `${device.id || ""} ${device.label || ""} ${device.variant || ""}`.toLowerCase();
+    if (device.type === "laser" || /激光器|激光源/.test(token)) return "laser";
+    if (device.type === "mirror" || /反射镜/.test(token)) return "mirror";
+    if (device.type === "splitter" || /分束/.test(token)) return "splitter";
+    if (device.type === "lens" || /透镜/.test(token)) return "lens";
+    if (device.type === "screen" || /观察屏/.test(token)) return "screen";
+    if (device.type === "scope" || /示波器/.test(token)) return "scope";
+    if (device.type === "board" && /面包板/.test(token)) return "breadboard";
+    if (/逻辑分析/.test(token) || /logic-analyzer/.test(token)) return "logic-analyzer";
+    if (/万用表/.test(token) || /multimeter/.test(token)) return "multimeter";
+    if (/光功率计/.test(token) || /power-meter/.test(token)) return "power-meter";
+    if (device.type === "power" || /电源/.test(token) || /hv-supply/.test(token)) return "power-supply";
+    if (device.type === "signal" || /信号发生器/.test(token)) return "generator";
+    if (device.type === "computer") return "computer";
+    if (device.type === "probe") return "probe";
+    if (device.type === "detector") return "detector";
+    if (/beam-profiler|光束轮廓/.test(token)) return "beam-profiler";
+    if (/ir-camera|红外热像/.test(token)) return "thermal-camera";
+    if (/camera|cam|相机|热像仪/.test(token)) return "camera";
+    if (/fiber-spool|光纤盘/.test(token)) return "fiber-spool";
+    if (/fiber-coupler|光纤耦合/.test(token)) return "fiber-coupler";
+    if (/optical-tx|optical-rx|光发射|光接收/.test(token)) return "optical-transceiver";
+    if (/spectrometer|分光计|光谱仪/.test(token)) return "spectrometer";
+    if (/prism|棱镜/.test(token)) return "prism";
+    if (/grating|光栅/.test(token)) return "grating";
+    if (/slit|单缝|双缝/.test(token)) return "slit";
+    if (/analyzer|检偏器/.test(token)) return "polarizer";
+    if (/polarizer|起偏器/.test(token)) return "polarizer";
+    if (/mcu|arduino|fpga|开发板|嵌入式/.test(token)) return "mcu-board";
+    if (/breadboard|面包板/.test(token)) return "breadboard";
+    if (/ultrasonic|sensor|传感器|thermometer|温度传感/.test(token)) return "sensor-module";
+    if (/lcd|显示模块/.test(token)) return "lcd-module";
+    if (/alarm|蜂鸣器/.test(token)) return "alarm";
+    if (/keypad|门禁输入/.test(token)) return "keypad";
+    if (/daq|采集卡/.test(token)) return "daq";
+    if (/load|电子负载/.test(token)) return "load";
+    if (/robot|机器人|小车/.test(token)) return "robot";
+    if (/actuator|执行器/.test(token)) return "actuator";
+    if (/led-strip|灯带/.test(token)) return "led-strip";
+    if (/transducer|换能器/.test(token)) return "acoustic-transducer";
+    if (/white-source|光源/.test(token)) return "optical-source";
+    if (/chamber|油滴室/.test(token)) return "millikan-chamber";
+    if (/microscope|显微镜/.test(token)) return "microscope";
+    if (/diode|二极管/.test(token)) return "diode-fixture";
+    if (/pendulum|单摆|三线摆/.test(token)) return "pendulum";
+    if (/vibrator|振动/.test(token)) return "vibrator";
+    if (/photogate|光电门/.test(token)) return "photogate";
+    if (/heater|加热/.test(token)) return "heater";
+    if (/calorimeter|量热/.test(token)) return "calorimeter";
+    if (/electrode/.test(token)) return "electrode";
+    if (/bioamp|生物放大器/.test(token)) return "bioamp";
+    if (/printer|制造设备/.test(token)) return "printer";
+    if (/caliper|测量工具|卡尺/.test(token)) return "caliper";
+    if (device.type === "sample") return "sample";
+    if (device.type === "magnet") return "magnet";
+    return "generic";
+  }
+
   function createDeviceGroup(device) {
     const THREE = state.three;
     const group = new THREE.Group();
     group.userData.deviceId = device.id;
+    const kind = deviceKind(device);
+    group.userData.kind = kind;
     const accent = new THREE.Color(device.accent || "#d9b474");
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x35433f,
@@ -467,7 +707,7 @@
       });
     }
 
-    if (device.type === "laser") {
+    if (kind === "laser") {
       const casingColor = device.variant === "hene" ? 0x8b3f38 :
         device.variant === "solid" ? 0x334c57 : device.variant === "fiber" ? 0x355a4e : 0x303d3b;
       const casing = new THREE.MeshStandardMaterial({ color: casingColor, metalness: 0.64, roughness: 0.3 });
@@ -481,7 +721,7 @@
       const panelTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(0.3, 0.14), new THREE.MeshBasicMaterial({ map: panelTexture }), [0, 0.3, 0.225]);
       addPart(group, device, new THREE.SphereGeometry(0.025, 12, 12), new THREE.MeshBasicMaterial({ color: 0x6ee3a2 }), [0.29, 0.42, 0.23]);
-    } else if (device.type === "mirror") {
+    } else if (kind === "mirror") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.45, 16), blackMetal, [0, 0.29, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.075, 0.44, 0.34), blackMetal, [0, 0.55, 0], [0, 0, -0.14]);
       addPart(group, device, new THREE.TorusGeometry(0.245, 0.026, 12, 32), blackMetal, [-0.046, 0.57, 0], [0, Math.PI / 2, 0]);
@@ -497,35 +737,78 @@
           [0, 0, Math.PI / 2]
         );
       }
-    } else if (device.type === "splitter") {
+    } else if (kind === "splitter") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.28, 16), blackMetal, [0, 0.2, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.38, 0.38, 0.38), glassMaterial, [0, 0.46, 0], [0, Math.PI / 4, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.39, 0.02, 0.39), accentMaterial, [0, 0.46, 0], [0, Math.PI / 4, 0]);
       [[-0.2, 0], [0.2, 0]].forEach(([x]) => {
         addPart(group, device, new THREE.CylinderGeometry(0.095, 0.105, 0.1, 20), blackMetal, [x, 0.46, 0], [0, 0, Math.PI / 2]);
       });
-    } else if (device.type === "lens") {
+    } else if (kind === "lens") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.46, 16), blackMetal, [0, 0.29, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.22, 0.035, 12, 32), blackMetal, [0, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.CircleGeometry(0.195, 32), glassMaterial, [-0.008, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.16, 0.006, 6, 32), accentMaterial, [-0.018, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.08, 0.2, 0.06), blackMetal, [0.02, 0.35, 0.17]);
-    } else if (device.type === "sample") {
-      const sampleColor = device.variant === "solar" ? 0x245a8b : 0x70a287;
-      addPart(group, device, new THREE.BoxGeometry(0.42, 0.035, 0.36), blackMetal, [0, 0.14, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.34, 0.29, 0.29), glassMaterial, [0, 0.3, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.24, 0.17, 0.2), new THREE.MeshStandardMaterial({
-        color: sampleColor,
-        emissive: sampleColor,
-        emissiveIntensity: 0.08,
-        transparent: true,
-        opacity: 0.82,
-        roughness: 0.28
-      }), [0, 0.3, 0]);
-      [-0.11, 0, 0.11].forEach((x) => {
-        addPart(group, device, new THREE.BoxGeometry(0.018, 0.18, 0.21), steelMaterial, [x, 0.3, 0]);
-      });
-    } else if (device.type === "screen") {
+    } else if (kind === "sample") {
+      if (device.variant === "solar" || /光伏|太阳能/.test(device.label)) {
+        addPart(group, device, new THREE.BoxGeometry(0.7, 0.055, 0.54), blackMetal, [0, 0.18, 0], [-0.3, 0, 0]);
+        addPart(group, device, new THREE.BoxGeometry(0.62, 0.025, 0.46), new THREE.MeshStandardMaterial({
+          color: 0x153d70,
+          metalness: 0.5,
+          roughness: 0.25
+        }), [0, 0.22, -0.015], [-0.3, 0, 0]);
+        for (let index = 1; index < 4; index += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.62, 0.008, 0.008), steelMaterial, [0, 0.235, -0.015 - 0.23 + index * 0.115], [-0.3, 0, 0]);
+        }
+        for (let index = 1; index < 5; index += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.008, 0.008, 0.46), steelMaterial, [-0.31 + index * 0.124, 0.236, -0.015], [-0.3, 0, 0]);
+        }
+        [-0.16, 0.16].forEach((x) => {
+          addPart(group, device, new THREE.BoxGeometry(0.035, 0.5, 0.035), steelMaterial, [x, 0.26, 0.25], [0.38, 0, 0]);
+        });
+      } else if (/LED|发光/.test(device.label)) {
+        addPart(group, device, new THREE.BoxGeometry(0.42, 0.04, 0.32), new THREE.MeshStandardMaterial({ color: 0x174a3b, roughness: 0.6 }), [0, 0.15, 0]);
+        addPart(group, device, new THREE.SphereGeometry(0.115, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhysicalMaterial({
+          color: accent,
+          emissive: accent,
+          emissiveIntensity: 0.8,
+          transparent: true,
+          opacity: 0.78,
+          roughness: 0.12
+        }), [0, 0.2, 0]);
+        [-0.08, 0.08].forEach((x) => {
+          addPart(group, device, new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), steelMaterial, [x, 0.1, 0]);
+        });
+      } else if (/靶|target|标定/.test(`${device.label} ${device.id}`)) {
+        addPart(group, device, new THREE.BoxGeometry(0.52, 0.56, 0.035), blackMetal, [0, 0.5, 0]);
+        for (let row = 0; row < 4; row += 1) {
+          for (let column = 0; column < 4; column += 1) {
+            addPart(
+              group,
+              device,
+              new THREE.PlaneGeometry(0.1, 0.1),
+              new THREE.MeshBasicMaterial({ color: (row + column) % 2 ? 0xe7e0ce : 0x121817 }),
+              [-0.15 + column * 0.1, 0.32 + (3 - row) * 0.1, 0.025]
+            );
+          }
+        }
+      } else {
+        addPart(group, device, new THREE.BoxGeometry(0.42, 0.035, 0.36), blackMetal, [0, 0.14, 0]);
+        addPart(group, device, new THREE.BoxGeometry(0.34, 0.29, 0.29), glassMaterial, [0, 0.3, 0]);
+        addPart(group, device, new THREE.BoxGeometry(0.24, 0.17, 0.2), new THREE.MeshStandardMaterial({
+          color: 0x70a287,
+          emissive: 0x70a287,
+          emissiveIntensity: 0.08,
+          transparent: true,
+          opacity: 0.82,
+          roughness: 0.28
+        }), [0, 0.3, 0]);
+        [-0.11, 0, 0.11].forEach((x) => {
+          addPart(group, device, new THREE.BoxGeometry(0.018, 0.18, 0.21), steelMaterial, [x, 0.3, 0]);
+        });
+      }
+    } else if (kind === "screen") {
       addPart(group, device, new THREE.CylinderGeometry(0.03, 0.03, 0.62, 14), blackMetal, [0, 0.33, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.74, 0.052, 0.18), blackMetal, [0, 0.08, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.72, 0.96, 0.04), blackMetal, [0, 0.66, 0]);
@@ -535,7 +818,7 @@
         side: THREE.DoubleSide
       }), [0, 0.66, 0.024]);
       addPart(group, device, new THREE.BoxGeometry(0.76, 0.025, 0.055), accentMaterial, [0, 1.15, 0]);
-    } else if (device.type === "scope") {
+    } else if (kind === "scope") {
       addPart(group, device, new THREE.BoxGeometry(1.12, 0.58, 0.54), bodyMaterial, [0, 0.34, 0]);
       addPart(group, device, new THREE.BoxGeometry(1.16, 0.045, 0.58), blackMetal, [0, 0.61, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.96, 0.51, 0.026), blackMetal, [0, 0.36, 0.282]);
@@ -555,19 +838,19 @@
         addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.055, 14), brassMaterial, [x, 0.21, 0.31], [Math.PI / 2, 0, 0]);
       });
       addPart(group, device, new THREE.TorusGeometry(0.28, 0.025, 8, 24, Math.PI), blackMetal, [0, 0.66, 0], [0, 0, Math.PI]);
-    } else if (device.type === "computer") {
+    } else if (kind === "computer") {
       addPart(group, device, new THREE.BoxGeometry(0.22, 0.25, 0.18), blackMetal, [0, 0.19, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.86, 0.57, 0.07), bodyMaterial, [0, 0.53, 0], [-0.08, 0, 0]);
       const screenTexture = makePanelTexture(device, state.config || {});
       addPart(group, device, new THREE.PlaneGeometry(0.78, 0.47), new THREE.MeshBasicMaterial({ map: screenTexture }), [0, 0.54, 0.042], [-0.08, 0, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.72, 0.045, 0.28), blackMetal, [0, 0.1, 0.25], [0.08, 0, 0]);
-    } else if (device.type === "detector" || device.type === "camera") {
+    } else if (["detector", "camera", "thermal-camera", "beam-profiler"].includes(kind)) {
       addPart(group, device, new THREE.CylinderGeometry(0.19, 0.17, 0.42, 32), bodyMaterial, [0, 0.39, 0], [0, 0, Math.PI / 2]);
       addPart(group, device, new THREE.TorusGeometry(0.145, 0.025, 10, 28), brassMaterial, [-0.215, 0.39, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.CircleGeometry(0.125, 28), glassMaterial, [-0.225, 0.39, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.14, 0.34, 0.25), blackMetal, [0.22, 0.31, 0]);
       addPart(group, device, new THREE.SphereGeometry(0.03, 12, 12), new THREE.MeshBasicMaterial({ color: 0x6ae3a4 }), [0.24, 0.5, 0.13]);
-    } else if (device.type === "board") {
+    } else if (kind === "breadboard") {
       const boardColor = device.variant === "digital" ? 0x17425c : device.variant === "arduino" ? 0x1d6c59 : 0x174b3a;
       addPart(group, device, new THREE.BoxGeometry(1.02, 0.08, 0.66), new THREE.MeshStandardMaterial({
         color: boardColor,
@@ -581,22 +864,22 @@
       }
       addPart(group, device, new THREE.BoxGeometry(0.2, 0.12, 0.14), steelMaterial, [0.36, 0.26, 0.19]);
       addPart(group, device, new THREE.BoxGeometry(0.18, 0.1, 0.15), darkMaterial, [-0.42, 0.25, 0.15]);
-    } else if (device.type === "probe") {
+    } else if (kind === "probe") {
       addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.36, 18), bodyMaterial, [0, 0.42, 0], [0, 0, -0.14]);
       addPart(group, device, new THREE.CylinderGeometry(0.012, 0.004, 0.62, 12), steelMaterial, [-0.065, 0.78, 0], [0, 0, -0.14]);
       addPart(group, device, new THREE.TorusGeometry(0.057, 0.012, 8, 18), accentMaterial, [0, 0.5, 0], [Math.PI / 2, 0, 0]);
       addPart(group, device, new THREE.CylinderGeometry(0.02, 0.02, 0.5, 10), blackMetal, [0.02, 0.28, 0], [0, 0, -0.14]);
-    } else if (device.type === "magnet") {
+    } else if (kind === "magnet") {
       addPart(group, device, new THREE.BoxGeometry(0.82, 0.16, 0.45), blackMetal, [0, 0.22, 0]);
       [-0.31, 0.31].forEach((x) => {
         addPart(group, device, new THREE.CylinderGeometry(0.1, 0.1, 0.5, 20), steelMaterial, [x, 0.42, 0]);
         addPart(group, device, new THREE.TorusGeometry(0.12, 0.038, 10, 24), brassMaterial, [x, 0.44, 0], [Math.PI / 2, 0, 0]);
       });
       addPart(group, device, new THREE.BoxGeometry(0.55, 0.1, 0.26), accentMaterial, [0, 0.33, 0]);
-    } else if (device.type === "prism") {
+    } else if (kind === "prism") {
       addPart(group, device, new THREE.CylinderGeometry(0.32, 0.32, 0.45, 3), glassMaterial, [0, 0.37, 0], [Math.PI / 2, 0, Math.PI / 6]);
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.31, 14), blackMetal, [0, 0.19, 0]);
-    } else if (device.type === "fiber-spool" || device.type === "fiber-coupler") {
+    } else if (kind === "fiber-spool" || kind === "fiber-coupler") {
       addPart(group, device, new THREE.BoxGeometry(0.5, 0.08, 0.36), blackMetal, [0, 0.16, 0]);
       [-0.09, 0.09].forEach((x) => {
         addPart(group, device, new THREE.TorusGeometry(0.2, 0.038, 12, 36), new THREE.MeshStandardMaterial({
@@ -606,12 +889,301 @@
         }), [x, 0.25, 0], [Math.PI / 2, 0, 0]);
       });
       addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.24, 16), brassMaterial, [0, 0.31, 0], [0, 0, Math.PI / 2]);
-    } else if (device.type === "diode") {
+    } else if (kind === "diode-fixture") {
       addPart(group, device, new THREE.CylinderGeometry(0.11, 0.11, 0.34, 24), blackMetal, [0, 0.24, 0], [0, 0, Math.PI / 2]);
       addPart(group, device, new THREE.TorusGeometry(0.105, 0.012, 8, 24), steelMaterial, [0.18, 0.24, 0], [0, Math.PI / 2, 0]);
       [-0.08, 0.08].forEach((z) => {
         addPart(group, device, new THREE.CylinderGeometry(0.008, 0.008, 0.26, 8), steelMaterial, [-0.2, 0.16, z], [0, 0, Math.PI / 2]);
       });
+    } else if (kind === "multimeter") {
+      const shell = new THREE.MeshStandardMaterial({ color: 0xd8a844, metalness: 0.18, roughness: 0.58 });
+      addPart(group, device, new THREE.BoxGeometry(0.62, 0.78, 0.24), shell, [0, 0.42, 0], [-0.18, 0, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.52, 0.28, 0.025), darkMaterial, [0, 0.62, 0.145], [-0.18, 0, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.46, 0.22), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.62, 0.16], [-0.18, 0, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.15, 0.15, 0.045, 32), blackMetal, [0, 0.31, 0.16], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.025, 0.12, 0.02), accentMaterial, [0, 0.39, 0.19], [0, 0, -0.24]);
+      [-0.2, -0.07, 0.07, 0.2].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.028, 0.028, 0.08, 14), x < 0 ? blackMetal : accentMaterial, [x, 0.12, 0.15], [Math.PI / 2, 0, 0]);
+      });
+      addPart(group, device, new THREE.BoxGeometry(0.44, 0.035, 0.3), blackMetal, [0, 0.04, 0.18]);
+    } else if (kind === "power-supply") {
+      addPart(group, device, new THREE.BoxGeometry(1.02, 0.5, 0.54), bodyMaterial, [0, 0.3, 0]);
+      addPart(group, device, new THREE.BoxGeometry(1.04, 0.04, 0.58), steelMaterial, [0, 0.57, 0]);
+      const panel = new THREE.MeshStandardMaterial({ color: 0x161d1b, roughness: 0.66, metalness: 0.22 });
+      addPart(group, device, new THREE.BoxGeometry(0.96, 0.38, 0.025), panel, [0, 0.31, 0.282]);
+      addPart(group, device, new THREE.PlaneGeometry(0.86, 0.28), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.34, 0.3]);
+      [-0.34, -0.02].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.045, 22), brassMaterial, [x, 0.11, 0.31], [Math.PI / 2, 0, 0]);
+      });
+      [-0.2, 0.2].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.06, 0.06, 0.045, 22), blackMetal, [x, 0.11, 0.31], [Math.PI / 2, 0, 0]);
+        addPart(group, device, new THREE.CylinderGeometry(0.02, 0.02, 0.04, 12), accentMaterial, [x + 0.23, 0.11, 0.31], [Math.PI / 2, 0, 0]);
+      });
+      for (let index = 0; index < 5; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.42, 0.012, 0.018), darkMaterial, [0.18, 0.13 + index * 0.027, 0.298]);
+      }
+    } else if (kind === "generator") {
+      addPart(group, device, new THREE.BoxGeometry(0.94, 0.43, 0.5), bodyMaterial, [0, 0.27, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.86, 0.31, 0.025), blackMetal, [0, 0.3, 0.263]);
+      addPart(group, device, new THREE.PlaneGeometry(0.74, 0.24), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.32, 0.282]);
+      addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.04, 22), accentMaterial, [0.35, 0.18, 0.28], [Math.PI / 2, 0, 0]);
+      [-0.25, 0, 0.25].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.032, 0.032, 0.055, 16), brassMaterial, [x, 0.12, 0.28], [Math.PI / 2, 0, 0]);
+      });
+      addPart(group, device, new THREE.BoxGeometry(0.2, 0.16, 0.04), darkMaterial, [-0.34, 0.19, 0.275]);
+    } else if (kind === "logic-analyzer") {
+      addPart(group, device, new THREE.BoxGeometry(1.1, 0.52, 0.56), bodyMaterial, [0, 0.32, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.82, 0.36), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.08, 0.37, 0.3]);
+      for (let row = 0; row < 2; row += 1) {
+        for (let index = 0; index < 8; index += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.035, 0.045, 0.025), index === 0 ? accentMaterial : brassMaterial, [-0.34 + index * 0.1, 0.15 + row * 0.08, 0.3]);
+        }
+      }
+      addPart(group, device, new THREE.BoxGeometry(0.34, 0.055, 0.36), blackMetal, [0, 0.59, 0]);
+    } else if (kind === "mcu-board") {
+      const boardColor = device.variant === "fpga" ? 0x1a3f5c : device.variant === "arduino" ? 0x17634f : 0x184635;
+      const pcb = new THREE.MeshStandardMaterial({ color: boardColor, metalness: 0.12, roughness: 0.62 });
+      addPart(group, device, new THREE.BoxGeometry(1.02, 0.075, 0.64), pcb, [0, 0.16, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.26, 0.1, 0.24), darkMaterial, [-0.12, 0.25, -0.03]);
+      addPart(group, device, new THREE.BoxGeometry(0.14, 0.055, 0.14), accentMaterial, [0.2, 0.235, -0.1]);
+      addPart(group, device, new THREE.BoxGeometry(0.2, 0.13, 0.16), steelMaterial, [0.31, 0.26, 0.18]);
+      for (let index = 0; index < 16; index += 1) {
+        const x = -0.46 + index * 0.061;
+        addPart(group, device, new THREE.BoxGeometry(0.02, 0.035, 0.025), brassMaterial, [x, 0.225, 0.3]);
+        addPart(group, device, new THREE.BoxGeometry(0.02, 0.035, 0.025), brassMaterial, [x, 0.225, -0.3]);
+      }
+      addPart(group, device, new THREE.CylinderGeometry(0.027, 0.027, 0.028, 16), indexColor(accent, 0.12), [-0.37, 0.235, 0.16]);
+      addPart(group, device, new THREE.BoxGeometry(0.15, 0.09, 0.16), blackMetal, [-0.42, 0.23, -0.18]);
+      addPart(group, device, new THREE.BoxGeometry(0.17, 0.018, 0.11), brassMaterial, [0.42, 0.225, -0.2]);
+    } else if (kind === "sensor-module") {
+      addPart(group, device, new THREE.BoxGeometry(0.58, 0.045, 0.38), new THREE.MeshStandardMaterial({ color: 0x1b5c4c, roughness: 0.6 }), [0, 0.16, 0]);
+      if (/超声/.test(device.label)) {
+        [-0.14, 0.14].forEach((x) => {
+          addPart(group, device, new THREE.CylinderGeometry(0.105, 0.105, 0.09, 28), steelMaterial, [x, 0.24, 0], [Math.PI / 2, 0, 0]);
+          addPart(group, device, new THREE.TorusGeometry(0.075, 0.009, 8, 24), darkMaterial, [x, 0.24, 0.05]);
+        });
+      } else if (/温度/.test(device.label)) {
+        addPart(group, device, new THREE.CylinderGeometry(0.025, 0.012, 0.56, 12), steelMaterial, [0.12, 0.42, 0], [0, 0, -0.95]);
+        addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.18, 16), blackMetal, [-0.18, 0.25, 0], [Math.PI / 2, 0, 0]);
+      } else {
+        addPart(group, device, new THREE.SphereGeometry(0.105, 20, 14), glassMaterial, [0, 0.25, 0]);
+        addPart(group, device, new THREE.SphereGeometry(0.045, 16, 12), accentMaterial, [0, 0.25, 0]);
+      }
+      for (let index = 0; index < 6; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.018, 0.04, 0.018), brassMaterial, [-0.2 + index * 0.08, 0.21, 0.22]);
+      }
+    } else if (kind === "lcd-module") {
+      addPart(group, device, new THREE.BoxGeometry(0.72, 0.045, 0.44), new THREE.MeshStandardMaterial({ color: 0x18583f, roughness: 0.58 }), [0, 0.16, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.54, 0.08, 0.31), darkMaterial, [0, 0.22, 0.02]);
+      addPart(group, device, new THREE.PlaneGeometry(0.46, 0.23), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.27, 0.195], [-0.18, 0, 0]);
+      [-0.27, -0.13, 0.13, 0.27].forEach((x) => {
+        addPart(group, device, new THREE.BoxGeometry(0.04, 0.025, 0.035), brassMaterial, [x, 0.2, -0.24]);
+      });
+    } else if (kind === "alarm") {
+      addPart(group, device, new THREE.BoxGeometry(0.52, 0.04, 0.34), new THREE.MeshStandardMaterial({ color: 0x1b4e40, roughness: 0.58 }), [0, 0.15, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.1, 0.1, 0.13, 28), blackMetal, [-0.12, 0.25, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.105, 0.012, 8, 28), steelMaterial, [-0.12, 0.31, 0], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.SphereGeometry(0.055, 18, 12), new THREE.MeshBasicMaterial({ color: 0xe55e4f }), [0.16, 0.24, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.06, 16), accentMaterial, [0.16, 0.18, 0]);
+    } else if (kind === "keypad") {
+      addPart(group, device, new THREE.BoxGeometry(0.58, 0.065, 0.62), blackMetal, [0, 0.18, 0]);
+      for (let row = 0; row < 4; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.12, 0.04, 0.1), bodyMaterial, [-0.16 + column * 0.16, 0.23, -0.19 + row * 0.125]);
+        }
+      }
+    } else if (kind === "daq") {
+      addPart(group, device, new THREE.BoxGeometry(0.94, 0.34, 0.5), bodyMaterial, [0, 0.24, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.88, 0.24, 0.025), blackMetal, [0, 0.25, 0.262]);
+      for (let index = 0; index < 8; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.06, 0.1, 0.055), index % 3 ? accentMaterial : brassMaterial, [-0.34 + index * 0.1, 0.25, 0.295]);
+      }
+      addPart(group, device, new THREE.BoxGeometry(0.2, 0.11, 0.16), steelMaterial, [0.33, 0.28, 0.27]);
+      addPart(group, device, new THREE.BoxGeometry(0.62, 0.025, 0.04), darkMaterial, [-0.08, 0.42, 0]);
+    } else if (kind === "load") {
+      addPart(group, device, new THREE.BoxGeometry(1.0, 0.45, 0.54), bodyMaterial, [0, 0.29, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.62, 0.25), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.12, 0.35, 0.295]);
+      for (let index = 0; index < 4; index += 1) {
+        addPart(group, device, new THREE.CylinderGeometry(0.034, 0.034, 0.06, 16), index < 2 ? brassMaterial : blackMetal, [0.24 + (index % 2) * 0.16, 0.3 - Math.floor(index / 2) * 0.14, 0.29], [Math.PI / 2, 0, 0]);
+      }
+      addPart(group, device, new THREE.CylinderGeometry(0.08, 0.08, 0.04, 22), accentMaterial, [0.3, 0.14, 0.29], [Math.PI / 2, 0, 0]);
+    } else if (kind === "robot") {
+      addPart(group, device, new THREE.BoxGeometry(0.94, 0.14, 0.66), new THREE.MeshStandardMaterial({ color: 0x5f6f6a, metalness: 0.42, roughness: 0.4 }), [0, 0.2, 0]);
+      [-0.3, 0.3].forEach((x) => {
+        [-0.36, 0.36].forEach((z) => {
+          addPart(group, device, new THREE.CylinderGeometry(0.13, 0.13, 0.08, 24), darkMaterial, [x, 0.13, z], [0, 0, Math.PI / 2]);
+          addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.09, 14), steelMaterial, [x, 0.13, z], [0, 0, Math.PI / 2]);
+        });
+      });
+      addPart(group, device, new THREE.BoxGeometry(0.35, 0.14, 0.4), new THREE.MeshStandardMaterial({ color: 0x183f3b, roughness: 0.55 }), [0, 0.31, 0]);
+      addPart(group, device, new THREE.SphereGeometry(0.075, 18, 12), new THREE.MeshBasicMaterial({ color: 0x76d6d2 }), [0, 0.26, 0.34]);
+    } else if (kind === "actuator") {
+      addPart(group, device, new THREE.CylinderGeometry(0.15, 0.15, 0.42, 24), bodyMaterial, [0, 0.29, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.CylinderGeometry(0.025, 0.025, 0.35, 12), steelMaterial, [0.38, 0.29, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.BoxGeometry(0.27, 0.22, 0.28), blackMetal, [0, 0.2, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.12, 0.02, 8, 24), accentMaterial, [-0.18, 0.29, 0], [0, Math.PI / 2, 0]);
+    } else if (kind === "led-strip") {
+      addPart(group, device, new THREE.BoxGeometry(1.18, 0.035, 0.12), blackMetal, [0, 0.13, 0]);
+      for (let index = 0; index < 12; index += 1) {
+        addPart(group, device, new THREE.SphereGeometry(0.035, 12, 10), indexColor(accent, (index % 4) * 0.08), [-0.5 + index * 0.091, 0.17, 0]);
+      }
+      addPart(group, device, new THREE.BoxGeometry(0.12, 0.04, 0.12), darkMaterial, [-0.64, 0.14, 0]);
+    } else if (kind === "optical-source") {
+      addPart(group, device, new THREE.BoxGeometry(0.56, 0.34, 0.42), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.16, 0.18, 0.37, 28), blackMetal, [0, 0.47, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.115, 0.115, 0.39, 24), new THREE.MeshBasicMaterial({ color: 0xf2e8c5 }), [0, 0.47, 0]);
+      for (let index = 0; index < 6; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.6, 0.018, 0.44), brassMaterial, [0, 0.23 + index * 0.035, 0]);
+      }
+      addPart(group, device, new THREE.PlaneGeometry(0.28, 0.11), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.31, 0.216]);
+    } else if (kind === "spectrometer") {
+      addPart(group, device, new THREE.BoxGeometry(1.02, 0.4, 0.62), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.25, 0.25, 0.09, 36), blackMetal, [0, 0.53, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.13, 0.13, 0.52, 28), bodyMaterial, [-0.43, 0.55, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.CylinderGeometry(0.11, 0.13, 0.44, 28), bodyMaterial, [0.42, 0.55, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.TorusGeometry(0.11, 0.018, 8, 26), accentMaterial, [-0.7, 0.55, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.09, 0.018, 8, 26), accentMaterial, [0.65, 0.55, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.48, 0.2), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [0, 0.32, 0.315]);
+      addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.035, 20), accentMaterial, [0.38, 0.13, 0.315], [Math.PI / 2, 0, 0]);
+    } else if (["grating", "slit", "polarizer"].includes(kind)) {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.4, 16), blackMetal, [0, 0.26, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.24, 0.03, 12, 36), blackMetal, [0, 0.54, 0], [0, Math.PI / 2, 0]);
+      if (kind === "polarizer") {
+        addPart(group, device, new THREE.CircleGeometry(0.21, 36), new THREE.MeshPhysicalMaterial({
+          color: device.accent || "#8b866a",
+          transparent: true,
+          opacity: 0.48,
+          roughness: 0.08,
+          transmission: 0.25
+        }), [-0.008, 0.54, 0], [0, Math.PI / 2, 0]);
+        for (let index = 0; index < 8; index += 1) {
+          addPart(group, device, new THREE.BoxGeometry(0.012, 0.012, 0.03), steelMaterial, [0.035, 0.54 + Math.cos(index * Math.PI / 4) * 0.19, Math.sin(index * Math.PI / 4) * 0.19]);
+        }
+      } else {
+        addPart(group, device, new THREE.BoxGeometry(0.025, 0.36, 0.36), new THREE.MeshPhysicalMaterial({
+          color: 0xa8c6bf,
+          metalness: 0.6,
+          roughness: 0.22,
+          transparent: true,
+          opacity: 0.78
+        }), [0, 0.54, 0]);
+        const lineCount = kind === "grating" ? 12 : 2;
+        for (let index = 0; index < lineCount; index += 1) {
+          const z = kind === "grating" ? -0.15 + index * 0.027 : -0.018 + index * 0.036;
+          addPart(group, device, new THREE.BoxGeometry(0.008, 0.31, 0.006), darkMaterial, [-0.016, 0.54, z]);
+        }
+      }
+      addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.035, 20), accentMaterial, [0.12, 0.32, 0.16], [Math.PI / 2, 0, 0]);
+    } else if (kind === "optical-transceiver") {
+      addPart(group, device, new THREE.BoxGeometry(0.66, 0.28, 0.46), new THREE.MeshStandardMaterial({
+        color: 0x788580,
+        metalness: 0.76,
+        roughness: 0.24
+      }), [0, 0.27, 0]);
+      [-0.18, 0.18].forEach((z) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.07, 0.07, 0.15, 24), brassMaterial, [0.38, 0.27, z], [0, 0, Math.PI / 2]);
+        addPart(group, device, new THREE.TorusGeometry(0.055, 0.012, 8, 20), darkMaterial, [0.46, 0.27, z], [0, Math.PI / 2, 0]);
+      });
+      addPart(group, device, new THREE.SphereGeometry(0.025, 12, 10), new THREE.MeshBasicMaterial({ color: 0x69e0a0 }), [-0.28, 0.39, 0.24]);
+      addPart(group, device, new THREE.BoxGeometry(0.5, 0.025, 0.04), accentMaterial, [0, 0.43, 0]);
+    } else if (kind === "microscope") {
+      addPart(group, device, new THREE.BoxGeometry(0.62, 0.08, 0.46), blackMetal, [0, 0.13, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.1, 0.78, 0.12), bodyMaterial, [-0.18, 0.52, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.5, 0.06, 0.36), steelMaterial, [0.08, 0.38, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.095, 0.13, 0.46, 24), bodyMaterial, [0.12, 0.68, 0], [0, 0, -0.24]);
+      addPart(group, device, new THREE.CylinderGeometry(0.07, 0.07, 0.16, 22), blackMetal, [0.28, 0.9, 0], [0, 0, -0.24]);
+      addPart(group, device, new THREE.CylinderGeometry(0.025, 0.012, 0.18, 14), steelMaterial, [-0.05, 0.5, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.035, 22), accentMaterial, [0.28, 0.42, 0], [Math.PI / 2, 0, 0]);
+    } else if (kind === "millikan-chamber") {
+      addPart(group, device, new THREE.BoxGeometry(0.62, 0.42, 0.56), glassMaterial, [0, 0.34, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.68, 0.045, 0.62), blackMetal, [0, 0.15, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.68, 0.045, 0.62), blackMetal, [0, 0.56, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.12, 0.16, 0.38, 24), bodyMaterial, [-0.38, 0.48, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.CylinderGeometry(0.03, 0.03, 0.3, 14), brassMaterial, [0, 0.74, 0]);
+      addPart(group, device, new THREE.SphereGeometry(0.018, 10, 8), accentMaterial, [0, 0.54, 0.2]);
+    } else if (kind === "pendulum") {
+      addPart(group, device, new THREE.BoxGeometry(0.76, 0.08, 0.54), blackMetal, [0, 0.14, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.07, 1.0, 0.08), bodyMaterial, [-0.28, 0.63, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.55, 0.055, 0.065), steelMaterial, [0.0, 1.1, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.006, 0.006, 0.62, 8), steelMaterial, [0.25, 0.8, 0], [0, 0, -0.18]);
+      addPart(group, device, new THREE.SphereGeometry(0.14, 24, 18), brassMaterial, [0.31, 0.49, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.035, 16), accentMaterial, [-0.28, 1.15, 0], [Math.PI / 2, 0, 0]);
+    } else if (kind === "vibrator") {
+      addPart(group, device, new THREE.BoxGeometry(0.7, 0.24, 0.46), bodyMaterial, [0, 0.23, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.1, 0.1, 0.38, 22), blackMetal, [0, 0.43, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.CylinderGeometry(0.022, 0.022, 0.45, 12), steelMaterial, [0.4, 0.43, 0], [0, 0, Math.PI / 2]);
+      for (let index = 0; index < 5; index += 1) {
+        addPart(group, device, new THREE.TorusGeometry(0.105, 0.012, 8, 22), brassMaterial, [-0.12 + index * 0.06, 0.43, 0], [0, 0, Math.PI / 2]);
+      }
+      addPart(group, device, new THREE.BoxGeometry(0.22, 0.04, 0.28), blackMetal, [-0.25, 0.14, 0]);
+    } else if (kind === "photogate") {
+      addPart(group, device, new THREE.BoxGeometry(0.5, 0.07, 0.3), blackMetal, [0, 0.13, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.08, 0.52, 0.1), bodyMaterial, [-0.18, 0.4, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.28, 0.09, 0.12), bodyMaterial, [0.02, 0.65, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.08, 0.24, 0.1), bodyMaterial, [0.18, 0.54, 0]);
+      addPart(group, device, new THREE.SphereGeometry(0.022, 10, 8), new THREE.MeshBasicMaterial({ color: 0xe75c57 }), [0.18, 0.46, 0.055]);
+      addPart(group, device, new THREE.BoxGeometry(0.2, 0.07, 0.18), darkMaterial, [-0.18, 0.68, 0]);
+    } else if (kind === "acoustic-transducer") {
+      addPart(group, device, new THREE.CylinderGeometry(0.2, 0.24, 0.22, 32), bodyMaterial, [0, 0.27, 0], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.17, 0.17, 0.025, 32), blackMetal, [0, 0.27, 0.125], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.CircleGeometry(0.15, 32), new THREE.MeshPhysicalMaterial({
+        color: 0x7d9d94,
+        metalness: 0.35,
+        roughness: 0.28
+      }), [0, 0.27, 0.14]);
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.18, 16), brassMaterial, [0, 0.18, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.BoxGeometry(0.35, 0.08, 0.28), darkMaterial, [0, 0.12, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.026, 0.026, 0.08, 14), accentMaterial, [0.27, 0.2, 0.12], [Math.PI / 2, 0, 0]);
+    } else if (kind === "heater" || kind === "calorimeter") {
+      addPart(group, device, new THREE.CylinderGeometry(0.27, 0.3, 0.42, 32), glassMaterial, [0, 0.35, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.28, 0.28, 0.035, 32), blackMetal, [0, 0.14, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.045, 0.045, 0.5, 14), brassMaterial, [0.2, 0.52, 0], [0, 0, -0.18]);
+      addPart(group, device, new THREE.TorusGeometry(0.16, 0.022, 10, 30), new THREE.MeshBasicMaterial({ color: 0xda7b55 }), [0, 0.38, 0], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.46, 0.12, 0.4), bodyMaterial, [0, 0.18, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.035, 18), accentMaterial, [0.32, 0.18, 0.1], [Math.PI / 2, 0, 0]);
+    } else if (kind === "electrode") {
+      addPart(group, device, new THREE.CylinderGeometry(0.2, 0.2, 0.025, 32), new THREE.MeshStandardMaterial({
+        color: 0xd7d7ca,
+        roughness: 0.7
+      }), [0, 0.12, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.065, 0.065, 0.08, 24), steelMaterial, [0, 0.16, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.32, 0.3, 0.025), new THREE.MeshStandardMaterial({ color: 0xb89a72, roughness: 0.86 }), [0.28, 0.15, 0], [0, 0, -0.12]);
+      addPart(group, device, new THREE.TorusGeometry(0.065, 0.01, 8, 24), accentMaterial, [0, 0.21, 0], [Math.PI / 2, 0, 0]);
+    } else if (kind === "bioamp") {
+      addPart(group, device, new THREE.BoxGeometry(0.85, 0.42, 0.5), bodyMaterial, [0, 0.28, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.65, 0.27), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.05, 0.33, 0.27]);
+      [-0.28, 0, 0.28].forEach((x) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.05, 16), x === 0 ? brassMaterial : steelMaterial, [x, 0.12, 0.28], [Math.PI / 2, 0, 0]);
+      });
+      addPart(group, device, new THREE.CylinderGeometry(0.07, 0.07, 0.04, 20), accentMaterial, [0.3, 0.12, 0.28], [Math.PI / 2, 0, 0]);
+    } else if (kind === "printer") {
+      addPart(group, device, new THREE.BoxGeometry(0.95, 0.08, 0.72), blackMetal, [0, 0.12, 0]);
+      [-0.42, 0.42].forEach((x) => {
+        addPart(group, device, new THREE.BoxGeometry(0.06, 0.9, 0.06), steelMaterial, [x, 0.58, -0.31]);
+        addPart(group, device, new THREE.BoxGeometry(0.06, 0.9, 0.06), steelMaterial, [x, 0.58, 0.31]);
+      });
+      addPart(group, device, new THREE.BoxGeometry(0.94, 0.06, 0.06), steelMaterial, [0, 0.98, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.34, 0.12, 0.3), bodyMaterial, [0, 0.82, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.02, 0.006, 0.25, 12), brassMaterial, [0, 0.66, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.18, 0.18, 0.07, 28), darkMaterial, [0, 0.98, -0.32], [Math.PI / 2, 0, 0]);
+    } else if (kind === "caliper") {
+      addPart(group, device, new THREE.BoxGeometry(1.1, 0.06, 0.13), steelMaterial, [0, 0.16, 0]);
+      [-0.25, 0.3].forEach((x) => {
+        addPart(group, device, new THREE.BoxGeometry(0.08, 0.32, 0.08), steelMaterial, [x, 0.29, 0.12]);
+        addPart(group, device, new THREE.BoxGeometry(0.08, 0.16, 0.04), steelMaterial, [x, 0.23, -0.11]);
+      });
+      for (let index = 0; index < 10; index += 1) {
+        addPart(group, device, new THREE.BoxGeometry(0.008, 0.045, 0.012), darkMaterial, [-0.5 + index * 0.1, 0.205, 0.06]);
+      }
+      addPart(group, device, new THREE.BoxGeometry(0.18, 0.08, 0.16), bodyMaterial, [-0.28, 0.2, 0]);
+    } else if (kind === "power-meter") {
+      addPart(group, device, new THREE.BoxGeometry(0.78, 0.4, 0.5), bodyMaterial, [0, 0.27, 0]);
+      addPart(group, device, new THREE.PlaneGeometry(0.52, 0.24), new THREE.MeshBasicMaterial({ map: makePanelTexture(device, state.config || {}) }), [-0.04, 0.33, 0.27]);
+      addPart(group, device, new THREE.CylinderGeometry(0.09, 0.09, 0.035, 24), accentMaterial, [0.28, 0.31, 0.28], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.11, 0.11, 0.16, 24), blackMetal, [0, 0.45, 0], [Math.PI / 2, 0, 0]);
+      addPart(group, device, new THREE.CircleGeometry(0.082, 24), glassMaterial, [0, 0.45, 0.085]);
+    } else if (kind === "spectrometer" && device.variant === "ftir") {
+      addPart(group, device, new THREE.BoxGeometry(1.1, 0.52, 0.7), bodyMaterial, [0, 0.34, 0]);
     } else {
       const wide = ["spectrometer", "instrument", "load", "logic-analyzer", "signal", "power"].includes(device.type);
       const width = wide ? 0.92 : 0.7;
@@ -735,6 +1307,11 @@
     state.processStep = 0;
     state.autoTour = false;
     state.processSteps = buildProcessSteps();
+    state.cameraState.viewMode = "overview";
+    document.querySelectorAll("[data-3d-view]").forEach((button) => {
+      button.classList.toggle("active", button.dataset["3dView"] === "overview");
+    });
+    render3DDeviceDock();
     frameScene();
     updateSelectionHelper();
     rebuildConnections();
@@ -742,102 +1319,338 @@
     updateHud();
   }
 
+  function render3DDeviceDock() {
+    const dock = $("#panorama-device-list");
+    if (!dock || !state.presetInfo) return;
+    dock.replaceChildren(...state.presetInfo.devices.map((device) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.panoramaDevice = device.id;
+      button.textContent = device.label;
+      button.title = `${DEVICE_KIND_LABELS[deviceKind(device)] || "实验仪器"} · 点击观察`;
+      button.classList.toggle("active", device.id === state.selectedId);
+      return button;
+    }));
+  }
+
   function buildProcessSteps() {
     const info = state.presetInfo;
     const devices = info?.devices || [];
-    const optics = info?.optics?.flat?.() || [];
-    const hasOptics = optics.length >= 2 || devices.some((device) => device.zone === "optical");
-    const electronicDevices = devices.filter((device) => device.zone === "electronic");
-    const hasElectronics = electronicDevices.length >= 2 || (info?.connections?.length || 0) > 0;
-    const source = devices.find((device) => device.type === "laser") || devices[0];
-    const firstOptic = devices.find((device) => ["mirror", "lens", "splitter", "sample"].includes(device.type)) || devices[1];
-    const detector = devices.find((device) => ["detector", "camera", "screen", "scope"].includes(device.type)) || devices.at(-1);
+    const experiment = state.config?.experiment || {};
+    const name = String(experiment.name || state.presetInfo?.name || "");
+    const presetId = info?.id || "";
+    const findDevice = (...ids) => devices.find((device) => ids.includes(device.id));
+    const findKind = (...kinds) => devices.find((device) => kinds.includes(deviceKind(device)));
+    const source = findKind("laser", "optical-source") || devices[0];
+    const detector = findKind("detector", "camera", "thermal-camera", "beam-profiler", "screen", "scope") || devices.at(-1);
+    const scope = findKind("scope") || detector;
+    const power = findKind("power-supply") || devices[0];
+    const meter = findKind("multimeter", "power-meter", "daq", "logic-analyzer") || detector;
+    const sample = findKind("sample") || devices[1];
+    const analyzer = findKind("logic-analyzer", "computer") || devices.at(-1);
+    const fiber = findKind("fiber-spool", "fiber-coupler", "optical-transceiver") || devices[1];
+    const primaryLabel = state.config?.primaryLabel || experiment.primaryLabel || "主参数";
+    const secondaryLabel = state.config?.secondaryLabel || experiment.secondaryLabel || "响应量";
+    const makeStep = (stage, title, detail, observe, device, options = {}) => ({
+      stage,
+      title,
+      detail,
+      observe,
+      deviceId: device?.id || devices[0]?.id,
+      guard: options.guard || "移动器材前先确认光源关闭或电源断开，所有读数保留单位。",
+      duration: options.duration || "约 3–5 分钟",
+      mode: options.mode || "operate"
+    });
 
-    if (hasOptics && hasElectronics) {
-      return [
-        {
-          title: "先断电检查光学与电子条件",
-          detail: `确认${source?.label || "光源"}的等级与遮光条件，核对${electronicDevices[0]?.label || "仪器"}量程、极性和共地。`,
-          deviceId: source?.id
-        },
-        {
-          title: "固定光源并建立主光轴",
-          detail: `锁定${source?.label || "光源"}，让出光口与平台导轨平行，先保证高度一致。`,
-          deviceId: source?.id
-        },
-        {
-          title: "依序安装光学与电子器件",
-          detail: `先放${firstOptic?.label || "第一片光学元件"}，再接好${electronicDevices[0]?.label || "测量仪器"}的标准测试线，悬空电缆留出余量。`,
-          deviceId: firstOptic?.id
-        },
-        {
-          title: "小步调节并观察实时反馈",
-          detail: "拖动镜架或样品时只做微调，关注对准率、功率和波形同时变化，避免一次移动过大。",
-          deviceId: detector?.id
-        },
-        {
-          title: "读数稳定后采集与复位",
-          detail: "保持环境不变重复测量 3 次，记录异常与环境条件；实验结束后先关光或断电，再拆除连线。",
-          deviceId: detector?.id
-        }
-      ];
-    }
-    if (hasElectronics && !hasOptics) {
-      return [
-        {
-          title: "断电核对器材与量程",
-          detail: `先检查${devices[0]?.label || "被测电路"}、夹具和测试线，确认仪表量程及共地方式。`,
-          deviceId: devices[0]?.id
-        },
-        {
-          title: "按接口标准完成接线",
-          detail: `按 ${info.standards || "实验指导书"} 接线，先接参考地，再接通信号与电源端。`,
-          deviceId: electronicDevices[0]?.id
-        },
-        {
-          title: "限流上电并建立稳定工作点",
-          detail: "从低电压、低电流开始，确认无异常发热后逐步增加，示波器先完成自动触发与零点校准。",
-          deviceId: devices[1]?.id || devices[0]?.id
-        },
-        {
-          title: "调节参数并记录响应",
-          detail: `围绕${state.config?.primaryLabel || "横轴变量"}做双向扫描，每个测点稳定后再记录，避免读数漂移。`,
-          deviceId: detector?.id
-        },
-        {
-          title: "断开负载并整理实验台",
-          detail: "先降输出、再断电、后拆线；保留原始数据与量程截图，检查异常点后重新测量。",
-          deviceId: devices.at(-1)?.id
-        }
-      ];
-    }
-    return [
+    const presetProfiles = {
+      semiconductor: "semiconductor",
+      mechanics: "mechanics",
+      circuit: "circuit",
+      thermal: "thermal",
+      biomedical: "biomedical",
+      spectrometer: "spectroscopy",
+      millikan: "millikan",
+      diffraction: "diffraction",
+      "wave-speed": "wave-speed",
+      photoelectric: "photoelectric",
+      "laser-lab": "laser",
+      "optical-interference": "interference",
+      "optics-general": "imaging",
+      imaging: "imaging",
+      polarization: "polarization",
+      digital: "digital",
+      solar: "solar",
+      "fiber-lab": "fiber",
+      embedded: "embedded",
+      communication: "communication",
+      fpga: "digital",
+      integrated: "integrated"
+    };
+    let profile = "general";
+    if (presetId.startsWith("professional-")) profile = presetId;
+    else if (presetProfiles[presetId]) profile = presetProfiles[presetId];
+    else if (/干涉/.test(name)) profile = "interference";
+    else if (/衍射|光栅|莫尔条纹|涡旋光束/.test(name)) profile = "diffraction";
+    else if (/偏振|马吕斯/.test(name)) profile = "polarization";
+    else if (/分光计|光谱|傅里叶变换|线宽|波长/.test(name)) profile = "spectroscopy";
+    else if (/激光|调Q|谐振腔/.test(name)) profile = "laser";
+    else if (/成像|CCD|CMOS|全息|机器视觉|图像处理/.test(name)) profile = "imaging";
+    else if (/光纤|FBG|EDFA|EDFL|OTDR|光通信|光放大器/.test(name)) profile = "fiber";
+    else if (/光电效应|弗兰克|响应度|暗电流|光子|荧光/.test(name)) profile = "photoelectric";
+    else if (/光伏|太阳能|光电池/.test(name)) profile = "solar";
+    else if (/摆|振动|转动惯量|杨氏模量|共振/.test(name)) profile = "mechanics";
+    else if (/比热|热导|温度|热透镜/.test(name)) profile = "thermal";
+    else if (/生物信号|心电|肌电/.test(name)) profile = "biomedical";
+    else if (/逻辑|触发|计数|FPGA|数字系统/.test(name)) profile = "digital";
+    else if (/单片机|GPIO|ADC|DAC|UART|I2C|SPI|PWM|Arduino/.test(name)) profile = "embedded";
+    else if (/示波器|电桥|基尔霍夫|戴维南|诺顿|万用表|伏安|电路|谐振/.test(name)) profile = "circuit";
+
+    const first = makeStep(
+      "准备",
+      /professional/.test(profile) ? "核对器材清单与实验条件" : "完成安全检查和器材初检",
+      `检查${source?.label || "主设备"}、${sample?.label || "样品/负载"}和${detector?.label || "测量端"}的外观、量程与连接端口；按实验指导书确认${primaryLabel}的初始范围。`,
+      "电源状态、器材铭牌、插头绝缘和平台水平",
+      source,
       {
-        title: "确认光源安全与实验条件",
-        detail: "检查光源等级、护目镜和急停位置，固定电源与光学平台，清理主光轴上的遮挡物。",
-        deviceId: source?.id
-      },
-      {
-        title: "固定光源并完成粗对准",
-        detail: `锁定${source?.label || "光源"}，出光口朝向主光轴，先让所有镜架中心高度一致。`,
-        deviceId: source?.id
-      },
-      {
-        title: "沿光路安装功能器件",
-        detail: `依序放入反射镜、分束器或${firstOptic?.label || "透镜"}，观察光斑是否落在下一器件中心。`,
-        deviceId: firstOptic?.id
-      },
-      {
-        title: "精细调节并读取稳定信号",
-        detail: "拖动镜架进行小角度微调，直到条纹清晰、对准率提高且探测器功率进入合理区间。",
-        deviceId: detector?.id
-      },
-      {
-        title: "重复采集并记录实验数据",
-        detail: "稳定 30 秒后读取测量值，重复 3 次并记录环境条件；原始数据应包含单位与实验编号。",
-        deviceId: detector?.id
+        guard: /光电|干涉|衍射|偏振|激光|spectroscopy|fiber/.test(profile)
+          ? "确认激光等级和遮光条件，严禁直视光束或裸光纤端面；高反光器件须先固定。"
+          : "先断电再接线，检查极性与共地；不要超出仪器额定电压和电流。",
+        mode: "prepare"
       }
-    ];
+    );
+
+    const core = {
+      interference: [
+        ["安装", "建立分束干涉光路", `将${source?.label || "光源"}、分束镜和两路反射镜按导轨依次固定，先让各器件光心近似同高。`, "光斑是否从每个镜片中心通过", findDevice("splitter", "mirror-a") || sample],
+        ["校准", "完成等光程与共轴调节", "先取下观察屏，用白纸追踪两路回光；微调镜架使两束光在远端重合，再减小光程差。", "两路光斑重合程度和条纹可见度", findDevice("mirror-a", "mirror-b") || source],
+        ["调焦", "安装透镜并捕获干涉条纹", `放入${findDevice("lens")?.label || "聚焦透镜"}和观察屏，前后移动屏幕，找到条纹最清晰且不饱和的位置。`, "条纹间距、中心位置和明暗对比", findDevice("screen") || detector],
+        ["扫描", "进行相位或位移扫描", `以${secondaryLabel}为步进量，从零附近开始做单向或往返扫描；每步等待读数稳定后再记录。`, "条纹吞吐方向、计数起点和回程差异", detector, { mode: "scan", duration: "约 6–10 分钟" }],
+        ["复核", "检查干涉数据并重复测量", "由条纹数计算光程差或面型，检查首尾方向误差；保持环境不变重复三次，记录温度与振动干扰。", "拟合残差、条纹计数误差和重复性", analyzer, { mode: "verify" }]
+      ],
+      diffraction: [
+        ["安装", "固定光源、狭缝和光栅", `保持${source?.label || "光源"}与平台导轨平行，将狭缝或光栅垂直光轴安装，避免刀口损伤。`, "零级光斑是否居中、光斑是否被截断", findDevice("slit", "grating") || sample],
+        ["校准", "调节准直与观察距离", `放入${findDevice("lens")?.label || "准直/聚焦透镜"}，让光束平行或聚焦；量取光屏到衍射元件的有效距离。`, "零级与高级次的对称性和清晰度", findDevice("lens") || detector],
+        ["测量", "采集衍射级次与条纹位置", "从中心向两侧测量暗纹、明纹或光谱级次的位置，左右各读取一次以抵消零点偏差。", "级次顺序、左右对称和背景光", findDevice("screen") || detector],
+        ["变量", "改变缝宽、周期或光源波长", `以${primaryLabel}为变量逐点更换参数，每次更换后重新检查光轴并记录新的图样。`, "条纹间距随参数的变化方向", source, { mode: "scan", duration: "约 6–8 分钟" }],
+        ["复核", "计算参数并检验误差", "由条纹间距拟合缝宽、光栅常数或波长，检查角度近似与屏距测量误差，并重复代表性测点。", "拟合斜率、衍射角不确定度和异常级次", analyzer, { mode: "verify" }]
+      ],
+      polarization: [
+        ["安装", "安装起偏器与检偏器", `先固定${source?.label || "光源"}，将起偏器置于探测器前，再把检偏器装入带角度刻度的旋转镜架。`, "起偏器刻度和检偏器转轴是否同轴", findDevice("polarizer") || sample],
+        ["校准", "寻找正交消光位置", "转动检偏器找到最小透射光强，将该方向记为 90° 或零参考点，并记录暗电流。", "最小光强、刻度回差和杂散光", findDevice("analyzer", "polarizer") || detector],
+        ["样品", "放入待测样品或波片", `在起偏器与检偏器之间放入${sample?.label || "样品"}，检查反射或吸收是否使光斑偏移。`, "样品位置、表面法线和透射光斑", sample],
+        ["扫描", "按角度逐点测量透射强度", `检偏器每隔固定角度旋转一次，以${secondaryLabel}作为响应量，记录角度与光强并保持光源稳定。`, "光强是否服从预期角度关系", detector, { mode: "scan", duration: "约 6–10 分钟" }],
+        ["复核", "拟合偏振模型并重复测量", "用余弦平方或偏振传递模型拟合数据，检查 90° 周期与消光比；回到零位重复一轮。", "拟合 R²、消光比和角度零点", analyzer, { mode: "verify" }]
+      ],
+      spectroscopy: [
+        ["安装", "预热光源并调整入射光路", `开启${source?.label || "光源"}预热，调节准直管使入射光成为平行光，并让狭缝像落在望远镜视场中心。`, "谱线亮度、狭缝宽度和光源稳定时间", source, { duration: "约 8–15 分钟" }],
+        ["校准", "建立角度零点与仪器基准", "先用零级光或已知谱线校准分光计/光谱仪角度，记录游标零点、暗电流和波长偏移。", "零级位置、左右游标差和基线漂移", findDevice("spectrometer") || analyzer],
+        ["分光", "调节棱镜最小偏向或光栅衍射", `旋转载物台或光栅座，找到谱线最窄的位置；比较${sample?.label || "待测样品"}前后的光谱变化。`, "谱线锐度、色散方向和背景谱", findDevice("prism", "grating") || sample],
+        ["采集", "逐条测量光谱峰与谱线位置", `围绕${primaryLabel}逐点采集光谱，记录峰位、峰高与半高宽，并避免探测器饱和。`, "峰值波长、信噪比和峰形对称性", analyzer, { mode: "scan", duration: "约 8–12 分钟" }],
+        ["复核", "完成波长标定与重复测量", "用标准灯或已知谱线建立标定曲线，检查峰位残差；重复空白和样品测量，比较基线漂移。", "标定斜率、峰位误差和样品重复性", analyzer, { mode: "verify" }]
+      ],
+      laser: [
+        ["预热", "检查激光安全并预热系统", `确认${source?.label || "激光器"}的冷却、驱动极性和急停状态，按说明书预热到输出稳定。`, "输出功率漂移、温度与冷却状态", source, { duration: "约 10–20 分钟" }],
+        ["安装", "安装腔镜和泵浦光路", "先放入后腔镜、增益介质和前腔镜，用低功率辅助光检查光轴，禁止在开光时调整镜片正面。", "回光是否重合并落在腔镜中心", findDevice("mirror-a", "mirror-b") || source],
+        ["阈值", "寻找阈值并建立稳定工作点", `从低泵浦电流开始，缓慢增加并记录${primaryLabel}；找到起振阈值后回退到安全工作区。`, "阈值拐点、输出跳变和模式稳定性", detector, { mode: "scan" }],
+        ["调谐", "测量功率、模式和光束参数", "沿光轴测量功率、光束直径和模式图样；检查束腰位置和光斑是否椭圆，避免功率计过载。", "光斑模式、功率斜率和光束质量", findDevice("beam-profiler", "power-meter") || detector],
+        ["复核", "检查热稳定与重复性", "待温度稳定后重复功率测量，记录开关光前后的基线漂移；关机前先降低泵浦或调 Q 驱动。", "功率漂移、温度漂移和重复测量偏差", analyzer, { mode: "verify" }]
+      ],
+      imaging: [
+        ["安装", "布置照明、标定靶与相机", `固定${source?.label || "光源"}和${sample?.label || "标定靶"}，将${findKind("camera")?.label || "相机"}光轴垂直靶面并锁紧支架。`, "靶面照度均匀性、相机光轴和遮挡", findKind("camera") || detector],
+        ["调焦", "调焦并设置工作距离", `放入${findDevice("lens")?.label || "成像透镜"}，移动相机或靶面直到边缘与中心同时清晰，记录物距和像距。`, "边缘 MTF、对焦峰和视场范围", findDevice("lens") || detector],
+        ["曝光", "调整光圈、曝光和增益", "先降低增益，以曝光时间匹配最亮区域；检查直方图不削顶、不压黑，再保存暗场和平场参考。", "直方图、饱和像素和暗噪声", findKind("camera") || analyzer],
+        ["采集", "采集图像并执行标定", "拍摄标定靶、空白和待测样品，保持相机位置不变；按像素尺寸、畸变和亮度建立标定。", "重复定位、图像漂移和标定残差", analyzer, { mode: "scan", duration: "约 6–10 分钟" }],
+        ["复核", "比较处理结果与重复图像", "用同一参数处理三次采集，比较中心位置、边缘清晰度和测量值；检查图像压缩或自动增益造成的变化。", "重复性、畸变和算法边界误差", analyzer, { mode: "verify" }]
+      ],
+      fiber: [
+        ["安装", "检查光纤端面并建立链路", `关闭${source?.label || "光源"}后检查 FC/APC 端面，使用无水乙醇和擦纤纸清洁，再按缺口方向插入耦合器或光纤盘。`, "端面洁净度、连接卡扣和弯曲半径", fiber],
+        ["校准", "测量入纤功率与零基线", `开启低功率光源，记录${source?.label || "光源"}输出、入纤功率和光功率计零点；避免裸纤端面直视。`, "插损、回波和功率计响应", findDevice("power-meter") || detector],
+        ["参考", "建立直通链路参考值", "用短跳线建立基准链路，记录各波长下的参考功率；再换入待测光纤或器件，保持接头清洁和位置一致。", "参考功率、连接重复性和波长漂移", fiber],
+        ["扫描", "测量损耗、应变或通信响应", `围绕${primaryLabel}扫描，记录${secondaryLabel}及眼图/误码率；每个测点等待功率稳定后再读数。`, "眼图张开度、损耗斜率和噪声", detector, { mode: "scan", duration: "约 8–12 分钟" }],
+        ["复核", "重复连接并核算不确定度", "断开并重新连接一次，比较插损重复性；检查光纤弯曲、接头污染和环境温度对结果的影响。", "重连偏差、链路损耗和误码率", analyzer, { mode: "verify" }]
+      ],
+      photoelectric: [
+        ["安装", "布置光源、样品与探测器", `固定${source?.label || "光源"}和${sample?.label || "样品"}，让光斑完全落入${detector?.label || "探测器"}有效面，遮去环境光。`, "暗场漏光、光斑覆盖和探测器温度", detector],
+        ["校准", "测量暗电流与零点", "断开光源或关闭快门，等待探测器稳定后记录暗电流；检查偏置电压和前置放大器量程。", "暗电流漂移、零点偏置和噪声底", findKind("power-meter", "multimeter", "scope") || detector],
+        ["偏置", "设置安全工作偏置", `从低偏置开始逐级增加，观察${secondaryLabel}是否随${primaryLabel}单调变化；发现击穿或饱和立即回退。`, "I–V 曲线拐点、饱和区和温升", detector, { mode: "scan" }],
+        ["扫描", "改变波长、光强或频率并采集", "按固定步长改变光强、波长或调制频率，记录光电流、响应时间与背景噪声，标记饱和点。", "响应度、截止频率和信噪比", findKind("scope", "multimeter") || detector, { mode: "scan", duration: "约 8–12 分钟" }],
+        ["复核", "计算响应度并重复低光强测量", "扣除暗电流后计算响应度与量子效率，检查线性范围；重复最弱信号点以确认噪声和漂移。", "线性拟合、响应度误差和重复性", analyzer, { mode: "verify" }]
+      ],
+      solar: [
+        ["安装", "固定光源、太阳电池与负载", `将${source?.label || "光源"}、${sample?.label || "光伏样品"}和${findKind("load")?.label || "电子负载"}放在同一光轴，记录光源距离和角度。`, "光斑覆盖、电池温度与接线极性", sample],
+        ["校准", "测量开路电压和短路电流", "关闭负载后测开路电压，再以低阻表测短路电流；确认万用表量程和测试时间，避免样品发热。", "Voc、Isc 和光源稳定时间", findKind("multimeter", "power-meter") || detector],
+        ["扫描", "执行 I–V 曲线扫描", `逐步改变电子负载，记录${primaryLabel}与${secondaryLabel}，从短路端扫描到开路端。`, "曲线膝点、填充因子和串联电阻", findKind("load", "daq") || analyzer, { mode: "scan", duration: "约 8–12 分钟" }],
+        ["变量", "比较光强、角度或温度影响", "在代表性负载下改变光照强度、入射角或样品温度，每个条件稳定后再采集完整曲线。", "短路电流、开路电压和温度系数", source],
+        ["复核", "计算效率并检查重复性", "由最大功率点计算填充因子和转换效率，重复标准光照条件；检查接触电阻和热漂移。", "Pmax、FF、效率及重复测量偏差", analyzer, { mode: "verify" }]
+      ],
+      mechanics: [
+        ["安装", "调平支架并安装摆动装置", `固定${findKind("pendulum")?.label || "摆动装置"}，调整底座水平，确认悬点、摆杆和光电门均在安全高度。`, "支架垂直度、摆杆自由度和地面振动", findKind("pendulum") || sample],
+        ["校准", "对准光电门并清零计时器", `将${findKind("photogate")?.label || "光电门"}放在摆锤最低点，检查遮光触发和计时分辨率。`, "触发次数、遮光宽度和计时零点", findKind("photogate") || scope],
+        ["预摆", "检查小角度自由振动", "以较小初始角度释放摆锤，不施加侧向力；预记录三个周期，确认摆动平面稳定。", "摆动平面、周期漂移和幅度衰减", findKind("pendulum") || detector],
+        ["测量", "改变长度、质量或驱动力", `围绕${primaryLabel}设置一系列条件，每个条件测量多个周期，使用光电门或示波器记录时间。`, "周期重复性、共振峰和相位差", scope, { mode: "scan", duration: "约 8–15 分钟" }],
+        ["复核", "拟合理论模型并重复测量", "用周期、幅值或频率关系拟合模型，检查系统误差；重复最短与最长周期条件确认量程。", "拟合斜率、阻尼和重复测量误差", analyzer, { mode: "verify" }]
+      ],
+      thermal: [
+        ["安装", "准备样品与温度接触", `将${sample?.label || "待测样品"}安装在${findKind("heater", "calorimeter")?.label || "加热/量热装置"}中，确保温度探头充分接触并绝缘。`, "样品位置、探头贴合和冷却水状态", findKind("heater", "calorimeter") || sample],
+        ["平衡", "记录初始温度并等待平衡", "在无加热条件下等待温度漂移小于设定阈值，记录室温、初始温度和采样间隔。", "基线漂移、环境温度和探头一致性", findKind("sensor-module") || detector],
+        ["加热", "建立稳定加热或热流条件", `从低功率开始施加${primaryLabel}，观察${secondaryLabel}随时间的变化，避免超温和局部汽化。`, "升温曲线、热流稳定时间和接触热阻", findKind("heater") || sample],
+        ["采集", "记录完整升降温曲线", "以固定采样间隔连续记录温度和功率，直到达到稳态或预设终点；保存原始时间序列。", "线性区、稳态平台和散热拐点", findKind("daq", "thermometer") || analyzer, { mode: "scan", duration: "约 10–20 分钟" }],
+        ["复核", "计算热学参数并重复实验", "用稳态或瞬态模型计算热导率/比热容，检查初始线性段；重复一次升降温确认滞后。", "拟合误差、热损失和重复性", analyzer, { mode: "verify" }]
+      ],
+      biomedical: [
+        ["安装", "准备电极与安全连接", `检查${source?.label || "受试者连接"}与${findKind("electrode")?.label || "生物电电极"}的绝缘，清洁皮肤后按标准位置贴附电极，先接参考地。`, "电极接触阻抗、皮肤状态和受试者舒适度", findKind("electrode") || sample],
+        ["校准", "设置增益、带宽与共模抑制", `开启${findKind("bioamp")?.label || "生物电放大器"}，使用内部校准信号检查增益、滤波和基线，确认不进入饱和。`, "基线漂移、50 Hz 干扰和削顶", findKind("bioamp") || detector],
+        ["静息", "采集静息基线信号", "受试者保持静止，先记录至少一分钟基线；观察肌电干扰、呼吸伪迹和电极松动。", "心率、基线稳定性和伪迹", findKind("daq", "scope") || detector],
+        ["刺激", "记录生理过程或动作响应", `按实验要求施加${primaryLabel}，同步记录${secondaryLabel}，标记事件时刻并保持环境安静。`, "波形重复性、延迟和幅度变化", analyzer, { mode: "scan", duration: "约 5–10 分钟" }],
+        ["复核", "清理电极并重复测量", "停止采集后先断开信号再移除电极，清洁接触部位；比较三次记录的基线、峰值和伪迹。", "重复性、噪声底与受试者安全", analyzer, { mode: "verify" }]
+      ],
+      digital: [
+        ["安装", "核对芯片方向与电源引脚", `断电检查${devices[0]?.label || "数字电路板"}的 VCC/GND、芯片缺口和排针方向，防止反接。`, "电源极性、芯片缺口和短路", power],
+        ["接线", "连接逻辑输入、输出和地线", "使用标准杜邦线连接电源、时钟、输入开关和输出指示；高速信号尽量缩短回路。", "接线表、共地和高频串扰", findKind("breadboard", "mcu-board") || power],
+        ["校准", "设置逻辑分析仪采样率与门限", `连接${findKind("logic-analyzer")?.label || "逻辑分析仪"}，设置与 3.3 V/5 V 逻辑一致的阈值和足够高的采样率。`, "通道顺序、触发边沿和地线噪声", findKind("logic-analyzer") || analyzer],
+        ["激励", "输入真值表或时钟序列", `按${primaryLabel}逐项改变输入状态，检查输出指示和逻辑波形；每个状态保持到采样完成。`, "状态切换、竞争冒险和毛刺", findKind("signal") || source],
+        ["采集", "保存总线波形和时序结果", "触发稳定边沿后采集完整序列，记录建立时间、保持时间和时钟相位；与真值表或状态图逐项对照。", "时序余量、异常脉冲和延迟", analyzer, { mode: "scan" }],
+        ["复核", "复位系统并重复关键状态", "保存波形后执行系统复位，重复边界输入状态；检查首次状态、复位值和掉电恢复。", "复位值、重复时序和电源跌落", analyzer, { mode: "verify" }]
+      ],
+      embedded: [
+        ["安装", "核对开发板与外设引脚", `断电检查${findKind("mcu-board")?.label || "开发板"}的供电跳线、IO 电平和${sample?.label || "外设"}接口，避免 5 V 信号直连 3.3 V 引脚。`, "板卡版本、跳线位置和共地", findKind("mcu-board") || power],
+        ["接线", "连接传感器、执行器和调试口", `按${info?.standards || "接口表"}接入传感器、显示器和调试器，先接参考地，再连接信号与电源。`, "接口方向、上位机识别和短路", findKind("sensor-module", "actuator") || power],
+        ["下载", "编译、下载并确认启动日志", "编译程序并下载到板卡，通过串口确认复位、时钟和固件版本；先运行最小闪灯或通信测试。", "启动日志、串口波特率和复位原因", findKind("computer") || analyzer],
+        ["功能", "逐项验证 IO、定时器和通信", `改变${primaryLabel}产生输入事件，观察${secondaryLabel}和接口波形；分别测试正常、边界和断线状态。`, "采样值、时序、丢包和异常码", findKind("logic-analyzer", "scope") || detector, { mode: "scan", duration: "约 6–12 分钟" }],
+        ["复核", "保存日志并执行冷启动测试", "保存串口记录和关键波形，断电重启后再验证初始状态；检查看门狗、超时和通信恢复。", "掉电恢复、重复启动和数据一致性", analyzer, { mode: "verify" }]
+      ],
+      circuit: [
+        ["安装", "断电识别元件与仪表量程", `检查${findKind("breadboard")?.label || "电路板"}、${sample?.label || "被测元件"}和${meter?.label || "测量仪表"}，按色环/铭牌记录标称值。`, "元件参数、仪表量程和测试线完整性", power],
+        ["接线", "按电路图连接电源、信号与参考地", `使用${info?.standards || "标准测试线"}完成接线，输入端先短接或置零，保留可快速断电的开关。`, "节点对应、极性和接触电阻", findKind("breadboard", "probe") || power],
+        ["校准", "清零仪表并设置保护", `将${meter?.label || "测量仪表"}置零，设置电压/电流限制和示波器探头衰减；确认信号源输出关闭。`, "零点、探头倍率、限流和触发", meter],
+        ["测量", "限流上电并建立工作点", "从低电压开始，缓慢增加输出；先测静态工作点，再打开信号源，观察是否出现异常发热或削顶。", "静态电压、电流和波形畸变", scope],
+        ["扫描", "改变参数并记录双向响应", `围绕${primaryLabel}从低到高、再从高到低测量${secondaryLabel}，每点等待稳定后记录，检查回差与非线性。`, "线性区、拐点、回差和噪声", findKind("scope", "multimeter") || detector, { mode: "scan", duration: "约 6–12 分钟" }],
+        ["复核", "降低输出、断电并重复关键点", "先降电源、再关信号、后拆线；回到两三个关键点复测，比较理论计算和测量偏差。", "重复性、功耗和连接接触误差", analyzer, { mode: "verify" }]
+      ],
+      semiconductor: [
+        ["安装", "安装器件并识别测试夹具", `断电后检查${findDevice("diode")?.label || "半导体测试夹具"}的引脚方向、限流电阻和${findKind("multimeter", "scope")?.label || "测量仪表"}量程。`, "器件极性、夹具接触和仪表量程", findDevice("diode") || sample],
+        ["校准", "测量零偏与暗态基线", `在${primaryLabel}为零时记录漏电流或暗态输出，检查探头共地、屏蔽和温漂；必要时执行仪表调零。`, "零偏电流、噪声底和温漂", meter],
+        ["偏置", "从小电压开始扫描工作区", "从零偏开始逐级增加偏置，记录正向、反向和拐点区域；达到限流或热漂移时立即回退。", "导通拐点、击穿风险和功率耗散", power, { mode: "scan" }],
+        ["变量", "测量温度或光照对特性的影响", `在代表性偏置下改变${secondaryLabel}，记录温度、光强或频率响应；每个条件等待热平衡和电学稳定。`, "曲线平移、响应度和迟滞", detector, { mode: "scan", duration: "约 8–12 分钟" }],
+        ["复核", "拟合器件参数并重复低偏置点", "由曲线提取阈值、斜率电阻或响应度，检查低偏置与高偏置区段误差；重复一个易漂移点确认可复现性。", "拟合参数、功耗和重复测量误差", analyzer, { mode: "verify" }]
+      ],
+      millikan: [
+        ["安装", "调平油滴室与读数显微镜", `将${findKind("millikan-chamber")?.label || "油滴室"}放在水平基座上，调节${findKind("microscope")?.label || "读数显微镜"}焦距，使上下极板刻线清晰。`, "极板水平、刻度清晰和视场照明", findKind("millikan-chamber") || sample],
+        ["校准", "检查高压电源与计时零点", `从零电压开始检查${findKind("power-supply")?.label || "高压电源"}的输出和极性，记录极板间距、黏度与环境温度。`, "电压零点、极板间距和温度", findKind("power-supply") || power],
+        ["喷雾", "喷入油滴并锁定单一粒子", "短促喷雾后关闭油雾入口，选择电量适中、运动平稳的单颗油滴，避免相邻油滴干扰。", "油滴清晰度、漂移和电荷稳定性", findKind("millikan-chamber") || detector],
+        ["平衡", "调节电压使油滴悬停", "缓慢增加极板电压，使油滴在视场中心附近悬停；记录平衡电压并检查是否反复上下漂移。", "悬停位置、电压细调和热对流", findKind("power-supply") || power, { mode: "scan" }],
+        ["测量", "测量匀速下落时间并重复", "撤去电场后记录油滴通过两段刻线的时间，重复同一油滴多次，再更换至少五颗油滴。", "下落时间、速度和电荷量子化", findKind("daq", "computer") || analyzer, { mode: "scan", duration: "约 10–20 分钟" }],
+        ["复核", "计算基本电荷并检查误差", "由平衡电压、下落速度和油滴半径计算电荷，按公约数分析基本电荷；检查半径和黏度修正。", "电荷分组、相对误差和异常油滴", analyzer, { mode: "verify" }]
+      ],
+      "wave-speed": [
+        ["安装", "布置声/光传播路径", `固定${findKind("acoustic-transducer")?.label || "换能器"}、${sample?.label || "传播介质"}和${findKind("detector", "probe")?.label || "接收端"}，测量有效传播距离。`, "传播距离、轴线对准和环境反射", findKind("acoustic-transducer") || source],
+        ["校准", "同步信号源与示波器触发", `将${findKind("generator")?.label || "信号源"}接入发射端和示波器触发端，检查通道延迟、探头倍率与触发稳定度。`, "参考相位、触发抖动和探头延迟", findKind("generator") || scope],
+        ["传播", "观察发射与接收波形", "用双通道示波器同时观察发射和接收信号，移动接收端改变传播距离，记录相位差或到达时间。", "波形相关、相位差和噪声", findKind("scope") || detector],
+        ["测量", "改变距离并作线性拟合", `围绕${primaryLabel}设置多个传播距离，记录${secondaryLabel}；每个点重复读数并保持介质温度稳定。`, "斜率、截距和传播延迟", analyzer, { mode: "scan", duration: "约 6–12 分钟" }],
+        ["复核", "由拟合斜率计算波速并重复", "用距离—时间/相位关系拟合传播速度，检查换能器延迟和环境温度修正；复测最短和最远距离。", "拟合 R²、波速误差和反射干扰", analyzer, { mode: "verify" }]
+      ],
+      communication: [
+        ["安装", "检查光收发模块和光纤链路", `关闭光源后清洁 FC 接口，将${findKind("optical-transceiver")?.label || "光收发模块"}与${fiber?.label || "光纤盘"}按方向连接，检查供电和地线。`, "接口洁净度、连接方向和供电", findKind("optical-transceiver") || fiber],
+        ["校准", "建立接收端零基线与参考电平", `开启低功率发射，调整${findKind("scope")?.label || "示波器"}垂直档位和触发，记录无调制时的接收噪声和偏置。`, "眼图基线、噪声和接收幅度", scope],
+        ["调制", "输入数字码流或模拟信号", `由${findKind("generator")?.label || "信号源"}输入设定码率与幅度，检查调制深度、波形上升沿和削顶。`, "码率、调制深度和失真", findKind("generator") || source],
+        ["测试", "测量眼图、误码率与衰减", `逐级增加衰减或光纤长度，记录${primaryLabel}与${secondaryLabel}；保持采样相位不变比较眼图张开度。`, "眼图张开、抖动、误码和链路余量", analyzer, { mode: "scan", duration: "约 8–15 分钟" }],
+        ["复核", "重新连接并验证通信恢复", "断开再连接光纤，比较插损与误码率；保存原始码流、眼图截图和测试衰减值。", "重连损耗、通信恢复和重复性", analyzer, { mode: "verify" }]
+      ],
+      integrated: [
+        ["安装", "定义综合测量链与数据接口", `梳理${source?.label || "激励端"}、${sample?.label || "被测对象"}、${detector?.label || "检测端"}和${findKind("computer")?.label || "分析端"}之间的信号流与数据接口。`, "模块边界、供电和同步信号", findKind("computer") || detector],
+        ["接线", "连接仪器与自动采集链路", `按${info?.standards || "接口表"}连接触发、测量和通信线，检查共地、隔离与数据采集通道。`, "触发同步、接口方向和丢包", findKind("daq") || analyzer],
+        ["校准", "建立参考状态与自动测试脚本", "先手工完成基准测量，再用同一量程设置自动扫描；确认软件显示值与仪器读数一致。", "脚本参数、参考值和采样间隔", analyzer],
+        ["联调", "逐模块运行并联调闭环", `依次验证${primaryLabel}、数据采集、处理和显示；发现问题时回到单一模块逐步排除。`, "闭环响应、延迟和异常日志", detector, { mode: "scan" }],
+        ["验收", "完成重复测量与数据一致性检查", "自动重复至少三轮，比较均值、离散度和异常点；检查断电重启后的参数与版本。", "三轮一致性、版本记录和异常点", analyzer, { mode: "verify" }]
+      ],
+      general: [
+        ["安装", "按实验步骤安装样品与测量端", `固定${sample?.label || "待测样品"}、${meter?.label || "测量端"}和连接线，确保基准面一致并记录初始参数。`, "样品位置、连接状态和初始读数", sample],
+        ["校准", "完成零点、量程或参考测量", `对${meter?.label || "测量仪表"}做零点/量程检查，记录空白或标准件结果，确认偏差在允许范围。`, "零线、标准值和背景噪声", meter],
+        ["测量", "设置主参数并观察响应", `从安全起点逐步改变${primaryLabel}，观察${secondaryLabel}是否按预期变化；异常时立即回到初始状态。`, "响应方向、稳定时间和异常点", detector, { mode: "scan" }],
+        ["采集", "按计划完成多点或重复测量", "在覆盖工作范围的位置采集数据，每个测点保留两次读数；标出饱和、跳变和接触不良位置。", "数据范围、重复读数和异常点", analyzer, { mode: "scan", duration: "约 6–10 分钟" }],
+        ["复核", "计算不确定度并重复基准点", "完成初步计算后回到首尾基准点复测，比较漂移和环境变化；保存原始数据、单位和实验条件。", "拟合残差、漂移和重复性", analyzer, { mode: "verify" }]
+      ]
+    };
+
+    let middle = core[profile] || core.general;
+    if (profile === "professional-arduino") {
+      middle = [
+        ["接线", "完成 Arduino 超声测距接线", `断电后将 SR04 的 VCC/GND、Trig/Echo，LCD1602 的 I²C 引脚和蜂鸣器/LED 接入${findKind("mcu-board")?.label || "控制板"}。`, "引脚编号、5 V 供电和共地", findKind("mcu-board") || power],
+        ["下载", "下载测距与显示程序", "先运行最小串口测试，再烧录测距、显示和报警逻辑；确认串口输出的距离单位与刷新率。", "程序版本、串口数据和复位", findKind("computer") || analyzer],
+        ["校准", "用标尺标定超声波读数", "在不同距离放置平面挡板，记录标尺距离和串口读数；修正安装偏角与环境温度造成的小偏差。", "重复读数、回波丢失和量程上限", findKind("sensor-module") || sample],
+        ["报警", "验证显示与声光报警阈值", "改变挡板距离触发阈值，检查 LCD、蜂鸣器和 LED 是否同时动作；记录滞后距离。", "动作阈值、延迟和误触发", findKind("alarm", "lcd-module") || detector]
+      ];
+    } else if (profile === "professional-robotics" || profile === "professional-robot") {
+      middle = [
+        ["接线", "连接传感器、执行器和主控", `按接线图连接${findKind("sensor-module")?.label || "传感器"}、执行器和${findKind("mcu-board")?.label || "主控板"}，检查轮组和电源极性。`, "接口对应、电机转向和轮距", findKind("mcu-board") || power],
+        ["下载", "下载运动与避障程序", "先完成单轮和单传感器测试，再运行完整避障状态机；确认急停逻辑和通信超时。", "程序状态、串口日志和急停", findKind("computer") || analyzer],
+        ["标定", "标定传感器与运动参数", "在低速度下记录传感器读数、行驶距离和转向角度，调整速度环和转向零点。", "直线偏差、转向半径和测距误差", findKind("sensor-module") || detector],
+        ["测试", "执行直线、转向与避障测试", "在安全边界内逐项测试，记录每次触发、避障和停车动作；禁止无人看管运行。", "重复路径、碰撞边界和电池电压", findKind("robot") || analyzer, { mode: "scan" }]
+      ];
+    } else if (profile === "professional-modeling") {
+      middle = [
+        ["建模", "完成三维建模与切片", `在${findKind("computer")?.label || "工作站"}中建立模型，检查壁厚、装配间隙和坐标原点，再设置打印/加工参数。`, "模型尺寸、壁厚和支撑位置", findKind("computer") || analyzer],
+        ["准备", "校正设备并安装材料", `检查${findKind("printer")?.label || "数字制造设备"}的平台水平、喷头或刀具高度和安全罩，装载符合材料参数。`, "调平间隙、材料规格和急停", findKind("printer") || sample],
+        ["加工", "启动试切或首层打印", "先运行空走或首层测试，确认路径、附着和冷却正常后再开始完整加工。", "首层附着、运动干涉和异响", findKind("printer") || source, { mode: "scan" }],
+        ["检测", "测量成品关键尺寸", `使用${findKind("caliper")?.label || "精密量具"}测量孔径、壁厚和外形，记录与设计模型的偏差。`, "关键尺寸、翘曲和装配配合", findKind("caliper") || analyzer]
+      ];
+    } else if (profile === "professional-instruments") {
+      middle = [
+        ["安装", "识别光学仪器与光轴", `检查${findKind("optical-source")?.label || "光源"}、棱镜和光谱仪，按说明书确认望远镜、平行光管和载物台位置。`, "目镜视场、狭缝和光轴高度", findKind("spectrometer") || source],
+        ["校准", "完成自准直和零点校准", "用自准直法调平载物台，记录游标零点；检查狭缝宽度与谱线清晰度的关系。", "自准直像、左右游标差和零点", findKind("spectrometer") || analyzer],
+        ["观察", "观察色散与仪器读数", "放入棱镜或光栅，逐项观察零级、色散方向和游标读数，比较不同光源的谱线。", "谱线颜色、角度和视差", findKind("prism", "grating") || sample],
+        ["复核", "重复角度测量并记录", "交换左右游标读取同一谱线，重复三次；检查读数回差和最小偏向角条件。", "角度重复性、游标视差和仪器误差", analyzer, { mode: "verify" }]
+      ];
+    } else if (profile === "professional-light-path") {
+      middle = [
+        ["安装", "安装激光、反射镜与透镜", `将${source?.label || "光源"}、${findDevice("mirror-a")?.label || "反射镜"}、${findDevice("lens")?.label || "透镜"}和观察屏按导轨高度固定。`, "所有镜架中心高度和光斑位置", findDevice("mirror-a") || source],
+        ["校准", "逐面调节使光斑居中", "按“光源—第一镜—第二镜—屏”的顺序逐面微调，每次只改变一个自由度，观察光斑移动方向。", "光斑中心、回光和调节方向", findDevice("mirror-a") || detector],
+        ["聚焦", "移动透镜观察成像变化", `改变${secondaryLabel}，记录光斑最小位置和观察屏上的像；判断物距、像距与焦距的关系。`, "光斑尺寸、清晰度和像的位置", findDevice("lens") || detector],
+        ["复核", "锁紧镜架并重复测量", "锁紧锁紧螺钉后重新读取光斑和焦距，检查锁紧是否引入偏移；保留调整前后数据。", "锁紧漂移、重复性和功率变化", analyzer, { mode: "verify" }]
+      ];
+    } else if (profile === "professional-stereo") {
+      middle = [
+        ["安装", "固定双目相机与标定靶", "将立体相机固定在刚性支架上，调好基线、俯仰和左右曝光；标定靶保持平整且充满视场。", "左右图像同步、基线和镜头畸变", findKind("camera") || sample],
+        ["标定", "采集多姿态标定图像", "从不同角度和距离拍摄棋盘格/靶面，保证角点完整且分布均匀，再计算内外参。", "重投影误差、角点覆盖率和同步误差", findKind("camera") || analyzer],
+        ["拍摄", "采集立体视频与目标视差", "保持相机稳定拍摄目标运动，记录基线、帧率和同步信号；避免反光和滚动快门。", "视差连续性、遮挡和曝光一致", findKind("camera") || detector],
+        ["复核", "计算深度并检查显示延迟", "用标定参数重构目标深度，比较左右图像和显示延迟；重复静止靶验证测量重复性。", "深度误差、同步延迟和重复性", analyzer, { mode: "verify" }]
+      ];
+    } else if (profile === "professional-voice") {
+      middle = [
+        ["安装", "连接音频源、光发射与接收模块", `依次连接${findKind("optical-transceiver")?.label || "光收发模块"}、${fiber?.label || "光纤盘"}和音频源，检查电源与接地。`, "音频输入电平、光纤连接和电源噪声", findKind("optical-transceiver") || fiber],
+        ["校准", "调整偏置和接收增益", "先输入低幅正弦音，调整发射偏置与接收增益，使示波器波形不削顶且背景噪声较低。", "波形失真、基线噪声和接收幅度", findKind("scope") || detector],
+        ["测试", "传输单音、语音与静音", "逐项输入单音、语音和静音，记录输出波形与失真；检查光纤弯曲和接头松动的影响。", "信噪比、失真和串扰", findKind("scope") || analyzer],
+        ["复核", "重复链路测试并记录误码", "重新连接光纤后比较输出，记录链路损耗、延迟和异常片段；保存原始音频与波形。", "链路重复性、延迟和信号完整性", analyzer, { mode: "verify" }]
+      ];
+    }
+
+    if (middle.length < 5) {
+      middle.push([
+        "复核",
+        "重复关键条件并核对原始记录",
+        `回到代表性测点复测${primaryLabel}与${secondaryLabel}，检查连接、复位和环境变化造成的偏差；保留原始数据与截图。`,
+        "重复读数、保存版本和异常波动",
+        analyzer,
+        { mode: "verify" }
+      ]);
+    }
+
+    const finish = makeStep(
+      "复位",
+      "完成数据复核、关机和实验台复位",
+      `先关闭${source?.label || "主设备"}输出或降低驱动，再关闭${detector?.label || "测量端"}与电源；保留 ${state.config?.experiment?.name || info?.name || "本次实验"} 的原始数据、量程和截图，拆线后归位器材。`,
+      "关机顺序、数据版本、器材完整性和现场清洁",
+      analyzer,
+      {
+        guard: /激光|光电|干涉|衍射|偏振|激光/.test(profile)
+          ? "关闭光源后再拆除光学件；激光器需要按说明书冷却，禁止直接切断冷却系统。"
+          : "先降输出、后断电、再拆线；电容或高压端应放电后再接触。",
+        duration: "约 2–4 分钟",
+        mode: "reset"
+      }
+    );
+
+    return [first, ...middle.map((item) => makeStep(...item)), finish];
   }
 
   function updateProcessUI() {
@@ -846,13 +1659,43 @@
     if (!step) return;
     const total = steps.length;
     const count = $("#lab-3d-step-count");
+    const stage = $("#lab-3d-step-stage");
+    const duration = $("#lab-3d-step-duration");
+    const status = $("#lab-3d-step-status");
+    const track = $("#lab-3d-step-track");
     const title = $("#lab-3d-step-title");
     const detail = $("#lab-3d-step-detail");
+    const observe = $("#lab-3d-step-observe");
+    const guard = $("#lab-3d-step-guard");
     const bar = $(".lab-3d-progress i");
     const autoButton = $("#lab-3d-auto-step");
     if (count) count.textContent = `实验过程 ${String(state.processStep + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+    if (stage) stage.textContent = step.stage || "操作";
+    if (duration) duration.textContent = step.duration || "约 3–5 分钟";
+    if (status) status.textContent = state.processStep === total - 1 ? "最后一步" : `第 ${state.processStep + 1} 阶段`;
     if (title) title.textContent = step.title;
     if (detail) detail.textContent = step.detail;
+    if (observe) observe.textContent = step.observe || "读数、波形和连接状态";
+    if (guard) guard.textContent = step.guard || "按仪器铭牌和指导书执行，异常时立即停止。";
+    if (track) {
+      track.replaceChildren(...steps.map((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.title = `${String(index + 1).padStart(2, "0")} ${item.title}`;
+        button.classList.toggle("active", index === state.processStep);
+        button.classList.toggle("done", index < state.processStep);
+        button.dataset.processStep = String(index);
+        const fill = document.createElement("i");
+        const label = document.createElement("span");
+        label.textContent = item.stage || String(index + 1).padStart(2, "0");
+        button.append(fill, label);
+        button.addEventListener("click", () => {
+          state.autoTour = false;
+          setProcessStep(index);
+        });
+        return button;
+      }));
+    }
     if (bar) bar.style.width = `${((state.processStep + 1) / total) * 100}%`;
     if (autoButton) {
       autoButton.classList.toggle("active", state.autoTour);
@@ -877,6 +1720,7 @@
       state.selectedId = targetId;
       updateSelectionHelper();
       updateHud();
+      if (state.cameraState.viewMode === "focus") setViewPreset("focus");
     }
     updateProcessUI();
   }
@@ -927,6 +1771,8 @@
       })
     );
     core.userData.connectionType = halo.userData.connectionType = "optical";
+    core.userData.baseOpacity = 0.96;
+    halo.userData.baseOpacity = 0.09;
     state.beamGroup.add(core, halo);
     for (let pulseIndex = 0; pulseIndex < 3; pulseIndex += 1) {
       const pulse = new THREE.Mesh(
@@ -940,13 +1786,15 @@
         })
       );
       pulse.userData.connectionType = "optical";
+      pulse.userData.baseOpacity = 0.68;
       state.beamGroup.add(pulse);
       state.animatedObjects.push({
         type: "beamPulse",
         curve,
         object: pulse,
         offset: (index * 0.19 + pulseIndex / 3) % 1,
-        speed: 0.075 + index * 0.004
+        speed: 0.075 + index * 0.004,
+        baseSpeed: 0.075 + index * 0.004
       });
     }
   }
@@ -988,10 +1836,12 @@
       const tube = makeTube([from, middle, to], 0.018, new state.three.Color(color), 0.86);
       tube.userData.connectionType = "cable";
       tube.userData.standard = connection.standard;
+      tube.userData.baseOpacity = 0.86;
       state.cableGroup.add(tube);
       const stripe = makeTube([from, middle, to], 0.006, new state.three.Color(color).offsetHSL(0, -0.16, 0.2), 0.72);
       stripe.position.y = 0.012;
       stripe.userData.connectionType = "cable";
+      stripe.userData.baseOpacity = 0.72;
       state.cableGroup.add(stripe);
       [from, to].forEach((point) => {
         const connector = new state.three.Mesh(
@@ -1000,18 +1850,35 @@
         );
         connector.position.copy(point);
         connector.rotation.x = Math.PI / 2;
+        connector.userData.connectionType = "cable";
+        connector.userData.baseOpacity = 1;
         state.cableGroup.add(connector);
       });
     });
   }
 
   function updateSceneAnimations(time) {
+    const currentStep = state.processSteps[state.processStep] || {};
+    const mode = currentStep.mode || "operate";
+    const speedFactor = mode === "scan" ? 1.9 : mode === "verify" ? 1.25 : mode === "prepare" ? 0.45 : mode === "reset" ? 0.2 : 1;
+    const beamFactor = mode === "prepare" ? 0.18 : mode === "install" ? 0.48 : mode === "align" ? 0.78 : mode === "reset" ? 0.1 : 1;
+    const cableFactor = mode === "prepare" ? 0.3 : mode === "install" ? 0.8 : mode === "reset" ? 0.12 : 0.92;
     state.animatedObjects.forEach((entry) => {
       if (entry.type !== "beamPulse") return;
-      const progress = (time * 0.001 * entry.speed + entry.offset) % 1;
+      const progress = (time * 0.001 * entry.baseSpeed * speedFactor + entry.offset) % 1;
       entry.object.position.copy(entry.curve.getPointAt(progress));
       const pulseScale = 0.72 + Math.sin(time * 0.006 + entry.offset * 8) * 0.22;
       entry.object.scale.setScalar(pulseScale);
+      entry.object.material.opacity = entry.object.userData.baseOpacity * beamFactor;
+    });
+    [state.beamGroup, state.cableGroup].forEach((group, index) => {
+      if (!group) return;
+      const factor = index === 0 ? beamFactor : cableFactor;
+      group.children.forEach((node) => {
+        if (node.material && node.userData.baseOpacity != null) {
+          node.material.opacity = node.userData.baseOpacity * factor;
+        }
+      });
     });
     state.deviceGroups.forEach((group, id) => {
       group.traverse((node) => {
@@ -1081,7 +1948,8 @@
     title.textContent = device.label;
     const ports = window.OptilabPanorama?.getPorts(id) || ["MEASURE", "GND"];
     const detail = document.createElement("small");
-    detail.textContent = `${device.variant ? `型号特征 ${device.variant}` : "标准器材"} · 端口 ${ports.join(" / ")}`;
+    const modelLabel = DEVICE_KIND_LABELS[deviceKind(device)] || "实验仪器";
+    detail.textContent = `${modelLabel} · ${device.variant ? `型号特征 ${device.variant}` : "标准实验室配置"} · 端口 ${ports.join(" / ")}`;
     tooltip.replaceChildren(title, detail);
     const rect = state.canvas.getBoundingClientRect();
     const x = clamp(event.clientX - rect.left, 8, Math.max(8, rect.width - 210));
@@ -1227,6 +2095,9 @@
       `器材特征：${state.presetInfo.equipmentTraits.join(" · ") || state.presetInfo.name}`
     );
     const selected = state.presetInfo.devices.find((device) => device.id === state.selectedId);
+    document.querySelectorAll("[data-panorama-device]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.panoramaDevice === state.selectedId);
+    });
     $("#panorama-selected") && ($("#panorama-selected").textContent = `正在观察：${selected?.label || "实验器件"}`);
     $("#panorama-port-map") && ($("#panorama-port-map").textContent =
       `端口：${selected ? window.OptilabPanorama.getPorts(selected.id).join(" · ") : "—"}`
@@ -1275,13 +2146,43 @@
       optical: { theta: Math.PI * 0.42, phi: Math.PI * 0.39, radius: 7.7 },
       top: { theta: Math.PI * 0.5, phi: 0.22, radius: 8.6 }
     };
-    const view = presets[name] || presets.overview;
-    state.cameraState.theta = view.theta;
-    state.cameraState.phi = view.phi;
-    state.cameraState.radius = view.radius;
+    state.cameraState.viewMode = name;
+    if (name === "focus") {
+      const selected = state.deviceGroups.get(state.selectedId);
+      if (selected) {
+        state.cameraState.target = {
+          x: selected.position.x,
+          y: selected.position.y + 0.42,
+          z: selected.position.z
+        };
+        state.cameraState.theta = Math.PI * 0.42;
+        state.cameraState.phi = Math.PI * 0.39;
+        state.cameraState.radius = 3.8;
+      }
+    } else {
+      frameScene();
+      const view = presets[name] || presets.overview;
+      state.cameraState.theta = view.theta;
+      state.cameraState.phi = view.phi;
+      state.cameraState.radius = view.radius;
+    }
     document.querySelectorAll("[data-3d-view]").forEach((button) => {
       button.classList.toggle("active", button.dataset["3dView"] === name);
     });
+  }
+
+  function handleDoubleClick(event) {
+    updateRayPointer(event);
+    const hits = state.raycaster.intersectObjects([...state.deviceGroups.values()], true);
+    const id = deviceIdFromObject(hits[0]?.object);
+    if (id) {
+      state.selectedId = id;
+      updateSelectionHelper();
+      updateHud();
+      setViewPreset("focus");
+    } else {
+      setViewPreset("overview");
+    }
   }
 
   function updateCamera() {
@@ -1375,7 +2276,15 @@
     canvas.addEventListener("pointercancel", pointerUp);
     canvas.addEventListener("pointerleave", hideTooltip);
     canvas.addEventListener("wheel", wheel, { passive: false });
-    canvas.addEventListener("dblclick", () => setViewPreset("overview"));
+    canvas.addEventListener("dblclick", handleDoubleClick);
+    $("#panorama-device-list")?.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-panorama-device]");
+      if (!button || !state.deviceGroups.has(button.dataset.panoramaDevice)) return;
+      state.selectedId = button.dataset.panoramaDevice;
+      updateSelectionHelper();
+      updateHud();
+      if (state.cameraState.viewMode === "focus") setViewPreset("focus");
+    });
     $("#panorama-reset-layout")?.addEventListener("click", resetLayout);
     $("#panorama-toggle-cables")?.addEventListener("click", () => {
       state.showCables = !state.showCables;
@@ -1407,6 +2316,14 @@
     getPreset: () => state.presetInfo,
     getSelected: () => state.selectedId,
     getDeviceCount: () => state.deviceGroups.size,
+    getProcess: () => ({
+      index: state.processStep,
+      total: state.processSteps.length,
+      steps: state.processSteps.map((step) => ({ ...step }))
+    }),
+    getDeviceKinds: () => Object.fromEntries(
+      [...state.deviceGroups.entries()].map(([id, group]) => [id, group.userData.kind || "generic"])
+    ),
     getPositions: () => Object.fromEntries(
       [...state.deviceGroups.entries()].map(([id, group]) => [
         id,
