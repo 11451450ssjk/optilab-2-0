@@ -166,7 +166,9 @@
     const power = hasOptics
       ? clamp((0.8 + sourceDrive * 3.8) * alignment, 0.08, 12)
       : clamp((0.2 + sourceDrive * 5.2) * connectivity, 0.03, 26);
-    const frequency = /Hz/i.test(`${experiment.secondaryUnit || ""} ${options.secondaryUnit || ""}`)
+    const frequency = Number.isFinite(Number(options.frequencyHz))
+      ? clamp(Math.abs(Number(options.frequencyHz)), 0.01, 250000)
+      : /Hz/i.test(`${experiment.secondaryUnit || ""} ${options.secondaryUnit || ""}`)
       ? clamp(Math.abs(secondary || 1000), 10, 250000)
       : /ms|µs|us|ns/i.test(`${experiment.primaryUnit || ""} ${options.primaryUnit || ""}`) && primary > 0
         ? clamp(1000 / primary, 0.01, 250000)

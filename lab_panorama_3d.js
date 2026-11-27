@@ -19,6 +19,7 @@
     orbit: null,
     deviceGroups: new Map(),
     proceduralGroups: new Map(),
+    deviceControls: new Map(),
     initialPositions: new Map(),
     dynamicTextures: [],
     selectionHelper: null,
@@ -349,6 +350,7 @@
     const safePrimary = Number.isFinite(primary) ? primary : 0;
     const safeSecondary = Number.isFinite(secondary) ? secondary : 0;
     const experimentName = String(config.experiment?.name || state.presetInfo?.name || "实验");
+    const controls = state.deviceControls.get(device.id) || {};
     const unified = window.OptilabPhysics?.calculate(
       config.experiment || { sim: "measurement" },
       safePrimary,
@@ -359,7 +361,8 @@
     const secondaryIsVoltage = /v(olt)?|伏/i.test(`${config.secondaryLabel || ""} ${secondaryUnit}`);
     const primaryIsCurrent = /a(mp|mpere)?|安/i.test(`${config.primaryLabel || ""} ${primaryUnit}`);
     const secondaryIsCurrent = /a(mp|mpere)?|安/i.test(`${config.secondaryLabel || ""} ${secondaryUnit}`);
-    const frequencyFromConfig = /hz/i.test(primaryUnit) ? safePrimary :
+    const frequencyFromConfig = controls.frequency != null ? Number(controls.frequency) :
+      /hz/i.test(primaryUnit) ? safePrimary :
       /hz/i.test(secondaryUnit) ? safeSecondary :
         /(^|\s)(ms|s)(\s|$)/i.test(primaryUnit) && safePrimary > 0 ? 1000 / Math.abs(safePrimary) :
           state.metrics.frequency;
@@ -367,16 +370,22 @@
     const wavelength = /nm/i.test(primaryUnit) ? Math.abs(safePrimary) :
       device.variant === "hene" ? 632.8 :
         clamp(430 + Math.abs(safePrimary % 360), 405, 780);
-    const supplyVoltage = primaryIsVoltage ? Math.abs(safePrimary) :
+    const supplyVoltage = controls.voltage != null ? Number(controls.voltage) :
+      primaryIsVoltage ? Math.abs(safePrimary) :
       secondaryIsVoltage ? Math.abs(safeSecondary) :
         clamp(5 + Math.abs(safePrimary % 24), 0, 30);
-    const supplyCurrent = primaryIsCurrent ? Math.abs(safePrimary) :
+    const supplyCurrent = controls.currentLimit != null ? Number(controls.currentLimit) :
+      primaryIsCurrent ? Math.abs(safePrimary) :
       secondaryIsCurrent ? Math.abs(safeSecondary) :
         clamp(state.metrics.power / Math.max(supplyVoltage, 1), 0.01, 5);
     const scopeFrequency = clamp(frequency, 10, 200000);
-    const scopeTimebase = scopeFrequency >= 1e6 ? "100 ns/div" :
-      scopeFrequency >= 1e3 ? "100 µs/div" : "10 ms/div";
-    const scopeAmplitude = /v/i.test(primaryUnit) ? Math.abs(safePrimary) :
+    const timeDefinition = deviceControlDefinitions(device).find((definition) => definition.key === "timeDiv");
+    const scopeTimebase = controls.timeDiv != null
+      ? timeDefinition?.options?.find(([value]) => String(value) === String(controls.timeDiv))?.[1] || "时基已设置"
+      : scopeFrequency >= 1e6 ? "100 ns/div" :
+        scopeFrequency >= 1e3 ? "100 µs/div" : "10 ms/div";
+    const scopeAmplitude = controls.amplitude != null ? Number(controls.amplitude) :
+      /v/i.test(primaryUnit) ? Math.abs(safePrimary) :
       /v/i.test(secondaryUnit) ? Math.abs(safeSecondary) :
         clamp(0.2 + Math.abs(safeSecondary % 4) * 0.45, 0.1, 10);
     const distanceValue = /cm/i.test(primaryUnit) ? Math.abs(safePrimary) / 100 :
@@ -384,13 +393,20 @@
         /(^|\s)m(\s|$)/i.test(primaryUnit) ? Math.abs(safePrimary) :
           /(^|\s)m(\s|$)/i.test(secondaryUnit) ? Math.abs(safeSecondary) : 0.428;
     const distance = clamp(distanceValue, 0.02, 5);
-    const temperatureValue = /°c|℃/i.test(primaryUnit) ? safePrimary :
+    const temperatureValue = controls.targetTemperature != null ? Number(controls.targetTemperature) :
+      controls.temperature != null ? Number(controls.temperature) :
+        /°c|℃/i.test(primaryUnit) ? safePrimary :
       /°c|℃/i.test(secondaryUnit) ? safeSecondary : 25.0;
     const temperature = clamp(temperatureValue, -20, 150);
     const peakWavelength = /nm/i.test(primaryUnit) ? clamp(Math.abs(safePrimary), 200, 1100) : 546.1;
-    const exposureMs = /(曝光|积分)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) :
+    const exposureMs = controls.exposure != null ? Number(controls.exposure) :
+      /(曝光|积分)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) :
       clamp(10, 0.1, 100);
-    const gain = /(增益)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) : 1;
+    const gain = controls.gain != null ? Number(controls.gain) :
+      /(增益)/.test(config.primaryLabel || "") ? Math.abs(safePrimary) : 1;
+    const displayPower = controls.output != null
+      ? state.metrics.power * Number(controls.output) / 70
+      : state.metrics.power;
     return {
       experimentName,
       primary: safePrimary,
@@ -401,7 +417,7 @@
       secondaryText: unitText(safeSecondary, secondaryUnit),
       frequencyText: unitText(frequency, "Hz", frequency >= 1000 ? 1 : 2),
       wavelengthText: unitText(wavelength, "nm", 1),
-      powerText: `${formatNumber(state.metrics.power, state.metrics.power < 1 ? 3 : 2)} ${state.metrics.powerUnit || "mW"}`,
+      powerText: `${formatNumber(displayPower, displayPower < 1 ? 3 : 2)} ${state.metrics.powerUnit || "mW"}`,
       voltageText: unitText(supplyVoltage, "V", 2),
       currentText: unitText(supplyCurrent, "A", supplyCurrent < 1 ? 3 : 2),
       supplyVoltage,
@@ -906,7 +922,8 @@
       addPart(group, device, new THREE.TorusGeometry(0.22, 0.035, 12, 32), blackMetal, [0, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.CircleGeometry(0.195, 32), glassMaterial, [-0.008, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.16, 0.006, 6, 32), accentMaterial, [-0.018, 0.53, 0], [0, Math.PI / 2, 0]);
-      addPart(group, device, new THREE.BoxGeometry(0.08, 0.2, 0.06), blackMetal, [0.02, 0.35, 0.17]);
+      const focusKnob = addPart(group, device, new THREE.BoxGeometry(0.08, 0.2, 0.06), blackMetal, [0.02, 0.35, 0.17]);
+      focusKnob.userData.focusKnob = true;
     } else if (kind === "sample") {
       if (device.variant === "solar" || /光伏|太阳能/.test(device.label)) {
         addPart(group, device, new THREE.BoxGeometry(0.7, 0.055, 0.54), blackMetal, [0, 0.18, 0], [-0.3, 0, 0]);
@@ -1317,7 +1334,8 @@
       addPart(group, device, new THREE.CylinderGeometry(0.095, 0.13, 0.46, 24), bodyMaterial, [0.12, 0.68, 0], [0, 0, -0.24]);
       addPart(group, device, new THREE.CylinderGeometry(0.07, 0.07, 0.16, 22), blackMetal, [0.28, 0.9, 0], [0, 0, -0.24]);
       addPart(group, device, new THREE.CylinderGeometry(0.025, 0.012, 0.18, 14), steelMaterial, [-0.05, 0.5, 0]);
-      addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.035, 22), accentMaterial, [0.28, 0.42, 0], [Math.PI / 2, 0, 0]);
+      const focusKnob = addPart(group, device, new THREE.CylinderGeometry(0.075, 0.075, 0.035, 22), accentMaterial, [0.28, 0.42, 0], [Math.PI / 2, 0, 0]);
+      focusKnob.userData.focusKnob = true;
     } else if (kind === "millikan-chamber") {
       addPart(group, device, new THREE.BoxGeometry(0.62, 0.42, 0.56), glassMaterial, [0, 0.34, 0]);
       addPart(group, device, new THREE.BoxGeometry(0.68, 0.045, 0.62), blackMetal, [0, 0.15, 0]);
@@ -1764,6 +1782,8 @@
       const group = createDeviceLOD(device, detail);
       state.deviceGroups.set(device.id, group);
       state.scene.add(group);
+      ensureDeviceControls(device);
+      applyDeviceControls(device.id, false);
       hydrateImportedModel(device, group);
     });
     if (!state.beamGroup) {
@@ -2215,7 +2235,16 @@
   function deviceWorldPoint(id, y = 0.48) {
     const group = state.deviceGroups.get(id);
     if (!group) return null;
-    return new state.three.Vector3(group.position.x, y, group.position.z);
+    const detail = state.proceduralGroups.get(id);
+    const localOffset = detail
+      ? new state.three.Vector3(detail.position.x, 0, detail.position.z)
+      : new state.three.Vector3();
+    localOffset.applyAxisAngle(new state.three.Vector3(0, 1, 0), group.rotation.y);
+    return new state.three.Vector3(
+      group.position.x + localOffset.x,
+      y + (detail?.position.y || 0),
+      group.position.z + localOffset.z
+    );
   }
 
   function makeTube(points, radius, color, opacity = 0.85) {
@@ -2302,6 +2331,12 @@
         if (!from || !to) continue;
         const mid = from.clone().lerp(to, 0.5);
         mid.y += 0.045;
+        const bendSource = state.deviceControls.get(ids[index + 1]) || state.deviceControls.get(ids[index]) || {};
+        const pitch = Number(bendSource.pitch || 0) * Math.PI / 180;
+        const azimuth = Number(bendSource.azimuth || 0) * Math.PI / 180;
+        const span = from.distanceTo(to);
+        mid.y += Math.tan(pitch) * span * 0.32;
+        mid.z += Math.tan(azimuth) * span * 0.32;
         makeBeam([from, mid, to], beamColor, pathIndex + index);
       }
     });
@@ -2555,21 +2590,49 @@
         return total + (group && origin ? Math.hypot(group.position.x - origin.x, group.position.z - origin.z) / 5.2 : 0);
       }, 0) / devices.length;
     };
-    const alignment = optical.length ? clamp(0.91 - deviation(optical) * 0.8, 0.18, 0.98) : 0.84;
+    const controlPenalty = optical.length
+      ? optical.reduce((total, device) => {
+        const controls = state.deviceControls.get(device.id) || {};
+        return total +
+          Math.abs(Number(controls.pitch) || 0) / 120 +
+          Math.abs(Number(controls.azimuth) || 0) / 120 +
+          Math.abs(Number(controls.fineFocus) || 0) / 12 +
+          Math.abs(Number(controls.coarseFocus) || 0) / 120;
+      }, 0) / optical.length
+      : 0;
+    const alignment = optical.length
+      ? clamp(0.91 - deviation(optical) * 0.8 - controlPenalty, 0.18, 0.98)
+      : 0.84;
     const connectivity = electronic.length ? clamp(0.92 - deviation(electronic) * 0.95, 0.2, 0.98) : 0.74;
     const hasOptics = optical.length >= 2;
     const hasElectronics = electronic.length >= 2;
+    const powerDevice = info.devices.find((device) => deviceKind(device) === "power-supply");
+    const generatorDevice = info.devices.find((device) => deviceKind(device) === "generator");
+    const effectivePrimary = state.deviceControls.get(powerDevice?.id)?.voltage
+      ?? state.config?.primary;
+    const effectiveSecondary = state.deviceControls.get(generatorDevice?.id)?.frequency
+      ?? state.config?.secondary;
     const unified = window.OptilabPhysics?.computeScene(state.config?.experiment || {}, {
-      primary: state.config?.primary,
-      secondary: state.config?.secondary,
+      primary: effectivePrimary,
+      secondary: effectiveSecondary,
       primaryUnit: state.config?.primaryUnit,
       secondaryUnit: state.config?.secondaryUnit,
+      frequencyHz: state.deviceControls.get(generatorDevice?.id)?.frequency,
       alignment,
       connectivity,
       hasOptics,
       hasElectronics
     });
-    if (unified?.metrics) return unified.metrics;
+    if (unified?.metrics) {
+      const sourceDevice = info.devices.find((device) => ["laser", "optical-source"].includes(deviceKind(device)));
+      const sourceOutput = Number(state.deviceControls.get(sourceDevice?.id)?.output);
+      const attenuation = info.devices
+        .map((device) => Number(state.deviceControls.get(device.id)?.attenuation) || 0)
+        .reduce((total, value) => total + value, 0);
+      if (Number.isFinite(sourceOutput)) unified.metrics.power *= sourceOutput / 70;
+      if (attenuation > 0) unified.metrics.power *= 10 ** (-attenuation / 10);
+      return unified.metrics;
+    }
     const sourceDrive = clamp(Math.abs(Number(state.config?.primary) || 1) / 20, 0.18, 1);
     const power = hasOptics
       ? clamp((0.8 + sourceDrive * 3.8) * alignment, 0.08, 12)
@@ -2627,6 +2690,197 @@
     refreshInspector();
   }
 
+  function deviceControlDefinitions(device) {
+    const kind = deviceKind(device);
+    const config = state.config || {};
+    const primary = Number(config.primary);
+    const secondary = Number(config.secondary);
+    const supplyVoltageDefault = /v(olt)?|伏/i.test(`${config.primaryLabel || ""} ${config.primaryUnit || ""}`)
+      ? Math.abs(primary) : 12;
+    const supplyCurrentDefault = /a(mp|mpere)?|安/i.test(`${config.secondaryLabel || ""} ${config.secondaryUnit || ""}`)
+      ? Math.abs(secondary) : 1.5;
+    const generatorFrequencyDefault = /hz/i.test(config.secondaryUnit || "")
+      ? Math.abs(secondary) : /hz/i.test(config.primaryUnit || "") ? Math.abs(primary) : 1000;
+    const defs = [
+      { key: "offsetX", label: "前后位置微调", min: -30, max: 30, step: 0.5, value: 0, unit: "mm" },
+      { key: "offsetZ", label: "横向位置微调", min: -30, max: 30, step: 0.5, value: 0, unit: "mm" },
+      { key: "yaw", label: "支架水平旋转", min: -15, max: 15, step: 0.25, value: 0, unit: "°" }
+    ];
+    if (kind === "mirror") {
+      defs.push(
+        { key: "pitch", label: "反射镜俯仰角", min: -8, max: 8, step: 0.05, value: 0, unit: "°" },
+        { key: "azimuth", label: "反射镜水平偏转", min: -8, max: 8, step: 0.05, value: 0, unit: "°" }
+      );
+    } else if (kind === "lens" || kind === "microscope") {
+      defs.push(
+        { key: "coarseFocus", label: "粗调焦位置", min: -25, max: 25, step: 0.5, value: 0, unit: "mm" },
+        { key: "fineFocus", label: "细准焦螺旋", min: -3, max: 3, step: 0.02, value: 0, unit: "mm" },
+        { key: "aperture", label: "通光孔径", min: 10, max: 100, step: 1, value: 100, unit: "%" }
+      );
+    } else if (kind === "laser" || kind === "optical-source") {
+      defs.push(
+        { key: "output", label: "输出功率", min: 0, max: 100, step: 1, value: 70, unit: "%" },
+        { key: "beamHeight", label: "出光高度", min: -15, max: 15, step: 0.2, value: 0, unit: "mm" }
+      );
+    } else if (kind === "scope") {
+      defs.push(
+        { key: "voltsDiv", label: "垂直档位", type: "select", value: "1", options: [["0.1", "100 mV/div"], ["0.2", "200 mV/div"], ["0.5", "500 mV/div"], ["1", "1 V/div"], ["2", "2 V/div"], ["5", "5 V/div"], ["10", "10 V/div"]] },
+        { key: "timeDiv", label: "水平时基", type: "select", value: "1e-4", options: [["1e-6", "1 µs/div"], ["1e-5", "10 µs/div"], ["1e-4", "100 µs/div"], ["1e-3", "1 ms/div"], ["1e-2", "10 ms/div"], ["1e-1", "100 ms/div"]] },
+        { key: "trigger", label: "触发电平", min: -50, max: 50, step: 1, value: 0, unit: "%" }
+      );
+    } else if (kind === "power-supply") {
+      defs.push(
+        { key: "voltage", label: "输出电压", min: 0, max: 30, step: 0.1, value: supplyVoltageDefault, unit: "V" },
+        { key: "currentLimit", label: "限流值", min: 0.01, max: 5, step: 0.01, value: supplyCurrentDefault, unit: "A" }
+      );
+    } else if (kind === "generator") {
+      defs.push(
+        { key: "frequency", label: "输出频率", min: 1, max: 100000, step: 1, value: generatorFrequencyDefault, unit: "Hz" },
+        { key: "amplitude", label: "输出幅度", min: 0, max: 10, step: 0.05, value: 1, unit: "Vpp" }
+      );
+    } else if (kind === "polarizer") {
+      defs.push({ key: "angle", label: "偏振片方位角", min: 0, max: 180, step: 1, value: 0, unit: "°" });
+    } else if (kind === "spectrometer") {
+      defs.push({ key: "turretAngle", label: "光栅/棱镜转台", min: -90, max: 90, step: 0.1, value: 0, unit: "°" });
+    } else if (kind === "camera" || kind === "thermal-camera" || kind === "beam-profiler") {
+      defs.push(
+        { key: "exposure", label: "曝光时间", min: 0.1, max: 100, step: 0.1, value: 10, unit: "ms" },
+        { key: "gain", label: "增益", min: 1, max: 16, step: 0.1, value: 1, unit: "×" },
+        { key: "cameraFocus", label: "镜头调焦", min: -5, max: 5, step: 0.02, value: 0, unit: "mm" }
+      );
+    } else if (kind === "sample") {
+      defs.push(
+        { key: "sampleAngle", label: "样品转角", min: -180, max: 180, step: 0.5, value: 0, unit: "°" },
+        { key: "temperature", label: "样品温度", min: -20, max: 150, step: 0.1, value: 25, unit: "°C" }
+      );
+    } else if (kind === "fiber-spool" || kind === "fiber-coupler") {
+      defs.push(
+        { key: "attenuation", label: "附加衰减", min: 0, max: 30, step: 0.1, value: 0, unit: "dB" },
+        { key: "polarization", label: "偏振控制", min: 0, max: 360, step: 1, value: 0, unit: "°" }
+      );
+    } else if (kind === "heater" || kind === "calorimeter") {
+      defs.push(
+        { key: "targetTemperature", label: "目标温度", min: 20, max: 120, step: 0.1, value: 50, unit: "°C" },
+        { key: "heatingRate", label: "升温速率", min: 0.1, max: 10, step: 0.1, value: 2, unit: "°C/min" }
+      );
+    } else if (kind === "mcu-board") {
+      defs.push(
+        { key: "clock", label: "系统时钟", min: 1, max: 200, step: 1, value: 16, unit: "MHz" },
+        { key: "ioVoltage", label: "IO 电平", type: "select", value: "5", options: [["3.3", "3.3 V"], ["5", "5 V"]] }
+      );
+    } else if (kind === "logic-analyzer" || kind === "daq") {
+      defs.push(
+        { key: "sampleRate", label: "采样率", min: 1000, max: 100000000, step: 1000, value: 1000000, unit: "Sa/s" },
+        { key: "threshold", label: "逻辑门限", min: 0, max: 5, step: 0.01, value: 1.65, unit: "V" }
+      );
+    }
+    return defs;
+  }
+
+  function ensureDeviceControls(device) {
+    if (state.deviceControls.has(device.id)) return state.deviceControls.get(device.id);
+    const controls = Object.fromEntries(deviceControlDefinitions(device).map((definition) => [
+      definition.key,
+      definition.type === "select" ? definition.value : Number(definition.value)
+    ]));
+    state.deviceControls.set(device.id, controls);
+    return controls;
+  }
+
+  function controlDisplay(definition, value) {
+    if (definition.type === "select") {
+      return definition.options?.find(([optionValue]) => String(optionValue) === String(value))?.[1] || String(value);
+    }
+    const numeric = Number(value);
+    return `${formatNumber(numeric, definition.step < 0.1 ? 2 : definition.step < 1 ? 1 : 0)}${definition.unit ? ` ${definition.unit}` : ""}`;
+  }
+
+  function applyDeviceControls(id, refresh = true) {
+    const lod = state.deviceGroups.get(id);
+    const device = state.presetInfo?.devices.find((item) => item.id === id);
+    const origin = state.initialPositions.get(id);
+    if (!lod || !device || !origin) return;
+    const controls = ensureDeviceControls(device);
+    lod.position.x = origin.x + Number(controls.offsetX || 0) * 0.018;
+    lod.position.z = origin.z + Number(controls.offsetZ || 0) * 0.018;
+    lod.rotation.y = Number(controls.yaw || 0) * Math.PI / 180;
+    const detail = state.proceduralGroups.get(id);
+    if (detail) {
+      detail.rotation.x = Number(controls.pitch || 0) * Math.PI / 180;
+      detail.rotation.z = Number(controls.azimuth || 0) * Math.PI / 180;
+      detail.position.x = (
+        Number(controls.coarseFocus || 0) * 0.012 +
+        Number(controls.fineFocus || 0) * 0.03 +
+        Number(controls.cameraFocus || 0) * 0.018
+      );
+      detail.position.y = Number(controls.beamHeight || 0) * 0.002;
+      detail.rotation.y = Number(controls.sampleAngle || controls.angle || controls.turretAngle || controls.polarization || 0) * Math.PI / 180;
+      detail.traverse((node) => {
+        if (!node.userData?.focusKnob) return;
+        if (!node.userData.focusBaseRotation) {
+          node.userData.focusBaseRotation = {
+            x: node.rotation.x,
+            y: node.rotation.y,
+            z: node.rotation.z
+          };
+        }
+        node.rotation.z = node.userData.focusBaseRotation.z + Number(controls.fineFocus || 0) * 0.85;
+      });
+    }
+    if (!refresh) return;
+    updateSelectionHelper();
+    rebuildConnections();
+    updateHud();
+    state.dynamicTextures.forEach((entry) => drawPanelTexture(entry, performance.now(), state.config || {}));
+  }
+
+  function renderDeviceControls(device) {
+    const list = $("#lab-3d-control-list");
+    if (!list) return;
+    const definitions = deviceControlDefinitions(device);
+    const controls = ensureDeviceControls(device);
+    list.replaceChildren(...definitions.map((definition) => {
+      const item = document.createElement("label");
+      item.className = "lab-3d-control-item";
+      const label = document.createElement("span");
+      label.className = "lab-3d-control-label";
+      const name = document.createElement("span");
+      const output = document.createElement("strong");
+      name.textContent = definition.label;
+      output.textContent = controlDisplay(definition, controls[definition.key]);
+      label.append(name, output);
+      let input;
+      if (definition.type === "select") {
+        input = document.createElement("select");
+        definition.options?.forEach(([value, text]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = text;
+          input.append(option);
+        });
+        input.value = String(controls[definition.key]);
+      } else {
+        input = document.createElement("input");
+        input.type = "range";
+        input.min = String(definition.min);
+        input.max = String(definition.max);
+        input.step = String(definition.step);
+        input.value = String(controls[definition.key]);
+      }
+      input.dataset.controlKey = definition.key;
+      input.addEventListener("input", () => {
+        controls[definition.key] = definition.type === "select" ? input.value : Number(input.value);
+        output.textContent = controlDisplay(definition, controls[definition.key]);
+        applyDeviceControls(device.id);
+        refreshInspector();
+      });
+      item.append(label, input);
+      return item;
+    }));
+    const note = $("#lab-3d-control-note");
+    if (note) note.textContent = `${definitions.length} 项独立调节 · 实时联动`;
+  }
+
   function inspectorReadout(kind, display) {
     const readouts = {
       laser: `${display.wavelengthText} · ${display.powerText}`,
@@ -2667,6 +2921,7 @@
   function deviceInspectorData(device) {
     const kind = deviceKind(device);
     const display = liveDisplayData(device, state.config || {});
+    const liveControls = state.deviceControls.get(device.id) || {};
     const specs = [];
     const add = (label, value) => specs.push([label, String(value)]);
     add("结构类型", DEVICE_KIND_LABELS[kind] || "实验仪器");
@@ -2689,6 +2944,10 @@
         add("调节轴", "θx / θy 二维微调");
         add("镜架", "M4 锁定 · 三螺钉");
         add("安装高度", "中心 50 mm");
+        if (kind === "mirror") {
+          add("当前俯仰", `${formatNumber(Number(liveControls.pitch) || 0, 2)}°`);
+          add("当前偏转", `${formatNumber(Number(liveControls.azimuth) || 0, 2)}°`);
+        }
         break;
       case "lens":
         add("通光口径", "25.4 mm");
@@ -2696,6 +2955,7 @@
         add("镀膜", "400–700 nm 增透");
         add("表面质量", "40–20 scratch-dig");
         add("安装", "SM1 透镜架");
+        add("细准焦", `${formatNumber(Number(liveControls.fineFocus) || 0, 2)} mm`);
         break;
       case "scope":
         add("带宽", "100 MHz");
@@ -2996,6 +3256,7 @@
     }
     panel.hidden = false;
     state.inspectorId = id;
+    renderDeviceControls(device);
     const lod = state.deviceGroups.get(id);
     state.modelAssetStatus = lod?.userData.modelStatus
       || (lod?.userData.modelSource ? `${lod.userData.modelSource} · 自动 LOD` : "自动 LOD · 程序化模型");
@@ -3170,13 +3431,25 @@
   }
 
   function resetLayout() {
+    state.presetInfo?.devices.forEach((device) => {
+      state.deviceControls.set(device.id, Object.fromEntries(
+        deviceControlDefinitions(device).map((definition) => [
+          definition.key,
+          definition.type === "select" ? definition.value : Number(definition.value)
+        ])
+      ));
+    });
     state.deviceGroups.forEach((group, id) => {
       const origin = state.initialPositions.get(id);
       if (origin) {
         group.position.copy(origin);
+        group.rotation.set(0, 0, 0);
+        state.proceduralGroups.get(id)?.position.set(0, 0, 0);
+        state.proceduralGroups.get(id)?.rotation.set(0, 0, 0);
         state.selectionHelper?.update();
       }
     });
+    state.presetInfo?.devices.forEach((device) => applyDeviceControls(device.id, false));
     rebuildConnections();
     updateHud();
     frameScene();
@@ -3310,6 +3583,16 @@
         }
       ])
     ),
+    getDeviceTransform(id) {
+      const lod = state.deviceGroups.get(id);
+      const detail = state.proceduralGroups.get(id);
+      if (!lod) return null;
+      return {
+        position: { x: lod.position.x, y: lod.position.y, z: lod.position.z },
+        yaw: lod.rotation.y,
+        detailRotation: detail ? { x: detail.rotation.x, y: detail.rotation.y, z: detail.rotation.z } : null
+      };
+    },
     getDeviceParameters(id) {
       const device = state.presetInfo?.devices.find((item) => item.id === id);
       if (!device) return null;
@@ -3324,7 +3607,8 @@
         specs: data.specs.map(([label, value]) => ({ label, value })),
         ports: [...data.ports],
         connections: data.connectionText,
-        warning: data.warning
+        warning: data.warning,
+        controls: { ...(state.deviceControls.get(id) || {}) }
       };
     },
     getPositions: () => Object.fromEntries(
