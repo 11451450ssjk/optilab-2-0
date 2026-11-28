@@ -13,6 +13,7 @@
   const format = (value, digits = 4) => window.OptilabPhysics?.formatNumber(value, digits) || "—";
   let refreshTimer = 0;
   let lastSignature = "";
+  let workerToken = 0;
 
   const labels = {
     sourceVoltage: "电源",
@@ -169,13 +170,20 @@
     }
 
     if (electrical?.active) {
+      const spice = derived?.diagnostics?.spice;
       $("#simulation-electrical-model").textContent = electrical.model;
-      $("#simulation-electrical-value").textContent = electrical.model;
+      $("#simulation-electrical-value").textContent = spice
+        ? `${electrical.model} · SPICE ${Object.keys(spice.nodes).length} 节点`
+        : electrical.model;
       const readings = Object.entries(electrical.readings || {}).slice(0, 8);
-      $("#simulation-electrical-readings").innerHTML = readings.map(([key, value]) => `
+      const spiceReadings = Object.entries(spice?.nodes || {}).slice(0, 4).map(([node, value]) => [
+        `spice-${node}`,
+        value.re
+      ]);
+      $("#simulation-electrical-readings").innerHTML = [...readings, ...spiceReadings].map(([key, value]) => `
         <div class="simulation-reading">
-          <span>${labels[key] || key}</span>
-          <strong>${format(value, 5)} ${readingUnit(key, value, electrical)}</strong>
+          <span>${labels[key] || (key.startsWith("spice-") ? `SPICE ${key.slice(6)}` : key)}</span>
+          <strong>${format(value, 5)} ${readingUnit(key, value, electrical) || (key.startsWith("spice-") ? "V" : "")}</strong>
         </div>
       `).join("");
       $("#simulation-electrical-warning").textContent = electrical.warnings?.join("；") || "当前工作点位于教学线性模型有效范围内。";
@@ -214,6 +222,7 @@
     if (!force && signature === lastSignature) return;
     lastSignature = signature;
     window.clearTimeout(refreshTimer);
+    const requestToken = ++workerToken;
     refreshTimer = window.setTimeout(() => {
       const snapshot = window.OptilabPhysics.snapshot(experiment, primary, secondary, {
         primaryLabel: $("#primary-label")?.textContent || "",
@@ -224,6 +233,29 @@
       });
       const calculated = window.OptilabPhysics.calculate(experiment, primary, secondary);
       render(snapshot, calculated);
+      if (window.OptilabComputeWorker?.uncertainty) {
+        window.OptilabComputeWorker.uncertainty(
+          {
+            id: experiment.id,
+            name: experiment.name,
+            sim: experiment.sim,
+            primaryUnit: experiment.primaryUnit,
+            secondaryUnit: experiment.secondaryUnit,
+            primaryStep: experiment.primaryStep,
+            secondaryStep: experiment.secondaryStep
+          },
+          primary,
+          secondary,
+          { trials: 480, seed: `${experiment.id}-worker` }
+        ).then((workerUncertainty) => {
+          if (requestToken !== workerToken) return;
+          render(snapshot, { ...calculated, uncertainty: workerUncertainty });
+          const method = $("#simulation-uncertainty-method");
+          if (method) method.textContent = `${workerUncertainty.trials} 次 · Worker`;
+        }).catch(() => {
+          // The synchronous result remains available when Web Workers are blocked.
+        });
+      }
     }, 80);
   }
 

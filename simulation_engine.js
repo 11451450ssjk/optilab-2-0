@@ -1,7 +1,7 @@
 "use strict";
 
 (function () {
-  const base = window.OptilabPhysics;
+  const base = globalThis.OptilabPhysics;
   if (!base) return;
 
   const ENGINE_VERSION = "2026.11-sim-4";
@@ -470,16 +470,22 @@
   function simulateDetector(experiment, primaryValue, secondaryValue, options = {}) {
     const wave = options.wavefront || computeWavefront(experiment, primaryValue, secondaryValue, options);
     const inputPowerMw = clamp(Number(options.powerMw) || 3, 0, 100);
-    const responsivity = 0.42 + Math.min(0.18, (wave.wavelengthNm - 400) / 3000);
+    const responsivity = Number(options.responsivity) > 0
+      ? Number(options.responsivity)
+      : 0.42 + Math.min(0.18, (wave.wavelengthNm - 400) / 3000);
     const opticalTransmission = clamp(0.3 + wave.centerIntensity * 0.65, 0.05, 1);
     const opticalPowerMw = inputPowerMw * opticalTransmission;
     const photocurrentA = opticalPowerMw * 1e-3 * responsivity;
     const bandwidthHz = clamp(Number(options.bandwidthHz) || 1e6, 1, 1e9);
     const shotNoiseA = Math.sqrt(2 * 1.602176634e-19 * Math.max(0, photocurrentA) * bandwidthHz);
-    const readNoiseA = 2e-9;
+    const readNoiseA = Number(options.readNoisePa) > 0
+      ? Number(options.readNoisePa) * 1e-12
+      : 2e-9;
     const totalNoiseA = Math.hypot(shotNoiseA, readNoiseA);
     const snr = photocurrentA > 0 ? 20 * Math.log10(photocurrentA / Math.max(totalNoiseA, 1e-15)) : -Infinity;
-    const saturationCurrentA = Number(options.saturationCurrentA) || 1e-3;
+    const saturationCurrentA = Number(options.saturationCurrentUa) > 0
+      ? Number(options.saturationCurrentUa) * 1e-6
+      : Number(options.saturationCurrentA) || 1e-3;
     return {
       engineVersion: ENGINE_VERSION,
       inputPowerMw,
@@ -511,7 +517,7 @@
       const time = index / sampleRate;
       const phase = 2 * Math.PI * frequency * time + phaseOffset;
       const noise = gaussian(random) * noiseRms;
-      const quantization = verticalRange * 2 / 4096;
+  const quantization = verticalRange * 2 / 2 ** clamp(Math.round(Number(options.adcBits) || 12), 6, 16);
       const voltage = Math.round((Math.sin(phase) * amplitude * bandwidthFactor + noise) / quantization) * quantization;
       waveform.push({
         time,
@@ -541,15 +547,16 @@
     const height = 36;
     const exposureMs = clamp(Number(options.exposureMs) || 10, 0.01, 1000);
     const gain = clamp(Number(options.gain) || 1, 0.1, 64);
-    const readNoise = 3;
-    const fullWell = 12000;
+    const readNoise = Number(options.readNoiseElectrons) > 0 ? Number(options.readNoiseElectrons) : 3;
+    const fullWell = Number(options.fullWellElectrons) > 0 ? Number(options.fullWellElectrons) : 12000;
+    const quantumEfficiency = clamp(Number(options.quantumEfficiencyPercent) || 72, 1, 100) / 72;
     const pixels = new Float32Array(width * height);
     let saturatedPixels = 0;
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const sourceX = Math.min(wave.size - 1, Math.floor(x / width * wave.size));
         const sourceY = Math.min(wave.size - 1, Math.floor(y / height * wave.size));
-        const signal = wave.intensity[sourceY * wave.size + sourceX] * exposureMs * gain * 58;
+        const signal = wave.intensity[sourceY * wave.size + sourceX] * exposureMs * gain * 58 * quantumEfficiency;
         const shot = gaussian(random) * Math.sqrt(Math.max(1, signal));
         const value = clamp(signal + shot + gaussian(random) * readNoise, 0, fullWell);
         if (value >= fullWell) saturatedPixels += 1;
@@ -871,7 +878,7 @@
     };
   }
 
-  window.OptilabPhysics = {
+  globalThis.OptilabPhysics = {
     ...base,
     version: ENGINE_VERSION,
     baseVersion: base.version,
@@ -883,7 +890,7 @@
     propagateUncertainty,
     generateDataset
   };
-  window.OptilabSimulation = {
+  globalThis.OptilabSimulation = {
     version: ENGINE_VERSION,
     rayTrace,
     circuitDiagnostics,

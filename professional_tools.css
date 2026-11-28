@@ -1,0 +1,186 @@
+.calibration-open-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(201, 165, 105, 0.42);
+  border-radius: 8px;
+  color: #e0c28c;
+  background: rgba(88, 67, 38, 0.24);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.calibration-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.calibration-modal[hidden] {
+  display: none;
+}
+
+.calibration-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 7, 7, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.calibration-dialog {
+  width: min(860px, 100%);
+  max-height: min(86vh, 820px);
+  position: relative;
+  overflow: auto;
+  border: 1px solid rgba(205, 168, 104, 0.36);
+  border-radius: 20px;
+  color: #e9e8df;
+  background:
+    radial-gradient(circle at 90% 0, rgba(206, 163, 92, 0.1), transparent 20rem),
+    #0b1517;
+  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.55);
+}
+
+.calibration-head {
+  padding: 22px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.calibration-head h2 {
+  margin: 5px 0 4px;
+  font-size: 23px;
+}
+
+.calibration-head p {
+  margin: 0;
+  color: #8f9c95;
+  font-size: 11px;
+}
+
+.calibration-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  color: #aab4ae;
+  background: transparent;
+  cursor: pointer;
+}
+
+.calibration-toolbar {
+  padding: 16px 24px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.calibration-toolbar label,
+.calibration-field {
+  display: grid;
+  gap: 6px;
+  color: #8e9b94;
+  font-size: 10px;
+}
+
+.calibration-toolbar select,
+.calibration-field input {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid rgba(137, 158, 146, 0.24);
+  border-radius: 9px;
+  color: #e6e9e3;
+  background: rgba(255, 255, 255, 0.04);
+  font: inherit;
+}
+
+.calibration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.calibration-actions button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(137, 158, 146, 0.24);
+  border-radius: 9px;
+  color: #b8c1bc;
+  background: rgba(255, 255, 255, 0.035);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.calibration-actions button.primary {
+  color: #20211e;
+  border-color: #d7b474;
+  background: #ddba7d;
+  font-weight: 700;
+}
+
+.calibration-fields {
+  padding: 0 24px 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.calibration-status {
+  grid-column: 1 / -1;
+  min-height: 18px;
+  color: #8e9a93;
+  font-size: 10px;
+}
+
+.calibration-health {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border: 1px solid rgba(128, 163, 141, 0.2);
+  border-radius: 11px;
+  color: #9eaaa3;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+html[data-theme="day"] .calibration-dialog {
+  color: #2c302d;
+  background: #f8f5ed;
+}
+
+html[data-theme="day"] .calibration-toolbar select,
+html[data-theme="day"] .calibration-field input {
+  color: #303632;
+  background: #fffdf8;
+}
+
+@media (max-width: 760px) {
+  .calibration-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .calibration-fields {
+    grid-template-columns: 1fr 1fr;
+    padding: 0 15px 18px;
+  }
+
+  .calibration-head,
+  .calibration-toolbar {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calibration-fields {
+    grid-template-columns: 1fr;
+  }
+}

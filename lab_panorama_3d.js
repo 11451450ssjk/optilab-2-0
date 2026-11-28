@@ -529,17 +529,37 @@
     context.restore();
   }
 
+  function paintSpectrum(context, spectrum, x, y, width, height) {
+    if (!spectrum?.rgb?.length) return false;
+    const canvas = document.createElement("canvas");
+    canvas.width = spectrum.size;
+    canvas.height = spectrum.size;
+    const raster = canvas.getContext("2d");
+    const image = raster.createImageData(spectrum.size, spectrum.size);
+    for (let index = 0; index < spectrum.size * spectrum.size; index += 1) {
+      image.data[index * 4] = clamp(spectrum.rgb[index * 3] * 255, 0, 255);
+      image.data[index * 4 + 1] = clamp(spectrum.rgb[index * 3 + 1] * 255, 0, 255);
+      image.data[index * 4 + 2] = clamp(spectrum.rgb[index * 3 + 2] * 255, 0, 255);
+      image.data[index * 4 + 3] = 255;
+    }
+    raster.putImageData(image, 0, 0);
+    context.drawImage(canvas, x, y, width, height);
+    return true;
+  }
+
   function drawPanelTexture(entry, time, config) {
     const { canvas, context, device } = entry;
     const kind = deviceKind(device);
     const display = liveDisplayData(device, config);
     const issuedControls = state.deviceControls.get(device.id) || {};
+    const deviceCalibration = window.OptilabCalibration?.get(kind) || {};
     const scopeSignal = kind === "scope"
       ? window.OptilabSimulation?.simulateOscilloscope(state.config?.experiment || {}, display.scopeFrequency, display.scopeAmplitude, {
         frequencyHz: display.scopeFrequency,
         amplitudeV: display.scopeAmplitude,
         points: 260,
-        verticalRangeV: 5,
+        verticalRangeV: Number(deviceCalibration.verticalRangeV) || 5,
+        adcBits: Number(deviceCalibration.adcBits) || 12,
         phase: time * 0.0018
       })
       : null;
@@ -605,19 +625,42 @@
       }
     } else if (kind === "screen") {
       const controls = Object.fromEntries(state.deviceControls);
-      const wave = window.OptilabSimulation?.computeWavefront(
+      let wave = window.OptilabSimulation?.computeWavefront(
         state.config?.experiment || {},
         config.primary,
         config.secondary,
         { size: 48, controls, bandwidthNm: 0.5 }
       );
-      paintWavefront(context, wave, 8, 18, canvas.width - 16, canvas.height - 42, config.beamColor || [232, 190, 116]);
+      if (["double-slit", "diffraction", "grating"].includes(state.config?.experiment?.sim)) {
+        wave = {
+          ...wave,
+          ...window.OptilabProfessionalPhysics?.angularSpectrum(
+            state.config?.experiment || {},
+            config.primary,
+            config.secondary,
+            { size: 48, distanceMm: 100 }
+          )
+        };
+      }
+      const spectrum = ["grating", "spectrometer", "prism"].includes(state.config?.experiment?.sim)
+        ? window.OptilabProfessionalPhysics?.simulateSpectrum(
+          state.config?.experiment || {},
+          config.primary,
+          config.secondary,
+          { size: 40, samples: 11, distanceMm: 100 }
+        )
+        : null;
+      if (!spectrum || !paintSpectrum(context, spectrum, 8, 18, canvas.width - 16, canvas.height - 42)) {
+        paintWavefront(context, wave, 8, 18, canvas.width - 16, canvas.height - 42, config.beamColor || [232, 190, 116]);
+      }
       context.strokeStyle = "rgba(220, 199, 152, 0.45)";
       context.strokeRect(8, 18, canvas.width - 16, canvas.height - 42);
       context.fillStyle = "#b6c2ba";
       context.font = '17px "Cascadia Mono", monospace';
       context.fillText(
-        wave ? `WAVE OPTICS · OPD ${formatNumber(wave.opdUm, 2)} μm · V ${formatNumber(wave.visibility * 100, 1)}%` : "WAVE OPTICS",
+        spectrum
+          ? `SPECTRAL ${formatNumber(spectrum.centerWavelengthNm, 1)} nm · Δλ ${formatNumber(spectrum.bandwidthNm, 2)} nm`
+          : wave ? `WAVE OPTICS · OPD ${formatNumber(wave.opdUm, 2)} μm · V ${formatNumber(wave.visibility * 100, 1)}%` : "WAVE OPTICS",
         14,
         canvas.height - 10
       );
@@ -632,7 +675,14 @@
         state.config?.experiment || {},
         config.primary,
         config.secondary,
-        { wavefront: wave, powerMw: state.metrics.power, bandwidthHz: 1e6 }
+        {
+          wavefront: wave,
+          powerMw: state.metrics.power,
+          bandwidthHz: Number(deviceCalibration.bandwidthHz) || 1e6,
+          responsivity: Number(deviceCalibration.responsivityAw) || undefined,
+          readNoisePa: Number(deviceCalibration.readNoisePa) || undefined,
+          saturationCurrentUa: Number(deviceCalibration.saturationCurrentUa) || undefined
+        }
       );
       paintWavefront(context, wave, 18, 34, 190, 190, [108, 224, 159]);
       context.fillStyle = detector?.saturated ? "#f29b72" : "#8be3b2";
@@ -747,7 +797,10 @@
         {
           wavefront: wave,
           exposureMs: Number(issuedControls.exposure) || 10,
-          gain: Number(issuedControls.gain) || 1
+          gain: Number(issuedControls.gain) || 1,
+          readNoiseElectrons: Number(deviceCalibration.readNoiseElectrons) || undefined,
+          fullWellElectrons: Number(deviceCalibration.fullWellElectrons) || undefined,
+          quantumEfficiencyPercent: Number(deviceCalibration.quantumEfficiencyPercent) || undefined
         }
       );
       if (!state.cameraRaster) {
@@ -3081,14 +3134,13 @@
     const hit = hits[0];
     if (!hit) return null;
     const hitId = deviceIdFromObject(hit.object);
+    const worldNormal = hit.face?.normal
+      ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+      : new state.three.Vector3(0, 0, 1);
     return {
       deviceId: hitId,
       point: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
-      normal: hit.face?.normal ? {
-        x: hit.face.normal.x,
-        y: hit.face.normal.y,
-        z: hit.face.normal.z
-      } : null,
+      normal: { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z },
       distance: hit.distance,
       targetHit: hitId === targetId,
       obstruction: hitId && hitId !== sourceId && hitId !== targetId
@@ -3110,6 +3162,32 @@
     if (kind === "slit") return { effect: "diffract", transmission: 0.62, width: 0.72, penalty: 0.045, fan: [-0.18, 0, 0.18] };
     if (kind === "grating" || kind === "prism") return { effect: "disperse", transmission: 0.68, width: 0.86, penalty: 0.035, fan: [-0.2, 0, 0.2] };
     return { effect: "obstruct", transmission: 0.06, width: 0.6, penalty: 0.14, fan: [] };
+  }
+
+  function reflectedDirection(incoming, normal) {
+    return incoming.clone().sub(normal.clone().multiplyScalar(2 * incoming.dot(normal))).normalize();
+  }
+
+  function refractedDirection(incoming, normal, n1 = 1, n2 = 1.5168) {
+    const eta = n1 / n2;
+    const cosI = -incoming.dot(normal);
+    const sin2T = eta * eta * Math.max(0, 1 - cosI * cosI);
+    if (sin2T > 1) return reflectedDirection(incoming, normal);
+    const cosT = Math.sqrt(Math.max(0, 1 - sin2T));
+    return incoming.clone().multiplyScalar(eta)
+      .add(normal.clone().multiplyScalar(eta * cosI - cosT))
+      .normalize();
+  }
+
+  function fresnelReflectance(incoming, normal, n1 = 1, n2 = 1.5168) {
+    const eta = n1 / n2;
+    const cosI = clamp(-incoming.dot(normal), 0, 1);
+    const sin2T = eta * eta * (1 - cosI * cosI);
+    if (sin2T > 1) return 1;
+    const cosT = Math.sqrt(1 - sin2T);
+    const rs = (n1 * cosI - n2 * cosT) / Math.max(1e-9, n1 * cosI + n2 * cosT);
+    const rp = (n2 * cosI - n1 * cosT) / Math.max(1e-9, n2 * cosI + n1 * cosT);
+    return clamp((rs * rs + rp * rp) / 2, 0, 1);
   }
 
   function proximity3DEffects(beamRoutes) {
@@ -3272,7 +3350,55 @@
             if (["block", "observe", "detect"].includes(effect.effect)) {
               points[points.length - 1].set(meshHit.point.x, meshHit.point.y, meshHit.point.z);
             }
-            if (effect.fan.length) {
+            const incoming = new state.three.Vector3(
+              meshHit.point.x - points[0].x,
+              meshHit.point.y - points[0].y,
+              meshHit.point.z - points[0].z
+            ).normalize();
+            const normal = new state.three.Vector3(
+              meshHit.normal?.x || 0,
+              meshHit.normal?.y || 0,
+              meshHit.normal?.z || 1
+            ).normalize();
+            if (incoming.dot(normal) > 0) normal.negate();
+            const surfaceBranches = [];
+            if (effect.effect === "reflect") {
+              const calibration = window.OptilabCalibration?.get("mirror") || {};
+              surfaceBranches.push({
+                direction: reflectedDirection(incoming, normal),
+                power: clamp((Number(calibration.reflectivityPercent) || 99) / 100, 0.1, 1),
+                color
+              });
+            } else if (["lens", "split", "phase", "attenuate"].includes(effect.effect)) {
+              const calibration = window.OptilabCalibration?.get(effect.effect === "lens" ? "lens" : "nd-filter") || {};
+              const refractiveIndex = Number(calibration.refractiveIndex) || 1.5168;
+              const reflectance = fresnelReflectance(incoming, normal, 1, refractiveIndex);
+              surfaceBranches.push({
+                direction: refractedDirection(incoming, normal, 1, refractiveIndex),
+                power: clamp(1 - reflectance, 0.05, 1),
+                color
+              });
+              if (effect.effect === "split") {
+                surfaceBranches.push({
+                  direction: reflectedDirection(incoming, normal),
+                  power: reflectance + 0.35,
+                  color
+                });
+              }
+            }
+            surfaceBranches.forEach((branch, branchIndex) => {
+              const start = new state.three.Vector3(meshHit.point.x, meshHit.point.y, meshHit.point.z);
+              const end = start.clone().addScaledVector(branch.direction, 0.82);
+              const mid = start.clone().lerp(end, 0.5);
+              mid.y += 0.025;
+              makeBeam([start, mid, end], branch.color, path.routeIndex * 30 + branchIndex, entry.route, {
+                width: 0.68,
+                pulse: false,
+                simple: true,
+                powerFactor: branch.power
+              });
+            });
+            if (effect.fan.length && !["mirror", "lens", "split"].includes(effect.effect)) {
               const start = points[0];
               const direction = new state.three.Vector3(
                 meshHit.point.x - start.x,
@@ -3302,6 +3428,53 @@
                 );
               });
             }
+          }
+        }
+        if (meshHit?.targetHit && !meshHit.obstruction && path.rayIndex === 0) {
+          const targetDevice = state.presetInfo.devices.find((device) => device.id === meshHit.deviceId);
+          const targetKind = deviceKind(targetDevice || {});
+          if (["mirror", "lens", "beam-expander", "splitter", "compensator", "nd-filter", "prism"].includes(targetKind)) {
+            const incoming = new state.three.Vector3(
+              meshHit.point.x - points[0].x,
+              meshHit.point.y - points[0].y,
+              meshHit.point.z - points[0].z
+            ).normalize();
+            const normal = new state.three.Vector3(
+              meshHit.normal?.x || 0,
+              meshHit.normal?.y || 0,
+              meshHit.normal?.z || 1
+            ).normalize();
+            if (incoming.dot(normal) > 0) normal.negate();
+            const branches = [];
+            if (targetKind === "mirror") {
+              const mirrorCalibration = window.OptilabCalibration?.get("mirror") || {};
+              branches.push({
+                direction: reflectedDirection(incoming, normal),
+                power: clamp((Number(mirrorCalibration.reflectivityPercent) || 99) / 100, 0.1, 1)
+              });
+            } else {
+              const lensCalibration = window.OptilabCalibration?.get(["lens", "beam-expander"].includes(targetKind) ? "lens" : "nd-filter") || {};
+              const refractiveIndex = Number(lensCalibration.refractiveIndex) || 1.5168;
+              const reflectance = fresnelReflectance(incoming, normal, 1, refractiveIndex);
+              branches.push({
+                direction: refractedDirection(incoming, normal, 1, refractiveIndex),
+                power: clamp(1 - reflectance, 0.05, 1)
+              });
+              if (targetKind === "splitter") {
+                branches.push({ direction: reflectedDirection(incoming, normal), power: reflectance + 0.35 });
+              }
+            }
+            branches.forEach((branch, branchIndex) => {
+              const start = new state.three.Vector3(meshHit.point.x, meshHit.point.y, meshHit.point.z);
+              const end = start.clone().addScaledVector(branch.direction, 0.48);
+              makeBeam(
+                [start, start.clone().lerp(end, 0.5), end],
+                color,
+                path.routeIndex * 40 + branchIndex,
+                entry.route,
+                { width: 0.52, pulse: false, simple: true, powerFactor: branch.power }
+              );
+            });
           }
         }
         makeBeam(points, color, path.routeIndex * 10 + path.rayIndex, entry.route, {
@@ -3955,13 +4128,27 @@
     const plotWidth = right - left;
     const plotHeight = bottom - top;
     const wavefrontEligible = ["michelson", "newton", "interference", "double-slit", "diffraction", "grating"].includes(sim);
-    const wavefront = wavefrontEligible
+    let wavefront = wavefrontEligible
       ? window.OptilabSimulation?.computeWavefront(experiment, primary, secondary, {
         size: 76,
         controls: Object.fromEntries(state.deviceControls),
         bandwidthNm: 0.5
       })
       : null;
+    if (["double-slit", "diffraction", "grating"].includes(sim) && window.OptilabProfessionalPhysics?.angularSpectrum) {
+      const angular = window.OptilabProfessionalPhysics.angularSpectrum(experiment, primary, secondary, {
+        size: 64,
+        distanceMm: Math.max(40, secondary * 20)
+      });
+      wavefront = {
+        ...wavefront,
+        ...angular,
+        available: true,
+        opdUm: 0,
+        visibility: wavefront?.visibility || 0.9,
+        model: angular.method
+      };
+    }
     drawResultBackdrop(context, width, height);
     context.save();
     context.font = '11px "Cascadia Mono", monospace';
@@ -5334,18 +5521,36 @@
       heater: "高温表面和样品可能造成烫伤，断电后仍需等待冷却。",
       calorimeter: "高温表面和样品可能造成烫伤，断电后仍需等待冷却。"
     };
+    const calibration = window.OptilabCalibration?.get(kind) || {};
+    const detectorReading = display.unified?.diagnostics?.detector;
+    const health = window.OptilabProfessionalPhysics?.assessDeviceHealth?.(device, {
+      kind,
+      powerMw: state.metrics.power,
+      currentUa: detectorReading?.photocurrentUa,
+      wavelengthNm: Number(String(display.wavelengthText).match(/[\d.]+/)?.[0]) || 0,
+      voltageV: display.supplyVoltage,
+      currentA: display.supplyCurrent
+    }) || { state: "ok", alerts: [] };
+    if (calibration.model) add("校准型号", calibration.model);
+    if (calibration.serial) add("仪器序列号", calibration.serial);
+    if (calibration.calibratedAt) add("校准日期", calibration.calibratedAt);
+    health.alerts.forEach((alert) => add(alert.level === "danger" ? "安全告警" : "性能提示", alert.message));
+    const baseWarning = warningMap[kind] || "以设备铭牌、校准证书和指导教师要求为准；异常发热、异味或读数跳变时立即停止。";
+    const healthWarning = health.alerts.map((alert) => `${alert.message}${alert.recommendation ? `；${alert.recommendation}` : ""}`).join("；");
     return {
       kind,
       display,
       specs,
       ports,
       connectionText,
-      warning: warningMap[kind] || "以设备铭牌、校准证书和指导教师要求为准；异常发热、异味或读数跳变时立即停止。",
+      warning: [baseWarning, healthWarning].filter(Boolean).join("；"),
       reading: inspectorReadout(kind, display),
       note: `${display.primaryLabel}: ${display.primaryText} · ${display.secondaryLabel}: ${display.secondaryText} · ${display.unifiedValue}`,
-      state: /scope|analyzer|computer|daq|sensor/.test(kind) ? "SIGNAL LOCKED" :
-        /power|laser|generator/.test(kind) ? "OUTPUT ON" :
-          /camera|spectrometer/.test(kind) ? "ACQUIRING" : "READY"
+      state: health.state === "danger" ? "SATURATION / DAMAGE RISK" :
+        health.state === "warning" ? "CHECK CALIBRATION" :
+          /scope|analyzer|computer|daq|sensor/.test(kind) ? "SIGNAL LOCKED" :
+            /power|laser|generator/.test(kind) ? "OUTPUT ON" :
+              /camera|spectrometer/.test(kind) ? "ACQUIRING" : "READY"
     };
   }
 

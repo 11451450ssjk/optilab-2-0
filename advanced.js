@@ -4335,7 +4335,19 @@ async function readExperimentDataFile(file) {
     if (!window.XLSX) {
       throw new Error("Excel 解析组件未加载，请刷新页面或改用 CSV 文件");
     }
-    const workbook = window.XLSX.read(await file.arrayBuffer(), {
+    const buffer = await file.arrayBuffer();
+    if (window.OptilabComputeWorker?.parseSpreadsheet && buffer.byteLength > 100000) {
+      try {
+        const parsed = await window.OptilabComputeWorker.parseSpreadsheet(buffer, file.name);
+        return {
+          text: parsed.text,
+          sourceName: `${file.name} · ${parsed.sheetName} · 后台解析`
+        };
+      } catch {
+        // Fall through to the main-thread parser when workers are unavailable.
+      }
+    }
+    const workbook = window.XLSX.read(buffer, {
       type: "array",
       cellDates: true
     });

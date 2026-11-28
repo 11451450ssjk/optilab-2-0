@@ -230,7 +230,7 @@
     return "unknown";
   }
 
-  window.OptilabPhysics = {
+  globalThis.OptilabPhysics = {
     version: ENGINE_VERSION,
     calculate,
     computeScene,
