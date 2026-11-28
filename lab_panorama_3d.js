@@ -747,6 +747,11 @@
     mirror: "精密镜架",
     splitter: "分束器",
     lens: "光学透镜",
+    "beam-expander": "扩束镜组",
+    iris: "可变光阑",
+    compensator: "补偿板",
+    "nd-filter": "中性密度衰减片",
+    "beam-dump": "光束终止器",
     screen: "观察屏",
     scope: "数字示波器",
     computer: "分析工作站",
@@ -802,6 +807,11 @@
     if (device.type === "laser" || /激光器|激光源/.test(token)) return "laser";
     if (device.type === "mirror" || /反射镜/.test(token)) return "mirror";
     if (device.type === "splitter" || /分束/.test(token)) return "splitter";
+    if (/beam-expander|扩束/.test(token)) return "beam-expander";
+    if (/iris|可变光阑|光阑/.test(token)) return "iris";
+    if (/compensator|补偿板/.test(token)) return "compensator";
+    if (/nd-filter|衰减片/.test(token)) return "nd-filter";
+    if (/beam-dump|光束终止/.test(token)) return "beam-dump";
     if (device.type === "lens" || /透镜/.test(token)) return "lens";
     if (device.type === "screen" || /观察屏/.test(token)) return "screen";
     if (device.type === "scope" || /示波器/.test(token)) return "scope";
@@ -859,6 +869,24 @@
   function sceneLayoutPosition(device) {
     const info = state.presetInfo;
     const devices = info?.devices || [];
+    if (info?.id === "michelson") {
+      const michelsonLayout = {
+        laser: [-3.7, -0.35],
+        "beam-expander": [-2.35, -0.35],
+        iris: [-1.45, -0.35],
+        splitter: [0.2, -0.35],
+        "mirror-a": [0.2, -2.2],
+        compensator: [1.65, -0.35],
+        "mirror-b": [3.25, -0.35],
+        "nd-filter": [0.55, 0.95],
+        lens: [0.55, 1.7],
+        screen: [0.55, 2.4],
+        detector: [-1.05, 0.95],
+        scope: [-2.15, 1.75]
+      };
+      const position = michelsonLayout[device.id];
+      if (position) return { x: position[0], z: position[1] };
+    }
     const primaryPath = (info?.optics || []).find((path) => path.includes(device.id)) || [];
     const pathIndex = primaryPath.indexOf(device.id);
     if (pathIndex >= 0) {
@@ -901,6 +929,25 @@
       x: electronic ? -3.15 + (index % columns) * 3.15 : -2.8 + (index % columns) * 2.8,
       z: electronic ? -1.15 + row * 1.65 : 1.25 + row * 0.72
     };
+  }
+
+  function deviceBaseYaw(device) {
+    const info = state.presetInfo;
+    const routes = info?.routes || [];
+    const incoming = routes.find((route) => route.toId === device.id && route.fromId !== device.id);
+    const from = incoming ? state.initialPositions.get(incoming.fromId) : null;
+    const self = state.initialPositions.get(device.id);
+    if (!from || !self) return 0;
+    const dx = from.x - self.x;
+    const dz = from.z - self.z;
+    if (Math.hypot(dx, dz) < 0.001) return 0;
+    const kind = deviceKind(device);
+    if (kind === "mirror") return Math.atan2(-dz, dx);
+    if (kind === "screen") return Math.atan2(dx, dz);
+    if (["detector", "camera", "thermal-camera", "beam-profiler"].includes(kind)) {
+      return Math.atan2(dz, -dx);
+    }
+    return 0;
   }
 
   function optimalDeviceControls(device) {
@@ -1027,6 +1074,104 @@
       }), [0, 0.53, 0], [0, Math.PI / 2, 0]);
       const focusKnob = addPart(group, device, new THREE.BoxGeometry(0.08, 0.2, 0.06), blackMetal, [0.02, 0.35, 0.17]);
       focusKnob.userData.focusKnob = true;
+    } else if (kind === "beam-expander") {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.43, 16), blackMetal, [0, 0.27, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.145, 0.145, 0.62, 32), blackMetal, [0, 0.51, 0], [0, 0, Math.PI / 2]);
+      [-0.31, -0.12, 0.12, 0.31].forEach((x, index) => {
+        addPart(
+          group,
+          device,
+          new THREE.TorusGeometry(index === 0 || index === 3 ? 0.13 : 0.115, 0.012, 8, 32),
+          index === 1 || index === 2 ? brassMaterial : steelMaterial,
+          [x, 0.51, 0],
+          [0, Math.PI / 2, 0]
+        );
+      });
+      [-0.19, 0.19].forEach((x, index) => {
+        const element = addPart(group, device, new THREE.SphereGeometry(index ? 0.105 : 0.075, 24, 16), glassMaterial, [x, 0.51, 0]);
+        element.scale.x = 0.3;
+      });
+      const adjuster = addPart(group, device, new THREE.CylinderGeometry(0.055, 0.055, 0.055, 22), brassMaterial, [0.08, 0.34, 0.14], [Math.PI / 2, 0, 0]);
+      adjuster.userData.focusKnob = true;
+    } else if (kind === "iris") {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.45, 16), blackMetal, [0, 0.28, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.225, 0.035, 10, 36), blackMetal, [0, 0.52, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.19, 0.008, 6, 36), brassMaterial, [0.036, 0.52, 0], [0, Math.PI / 2, 0]);
+      for (let index = 0; index < 10; index += 1) {
+        const angle = index * Math.PI / 5;
+        const blade = addPart(
+          group,
+          device,
+          new THREE.BoxGeometry(0.012, 0.27, 0.034),
+          index % 2 ? darkMaterial : blackMetal,
+          [0.025, 0.52, 0],
+          [angle, 0, 0.24]
+        );
+        blade.position.y += Math.cos(angle) * 0.035;
+        blade.position.z += Math.sin(angle) * 0.035;
+      }
+      addPart(group, device, new THREE.CircleGeometry(0.052, 28), new THREE.MeshBasicMaterial({ color: 0x020404 }), [0.046, 0.52, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.018, 0.018, 0.13, 12), brassMaterial, [0.06, 0.32, 0.18], [0, 0, -0.7]);
+    } else if (kind === "compensator") {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.43, 16), blackMetal, [0, 0.27, 0]);
+      addPart(group, device, new THREE.BoxGeometry(0.075, 0.42, 0.46), blackMetal, [0, 0.49, 0]);
+      const plate = addPart(group, device, new THREE.BoxGeometry(0.032, 0.34, 0.36), glassMaterial, [0.045, 0.49, 0]);
+      plate.material = glassMaterial.clone();
+      plate.material.opacity = 0.27;
+      plate.material.transmission = 0.68;
+      [-0.13, 0.0, 0.13].forEach((z) => {
+        addPart(group, device, new THREE.BoxGeometry(0.009, 0.37, 0.006), new THREE.MeshBasicMaterial({
+          color: 0xd7eadc,
+          transparent: true,
+          opacity: 0.32
+        }), [0.064, 0.49, z]);
+      });
+      [-0.18, 0.18].forEach((z) => {
+        addPart(group, device, new THREE.CylinderGeometry(0.024, 0.024, 0.06, 12), brassMaterial, [0.075, 0.49, z], [0, 0, Math.PI / 2]);
+      });
+    } else if (kind === "nd-filter") {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.46, 16), blackMetal, [0, 0.29, 0]);
+      addPart(group, device, new THREE.TorusGeometry(0.235, 0.036, 10, 36), blackMetal, [0, 0.53, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.205, 0.205, 0.022, 36), new THREE.MeshPhysicalMaterial({
+        color: 0x14201e,
+        transparent: true,
+        opacity: 0.78,
+        transmission: 0.12,
+        roughness: 0.16,
+        metalness: 0.08
+      }), [0.02, 0.53, 0], [0, 0, Math.PI / 2]);
+      for (let index = 0; index < 20; index += 1) {
+        const angle = index * Math.PI * 2 / 20;
+        addPart(
+          group,
+          device,
+          new THREE.BoxGeometry(0.012, index % 5 === 0 ? 0.035 : 0.018, 0.012),
+          index % 5 === 0 ? brassMaterial : steelMaterial,
+          [0.05, 0.53 + Math.cos(angle) * 0.215, Math.sin(angle) * 0.215],
+          [angle, 0, 0]
+        );
+      }
+      addPart(group, device, new THREE.CylinderGeometry(0.05, 0.05, 0.04, 20), accentMaterial, [0.08, 0.31, 0.16], [Math.PI / 2, 0, 0]);
+    } else if (kind === "beam-dump") {
+      addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.44, 16), blackMetal, [0, 0.28, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.19, 0.25, 0.44, 36, 1, true), new THREE.MeshStandardMaterial({
+        color: 0x080b0a,
+        metalness: 0.3,
+        roughness: 0.82,
+        side: THREE.DoubleSide
+      }), [0, 0.5, 0], [0, 0, Math.PI / 2]);
+      addPart(group, device, new THREE.TorusGeometry(0.245, 0.018, 8, 36), blackMetal, [-0.23, 0.5, 0], [0, Math.PI / 2, 0]);
+      addPart(group, device, new THREE.CylinderGeometry(0.16, 0.16, 0.018, 36), new THREE.MeshStandardMaterial({
+        color: 0x171e1b,
+        roughness: 0.88,
+        metalness: 0.18
+      }), [0.23, 0.5, 0], [0, 0, Math.PI / 2]);
+      for (let index = 0; index < 12; index += 1) {
+        const ring = index < 6 ? 0.055 : 0.115;
+        const angle = index * Math.PI / 3;
+        addPart(group, device, new THREE.CylinderGeometry(0.018, 0.018, 0.008, 12), darkMaterial, [0.242, 0.5 + Math.sin(angle) * ring, Math.cos(angle) * ring], [0, 0, Math.PI / 2]);
+      }
+      addPart(group, device, new THREE.SphereGeometry(0.02, 12, 10), new THREE.MeshBasicMaterial({ color: 0xe25d4f }), [-0.24, 0.5, 0.2]);
     } else if (kind === "sample") {
       if (device.variant === "solar" || /光伏|太阳能/.test(device.label)) {
         addPart(group, device, new THREE.BoxGeometry(0.7, 0.055, 0.54), blackMetal, [0, 0.18, 0], [-0.3, 0, 0]);
@@ -2399,6 +2544,59 @@
     );
   }
 
+  function deviceWorldPort(id, port = "auto", otherId = "", lane = 0, y = 0.54) {
+    const THREE = state.three;
+    const group = state.deviceGroups.get(id);
+    const other = state.deviceGroups.get(otherId);
+    if (!group) return null;
+    const detail = state.proceduralGroups.get(id);
+    const device = state.presetInfo?.devices.find((item) => item.id === id) || {};
+    const kind = deviceKind(device);
+    const radius = {
+      laser: 0.43,
+      mirror: 0.27,
+      splitter: 0.27,
+      lens: 0.29,
+      "beam-expander": 0.36,
+      iris: 0.26,
+      compensator: 0.27,
+      "nd-filter": 0.27,
+      "beam-dump": 0.27,
+      screen: 0.5,
+      scope: 0.52,
+      computer: 0.5
+    }[kind] || 0.38;
+    let resolved = port || "auto";
+    if (resolved === "auto") {
+      const dx = (other?.position.x || group.position.x + 1) - group.position.x;
+      const dz = (other?.position.z || group.position.z) - group.position.z;
+      resolved = Math.abs(dx) >= Math.abs(dz)
+        ? (dx >= 0 ? "right" : "left")
+        : (dz >= 0 ? "top" : "bottom");
+    }
+    let localX = 0;
+    let localZ = 0;
+    if (resolved.includes("left")) localX -= radius;
+    if (resolved.includes("right")) localX += radius;
+    if (resolved.includes("top")) localZ -= radius;
+    if (resolved.includes("bottom")) localZ += radius;
+    const horizontal = !resolved.includes("top") && !resolved.includes("bottom");
+    const vertical = !resolved.includes("left") && !resolved.includes("right");
+    if (horizontal) localZ += lane;
+    else if (vertical) localX += lane;
+    else {
+      localX += lane * 0.71;
+      localZ += lane * 0.71;
+    }
+    const local = new THREE.Vector3(localX, 0, localZ);
+    local.applyAxisAngle(new THREE.Vector3(0, 1, 0), group.rotation.y);
+    return new THREE.Vector3(
+      group.position.x + local.x,
+      y + group.position.y + (detail?.position.y || 0),
+      group.position.z + local.z
+    );
+  }
+
   function makeTube(points, radius, color, opacity = 0.85) {
     const THREE = state.three;
     const curve = new THREE.CatmullRomCurve3(points);
@@ -2415,11 +2613,11 @@
     return new THREE.Mesh(geometry, material);
   }
 
-  function makeBeam(points, color, index) {
+  function makeBeam(points, color, index, route = {}) {
     const THREE = state.three;
     const curve = new THREE.CatmullRomCurve3(points);
     const core = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.009, 8, false),
+      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.014, 8, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
@@ -2429,53 +2627,51 @@
       })
     );
     const halo = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.036, 8, false),
+      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.052, 8, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.09,
+        opacity: 0.16,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
     );
     const outerGlow = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.075, 8, false),
+      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.105, 8, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.028,
+        opacity: 0.055,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
     );
     core.userData.connectionType = halo.userData.connectionType = outerGlow.userData.connectionType = "optical";
     core.userData.baseOpacity = 0.96;
-    halo.userData.baseOpacity = 0.09;
-    outerGlow.userData.baseOpacity = 0.028;
+    halo.userData.baseOpacity = 0.16;
+    outerGlow.userData.baseOpacity = 0.055;
     state.beamGroup.add(core, halo, outerGlow);
-    for (let pulseIndex = 0; pulseIndex < 3; pulseIndex += 1) {
-      const pulse = new THREE.Mesh(
-        new THREE.SphereGeometry(0.026, 10, 10),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.68,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        })
-      );
-      pulse.userData.connectionType = "optical";
-      pulse.userData.baseOpacity = 0.68;
-      state.beamGroup.add(pulse);
-      state.animatedObjects.push({
-        type: "beamPulse",
-        curve,
-        object: pulse,
-        offset: (index * 0.19 + pulseIndex / 3) % 1,
-        speed: 0.075 + index * 0.004,
-        baseSpeed: 0.075 + index * 0.004
-      });
-    }
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.046, 14, 14),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.86,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    pulse.userData.connectionType = "optical";
+    pulse.userData.baseOpacity = 0.86;
+    state.beamGroup.add(pulse);
+    state.animatedObjects.push({
+      type: "beamPulse",
+      curve,
+      object: pulse,
+      sequenceStart: clamp(Number(route.order || 0) * 0.092 + Number(route.path || 0) * 0.014, 0, 0.78),
+      sequenceSpan: 0.125,
+      routeIndex: index
+    });
   }
 
   function rebuildConnections() {
@@ -2487,23 +2683,47 @@
     state.cableGroup.visible = state.showCables;
     const assemblyActive = Boolean(state.autoTune?.mode === "assembly");
     const assemblyReady = (id) => !assemblyActive || state.autoTune.placedIds?.has(id);
-    const beamColor = new state.three.Color(colorArrayToHex(state.config?.beamColor));
-    state.presetInfo.optics.forEach((path, pathIndex) => {
-      const ids = path.filter((id) => state.deviceGroups.has(id) && assemblyReady(id));
-      for (let index = 0; index < ids.length - 1; index += 1) {
-        const from = deviceWorldPoint(ids[index], 0.55);
-        const to = deviceWorldPoint(ids[index + 1], 0.55);
-        if (!from || !to) continue;
-        const mid = from.clone().lerp(to, 0.5);
-        mid.y += 0.045;
-        const bendSource = state.deviceControls.get(ids[index + 1]) || state.deviceControls.get(ids[index]) || {};
-        const pitch = Number(bendSource.pitch || 0) * Math.PI / 180;
-        const azimuth = Number(bendSource.azimuth || 0) * Math.PI / 180;
-        const span = from.distanceTo(to);
-        mid.y += Math.tan(pitch) * span * 0.32;
-        mid.z += Math.tan(azimuth) * span * 0.32;
-        makeBeam([from, mid, to], beamColor, pathIndex + index);
-      }
+    const routeColors = {
+      source: 0xff545c,
+      "arm-a": 0x45d5ed,
+      "arm-a-return": 0x68a8ff,
+      "arm-b": 0xffbd55,
+      "arm-b-return": 0xff7558,
+      recombined: 0xffe1a4,
+      observation: 0xfff2c4,
+      detector: 0x68e69c,
+      branch: 0xffad57
+    };
+    const routes = state.presetInfo.routes?.length
+      ? state.presetInfo.routes
+      : (state.presetInfo.optics || []).flatMap((path, pathIndex) =>
+        path.slice(0, -1).map((fromId, order) => ({
+          fromId,
+          toId: path[order + 1],
+          fromPort: "auto",
+          toPort: "auto",
+          colorRole: pathIndex ? "branch" : "source",
+          order,
+          path: pathIndex,
+          lane: pathIndex % 2 === 0 ? -0.012 : 0.012
+        }))
+      );
+    routes.forEach((route, routeIndex) => {
+      if (!route.fromId || !route.toId) return;
+      if (!state.deviceGroups.has(route.fromId) || !state.deviceGroups.has(route.toId)) return;
+      if (!assemblyReady(route.fromId) || !assemblyReady(route.toId)) return;
+      const from = deviceWorldPort(route.fromId, route.fromPort, route.toId, route.lane || 0, 0.55);
+      const to = deviceWorldPort(route.toId, route.toPort, route.fromId, route.lane || 0, 0.55);
+      if (!from || !to) return;
+      const mid = from.clone().lerp(to, 0.5);
+      const bendSource = state.deviceControls.get(route.toId) || state.deviceControls.get(route.fromId) || {};
+      const pitch = Number(bendSource.pitch || 0) * Math.PI / 180;
+      const azimuth = Number(bendSource.azimuth || 0) * Math.PI / 180;
+      const span = from.distanceTo(to);
+      mid.y += 0.045 + Math.tan(pitch) * span * 0.32;
+      mid.z += Math.tan(azimuth) * span * 0.32;
+      const color = new state.three.Color(routeColors[route.colorRole] || colorArrayToHex(state.config?.beamColor));
+      makeBeam([from, mid, to], color, routeIndex, route);
     });
     const cableColors = {
       "BNC 50Ω 同轴": 0xd9b473,
@@ -2551,11 +2771,18 @@
     const speedFactor = mode === "scan" ? 1.9 : mode === "verify" ? 1.25 : mode === "prepare" ? 0.45 : mode === "reset" ? 0.2 : 1;
     const beamFactor = mode === "prepare" ? 0.18 : mode === "install" ? 0.48 : mode === "align" ? 0.78 : mode === "reset" ? 0.1 : 1;
     const cableFactor = mode === "prepare" ? 0.3 : mode === "install" ? 0.8 : mode === "reset" ? 0.12 : 0.92;
+    const sequenceCycle = (time * 0.001 / 6.4) % 1;
     state.animatedObjects.forEach((entry) => {
       if (entry.type !== "beamPulse") return;
-      const progress = (time * 0.001 * entry.baseSpeed * speedFactor + entry.offset) % 1;
-      entry.object.position.copy(entry.curve.getPointAt(progress));
-      const pulseScale = 0.72 + Math.sin(time * 0.006 + entry.offset * 8) * 0.22;
+      const local = (sequenceCycle - (entry.sequenceStart || 0)) / (entry.sequenceSpan || 0.125);
+      if (local < 0 || local > 1) {
+        entry.object.visible = false;
+        return;
+      }
+      entry.object.visible = true;
+      const eased = local * local * (3 - 2 * local);
+      entry.object.position.copy(entry.curve.getPointAt(eased));
+      const pulseScale = 0.82 + Math.sin(time * 0.008 + local * 8) * 0.18;
       entry.object.scale.setScalar(pulseScale);
       entry.object.material.opacity = entry.object.userData.baseOpacity * beamFactor;
     });
@@ -3220,6 +3447,36 @@
         { key: "fineFocus", label: "细准焦螺旋", min: -3, max: 3, step: 0.02, value: 0, unit: "mm" },
         { key: "aperture", label: "通光孔径", min: 10, max: 100, step: 1, value: 100, unit: "%" }
       );
+    } else if (kind === "beam-expander") {
+      defs.push(
+        { key: "zoom", label: "扩束倍率", min: 1, max: 20, step: 0.1, value: 5, unit: "×" },
+        { key: "coarseFocus", label: "前后镜组间距", min: -8, max: 8, step: 0.05, value: 0, unit: "mm" },
+        { key: "aperture", label: "有效通光口径", min: 20, max: 100, step: 1, value: 100, unit: "%" }
+      );
+    } else if (kind === "iris") {
+      defs.push(
+        { key: "aperture", label: "光阑开孔", min: 2, max: 25, step: 0.1, value: 12, unit: "mm" },
+        { key: "irisCenterX", label: "横向中心", min: -10, max: 10, step: 0.02, value: 0, unit: "mm" },
+        { key: "irisCenterY", label: "高度中心", min: -10, max: 10, step: 0.02, value: 0, unit: "mm" }
+      );
+    } else if (kind === "compensator") {
+      defs.push(
+        { key: "tiltX", label: "补偿板俯仰", min: -5, max: 5, step: 0.02, value: 0, unit: "°" },
+        { key: "tiltZ", label: "补偿板侧倾", min: -5, max: 5, step: 0.02, value: 0, unit: "°" },
+        { key: "insertion", label: "切入光路深度", min: 0, max: 100, step: 1, value: 100, unit: "%" }
+      );
+    } else if (kind === "nd-filter") {
+      defs.push(
+        { key: "attenuation", label: "衰减量", min: 0, max: 10, step: 0.1, value: 1, unit: "OD" },
+        { key: "filterAngle", label: "滤片转角", min: -90, max: 90, step: 0.2, value: 0, unit: "°" },
+        { key: "transmission", label: "透射率", min: 0, max: 100, step: 0.1, value: 10, unit: "%" }
+      );
+    } else if (kind === "beam-dump") {
+      defs.push(
+        { key: "dumpAngle", label: "吸收筒俯仰", min: -12, max: 12, step: 0.1, value: 0, unit: "°" },
+        { key: "dumpHeight", label: "中心高度", min: -10, max: 10, step: 0.1, value: 0, unit: "mm" },
+        { key: "dumpDistance", label: "安全距离", min: 10, max: 300, step: 1, value: 80, unit: "mm" }
+      );
     } else if (kind === "laser" || kind === "optical-source") {
       defs.push(
         { key: "output", label: "输出功率", min: 0, max: 100, step: 1, value: 70, unit: "%" },
@@ -3323,10 +3580,25 @@
       detail.position.x = (
         Number(controls.coarseFocus || 0) * 0.012 +
         Number(controls.fineFocus || 0) * 0.03 +
-        Number(controls.cameraFocus || 0) * 0.018
+        Number(controls.cameraFocus || 0) * 0.018 +
+        Number(controls.insertion || 0) * 0.001
       );
-      detail.position.y = Number(controls.beamHeight || 0) * 0.002;
-      detail.rotation.y = Number(controls.sampleAngle || controls.angle || controls.turretAngle || controls.polarization || 0) * Math.PI / 180;
+      detail.position.y = (
+        Number(controls.beamHeight || 0) * 0.002 +
+        Number(controls.irisCenterY || 0) * 0.004 +
+        Number(controls.dumpHeight || 0) * 0.003
+      );
+      detail.position.z = Number(controls.irisCenterX || 0) * 0.004;
+      detail.rotation.x += (
+        Number(controls.tiltX || 0) +
+        Number(controls.dumpAngle || 0)
+      ) * Math.PI / 180;
+      detail.rotation.z += Number(controls.tiltZ || 0) * Math.PI / 180;
+      detail.rotation.y = (
+        deviceBaseYaw(device) * 180 / Math.PI +
+        Number(controls.sampleAngle || controls.angle || controls.turretAngle || controls.polarization || 0) +
+        Number(controls.filterAngle || 0)
+      ) * Math.PI / 180;
       detail.traverse((node) => {
         if (!node.userData?.focusKnob) return;
         if (!node.userData.focusBaseRotation) {
@@ -3693,12 +3965,14 @@
       group.rotation.y = start.rotation.y * (1 - progress);
       group.rotation.z = start.rotation.z * (1 - progress);
       const detail = state.proceduralGroups.get(id);
+      const device = state.presetInfo.devices.find((item) => item.id === id);
       if (detail && start.detailPosition && start.detailRotation) {
         detail.position.x = start.detailPosition.x * (1 - progress);
         detail.position.y = start.detailPosition.y * (1 - progress);
         detail.position.z = start.detailPosition.z * (1 - progress);
         detail.rotation.x = start.detailRotation.x * (1 - progress);
-        detail.rotation.y = start.detailRotation.y * (1 - progress);
+        detail.rotation.y = start.detailRotation.y * (1 - progress) +
+          (device ? deviceBaseYaw(device) : 0) * progress;
         detail.rotation.z = start.detailRotation.z * (1 - progress);
       }
       const controls = state.deviceControls.get(id);
@@ -3715,7 +3989,6 @@
           controls[definition.key] = fromNumber + (toNumber - fromNumber) * progress;
         }
       });
-      const device = state.presetInfo.devices.find((item) => item.id === id);
       if (device) drawAutoTuneBadge(device, controls, targetControls);
       syncAutoTuneHudValues(id);
       if (state.inspectorId === id) {
@@ -3885,6 +4158,11 @@
       mirror: `λ/10 反射面 · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
       splitter: `分束比 50:50 · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
       lens: `Φ 25.4 mm · 对准 ${Math.round(state.metrics.alignment * 100)}%`,
+      "beam-expander": `扩束倍率 ${formatNumber(state.deviceControls.get("beam-expander")?.zoom || 5, 1)}× · 准直就绪`,
+      iris: `开孔 ${formatNumber(state.deviceControls.get("iris")?.aperture || 12, 1)} mm · 中心对准`,
+      compensator: `K9 补偿板 · 光程差补偿 ${Math.round(state.metrics.alignment * 100)}%`,
+      "nd-filter": `衰减 ${formatNumber(state.deviceControls.get("nd-filter")?.attenuation || 1, 1)} OD · ${formatNumber(state.deviceControls.get("nd-filter")?.transmission || 10, 1)}% T`,
+      "beam-dump": `吸收就绪 · 残余反射 < 0.2%`,
       screen: `条纹可见度 ${Math.round(state.metrics.alignment * 100)}%`,
       scope: `${display.scopeFrequencyText} · ${display.scopeTimebase}`,
       "power-meter": `${display.powerText} @ ${display.wavelengthText}`,
@@ -3954,6 +4232,47 @@
         add("表面质量", "40–20 scratch-dig");
         add("安装", "SM1 透镜架");
         add("细准焦", `${formatNumber(Number(liveControls.fineFocus) || 0, 2)} mm`);
+        break;
+      case "beam-expander":
+        add("扩束倍率", `${formatNumber(Number(liveControls.zoom) || 5, 1)}×`);
+        add("入射口径", "Ø 3–8 mm");
+        add("出射口径", "Ø 25–45 mm");
+        add("镜组结构", "双胶合消色差透镜");
+        add("调节轴", "轴向调焦 + 二维平移");
+        add("接口", "SM1 / M4 光学平台");
+        add("镜组间距", `${formatNumber(Number(liveControls.coarseFocus) || 0, 2)} mm`);
+        break;
+      case "iris":
+        add("通光范围", "2–25 mm");
+        add("叶片结构", "10 片低反射发黑钢片");
+        add("中心高度", "50 mm 标准光轴");
+        add("调节轴", "开孔 + 横向 + 高度");
+        add("安装", "M4 磁性底座 / 立柱");
+        add("当前开孔", `${formatNumber(Number(liveControls.aperture) || 12, 1)} mm`);
+        break;
+      case "compensator":
+        add("材料", "K9 精密退火玻璃");
+        add("厚度", "与分束器基片等厚");
+        add("平行度", "< 10 arcsec");
+        add("面型", "λ/10 @ 633 nm");
+        add("调节轴", "θx / θy + 切入深度");
+        add("当前俯仰", `${formatNumber(Number(liveControls.tiltX) || 0, 2)}°`);
+        break;
+      case "nd-filter":
+        add("衰减范围", "0.1–10 OD");
+        add("工作波段", "400–1100 nm");
+        add("透射率", `${formatNumber(Number(liveControls.transmission) || 10, 1)}%`);
+        add("通光口径", "Ø 25.4 mm");
+        add("调节轴", "旋转刻度 + 二维平移");
+        add("当前衰减", `${formatNumber(Number(liveControls.attenuation) || 1, 1)} OD`);
+        break;
+      case "beam-dump":
+        add("吸收结构", "锥形蜂窝吸收腔");
+        add("适用功率", "≤ 5 W 连续波");
+        add("残余反射", "< 0.2%");
+        add("入射口径", "Ø 25 mm");
+        add("安全距离", `${formatNumber(Number(liveControls.dumpDistance) || 80, 0)} mm`);
+        add("安装", "M4 平台 / 磁性底座");
         break;
       case "scope":
         add("带宽", "100 MHz");
@@ -4199,6 +4518,10 @@
         : "当前无外部线缆；作为独立器件使用";
     const warningMap = {
       laser: "禁止直视出光口或镜面反射光；调整光路前必须关闭快门并确认激光等级。",
+      iris: "收小光阑时关注衍射和热效应；不得用手直接触碰发黑叶片。",
+      compensator: "拿取时仅接触镜架，避免指纹和划伤；调节后重新锁紧镜架。",
+      "nd-filter": "确认衰减片适用于当前波长和功率密度；高功率下不得贴近焦点使用。",
+      "beam-dump": "出光前确认吸收筒已正对杂散光，且不会把反射光引向人员或易燃物。",
       "power-supply": "不得超出额定电压和电流；接线、改线和拆线前先关闭输出。",
       scope: "输入电压不得超过探头和通道额定值；测量市电必须使用隔离差分探头。",
       multimeter: "测量前确认档位、插孔和量程；禁止用电流档直接并联电源。",

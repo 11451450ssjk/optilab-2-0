@@ -8,6 +8,11 @@
     ["mirror-b", "反射镜 B", "mirror", "optical"],
     ["splitter", "分束镜", "splitter", "optical"],
     ["lens", "聚焦透镜", "lens", "optical"],
+    ["beam-expander", "扩束镜组", "lens", "optical"],
+    ["iris", "可变光阑", "instrument", "optical", "◎"],
+    ["compensator", "补偿板", "instrument", "optical", "▱"],
+    ["nd-filter", "中性衰减片", "instrument", "optical", "ND"],
+    ["beam-dump", "光束终止器", "instrument", "optical", "■"],
     ["sample", "待测样品", "sample", "optical"],
     ["screen", "观察屏", "screen", "optical"],
     ["detector", "光电探测器", "detector", "optical"],
@@ -80,6 +85,10 @@
     power: ["+4mm", "−4mm", "GND"],
     probe: ["TIP", "GND", "BNC50Ω"],
     detector: ["SIG/BNC", "BIAS"],
+    iris: ["FREE-SPACE"],
+    compensator: ["FREE-SPACE"],
+    "nd-filter": ["FREE-SPACE"],
+    "beam-dump": ["BEAM STOP"],
     mcu: ["GPIO", "ADC", "UART", "5V/GND"],
     sensor: ["VCC", "GND", "SIG"],
     actuator: ["VCC", "PWM", "GND"],
@@ -111,6 +120,7 @@
     "professional-breathing": { name: "专业认知 · 炫彩呼吸灯", devices: ["mcu", "led-strip", "power", "scope"], optics: [], cables: [["power", "mcu"], ["mcu", "led-strip"], ["mcu", "scope"]] },
     "professional-robot": { name: "专业认知 · 机器人小车", devices: ["mcu", "sensor", "actuator", "robot", "computer"], optics: [], cables: [["mcu", "sensor"], ["mcu", "actuator"], ["actuator", "robot"], ["mcu", "computer"]] },
     "optical-interference": { name: "光学干涉", devices: ["laser", "mirror-a", "mirror-b", "splitter", "lens", "screen", "detector", "scope"], optics: [["laser", "splitter", "mirror-a", "splitter", "lens", "screen"], ["splitter", "mirror-b", "splitter", "detector"]], cables: [["detector", "scope"]] },
+    "michelson": { name: "迈克尔逊干涉", devices: ["laser", "beam-expander", "iris", "splitter", "mirror-a", "mirror-b", "compensator", "nd-filter", "lens", "screen", "detector", "scope"], optics: [["laser", "beam-expander", "iris", "splitter", "compensator", "mirror-b", "compensator", "splitter", "mirror-a", "splitter", "nd-filter", "lens", "screen"], ["splitter", "detector"]], cables: [["detector", "scope"]] },
     "optics-general": { name: "应用光学", devices: ["white-source", "lens", "sample", "screen", "camera", "computer"], optics: [["white-source", "lens", "sample", "screen", "camera"]], cables: [["camera", "computer"]] },
     "polarization": { name: "偏振光学", devices: ["laser", "polarizer", "sample", "analyzer", "detector", "scope"], optics: [["laser", "polarizer", "sample", "analyzer", "detector"]], cables: [["detector", "scope"]] },
     "diffraction": { name: "衍射与光谱", devices: ["laser", "slit", "grating", "lens", "screen", "detector", "scope"], optics: [["laser", "slit", "grating", "lens", "screen"], ["screen", "detector"]], cables: [["detector", "scope"]] },
@@ -137,6 +147,43 @@
     "integrated": { name: "综合光电系统", devices: ["laser", "sample", "detector", "daq", "computer", "monitor"], optics: [["laser", "sample", "detector"]], cables: [["detector", "daq"], ["daq", "computer"], ["computer", "monitor"]] }
   };
 
+  const SUPPORT_DEVICES = {
+    "professional-light-path": ["iris", "nd-filter"],
+    "professional-instruments": ["iris", "nd-filter"],
+    "optical-interference": ["iris", "nd-filter", "beam-dump"],
+    "optics-general": ["iris", "nd-filter"],
+    polarization: ["iris", "nd-filter"],
+    diffraction: ["iris", "nd-filter", "beam-dump"],
+    spectrometer: ["iris", "nd-filter"],
+    "laser-lab": ["beam-expander", "iris", "nd-filter", "beam-dump"],
+    photoelectric: ["iris", "nd-filter"],
+    imaging: ["iris"],
+    holography: ["iris", "nd-filter", "beam-dump"],
+    solar: ["iris"],
+    integrated: ["iris", "nd-filter"]
+  };
+
+  const LAYOUT_OVERRIDES = {
+    michelson: {
+      laser: [0.08, 0.36],
+      "beam-expander": [0.22, 0.36],
+      iris: [0.32, 0.36],
+      splitter: [0.47, 0.36],
+      "mirror-a": [0.47, 0.10],
+      "mirror-b": [0.84, 0.36],
+      compensator: [0.65, 0.36],
+      "nd-filter": [0.54, 0.55],
+      lens: [0.54, 0.68],
+      screen: [0.54, 0.82],
+      detector: [0.25, 0.55],
+      scope: [0.18, 0.72]
+    }
+  };
+
+  function completePresetDevices(presetId, devices) {
+    return [...new Set([...(devices || []), ...(SUPPORT_DEVICES[presetId] || [])])];
+  }
+
   const PALETTES = [
     { bodyTop: "#4d5a55", bodyMid: "#26322f", bodyBottom: "#131b18", accent: "#d9b474", glow: "#7ec59a" },
     { bodyTop: "#40545d", bodyMid: "#22333b", bodyBottom: "#10191d", accent: "#77b8c4", glow: "#72b6ad" },
@@ -155,6 +202,7 @@
     preset: null,
     experimentId: "",
     currentConfig: null,
+    opticalRoutes: [],
     connectionSpecs: [],
     standardSummary: "",
     equipmentTraits: [],
@@ -214,7 +262,8 @@
       [/人体生物信号/i, "biomedical"],
       [/声速与光速/i, "wave-speed"],
       [/伏安特性|二极管|霍尔|巨磁|核磁|磁滞|晶体管输入/i, "semiconductor"],
-      [/迈克尔逊|牛顿环|相移干涉|剪切干涉/i, "optical-interference"],
+      [/迈克尔逊/i, "michelson"],
+      [/牛顿环|相移干涉|剪切干涉/i, "optical-interference"],
       [/双缝|单缝|干涉与衍射|衍射|涡旋|莫尔|泰伯/i, "diffraction"],
       [/偏振|马吕斯/i, "polarization"],
       [/光栅|分光计|光谱|傅里叶变换光谱/i, "spectrometer"],
@@ -246,7 +295,7 @@
       optics: "optics-general",
       grating: "spectrometer",
       polarization: "polarization",
-      michelson: "optical-interference",
+      michelson: "michelson",
       newton: "optical-interference",
       "double-slit": "diffraction",
       diffraction: "diffraction",
@@ -264,8 +313,17 @@
     return simMap[sim] || "measurement";
   }
 
-  function arrangeDevices(ids, seed = 0) {
+  function arrangeDevices(ids, seed = 0, presetId = "") {
     const definitions = ids.map((id) => DEVICE_MAP[id]).filter(Boolean);
+    const override = LAYOUT_OVERRIDES[presetId];
+    if (override) {
+      return definitions.map((item) => {
+        const position = override[item.id];
+        return position
+          ? { ...item, x: position[0], y: position[1] }
+          : { ...item, x: 0.12 + (definitions.indexOf(item) % 4) * 0.2, y: 0.86 };
+      });
+    }
     const optical = definitions.filter((item) => item.zone === "optical" || item.zone === "mixed");
     const electronic = definitions.filter((item) => item.zone === "electronic");
     const mechanical = definitions.filter((item) => item.zone === "mechanical");
@@ -296,6 +354,43 @@
       placeGroup(electronic, base, 0.14);
     }
     return positioned;
+  }
+
+  function createOpticalRoutes(preset, presetId) {
+    if (presetId === "michelson") {
+      return [
+        { fromId: "laser", toId: "beam-expander", fromPort: "right", toPort: "left", colorRole: "source", order: 0, path: 0, lane: 0, label: "相干光输出" },
+        { fromId: "beam-expander", toId: "iris", fromPort: "right", toPort: "left", colorRole: "source", order: 1, path: 0, lane: 0, label: "扩束" },
+        { fromId: "iris", toId: "splitter", fromPort: "right", toPort: "left", colorRole: "source", order: 2, path: 0, lane: 0, label: "入射分束镜" },
+        { fromId: "splitter", toId: "mirror-a", fromPort: "top", toPort: "bottom", colorRole: "arm-a", order: 3, path: 0, lane: -0.03, label: "固定参考臂" },
+        { fromId: "mirror-a", toId: "splitter", fromPort: "bottom", toPort: "top", colorRole: "arm-a-return", order: 4, path: 0, lane: 0.03, label: "参考臂返回" },
+        { fromId: "splitter", toId: "compensator", fromPort: "right", toPort: "left", colorRole: "arm-b", order: 3, path: 1, lane: 0.025, label: "测量臂" },
+        { fromId: "compensator", toId: "mirror-b", fromPort: "right", toPort: "left", colorRole: "arm-b", order: 4, path: 1, lane: 0.025, label: "补偿板 → 动镜" },
+        { fromId: "mirror-b", toId: "compensator", fromPort: "left", toPort: "right", colorRole: "arm-b-return", order: 5, path: 1, lane: -0.025, label: "动镜返回" },
+        { fromId: "compensator", toId: "splitter", fromPort: "left", toPort: "right", colorRole: "arm-b-return", order: 6, path: 1, lane: -0.025, label: "合束返回" },
+        { fromId: "splitter", toId: "nd-filter", fromPort: "bottom", toPort: "top", colorRole: "recombined", order: 5, path: 2, lane: 0, label: "干涉输出" },
+        { fromId: "nd-filter", toId: "lens", fromPort: "bottom", toPort: "top", colorRole: "recombined", order: 6, path: 2, lane: 0, label: "强度衰减" },
+        { fromId: "lens", toId: "screen", fromPort: "bottom", toPort: "top", colorRole: "observation", order: 7, path: 2, lane: 0, label: "干涉环" },
+        { fromId: "splitter", toId: "detector", fromPort: "bottom-left", toPort: "top-right", colorRole: "detector", order: 5, path: 3, lane: 0, label: "第二输出 · 光电探测" }
+      ];
+    }
+    const routes = [];
+    (preset.optics || []).forEach((path, pathIndex) => {
+      for (let index = 0; index < path.length - 1; index += 1) {
+        routes.push({
+          fromId: path[index],
+          toId: path[index + 1],
+          fromPort: "auto",
+          toPort: "auto",
+          colorRole: pathIndex === 0 ? "source" : "branch",
+          order: index,
+          path: pathIndex,
+          lane: pathIndex % 2 === 0 ? -0.012 : 0.012,
+          label: pathIndex === 0 ? "主光路" : `分光支路 ${pathIndex}`
+        });
+      }
+    });
+    return routes;
   }
 
   function inferCableStandard(from, to, presetId) {
@@ -464,7 +559,9 @@
     state.preset = preset;
     state.experimentId = config.experimentId || "";
     state.currentConfig = { ...config };
-    state.devices = arrangeDevices(preset.devices, seed);
+    const expandedDevices = completePresetDevices(presetId, preset.devices);
+    state.devices = arrangeDevices(expandedDevices, seed, presetId);
+    state.opticalRoutes = createOpticalRoutes(preset, presetId);
     state.palette = PALETTES[seed % PALETTES.length];
     state.equipmentTraits = decorateExperimentDevices(state.devices, config, seed);
     state.defaultPositions = new Map(state.devices.map((device) => [device.id, { x: device.x, y: device.y }]));
@@ -806,49 +903,122 @@
     });
   }
 
+  function beamAnchor(device, target, port = "auto", lane = 0) {
+    const box = bounds(device);
+    const targetBox = bounds(target);
+    const dx = targetBox.cx - box.cx;
+    const dy = targetBox.cy - box.cy;
+    let resolved = port;
+    if (!resolved || resolved === "auto") {
+      resolved = Math.abs(dx) >= Math.abs(dy)
+        ? (dx >= 0 ? "right" : "left")
+        : (dy >= 0 ? "bottom" : "top");
+    }
+    let x = box.cx;
+    let y = box.cy;
+    if (resolved.includes("left")) x = box.x;
+    if (resolved.includes("right")) x = box.x + box.width;
+    if (resolved.includes("top")) y = box.y;
+    if (resolved.includes("bottom")) y = box.y + box.height;
+    const length = Math.hypot(dx, dy) || 1;
+    const offset = lane * state.width;
+    return {
+      x: x + (-dy / length) * offset,
+      y: y + (dx / length) * offset
+    };
+  }
+
+  function beamRoleColor(role, fallback) {
+    const colors = {
+      source: [255, 82, 84],
+      "arm-a": [73, 212, 232],
+      "arm-a-return": [93, 166, 255],
+      "arm-b": [255, 188, 72],
+      "arm-b-return": [255, 112, 86],
+      recombined: [255, 222, 159],
+      observation: [255, 241, 190],
+      detector: [103, 231, 157],
+      branch: [255, 174, 82]
+    };
+    return colors[role] || fallback;
+  }
+
   function drawBeam(context, from, to, time, color, strength = 1, phase = 0) {
     context.save();
     context.lineCap = "round";
-    context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.1 + strength * 0.18})`;
-    context.lineWidth = 7;
+    context.shadowColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.8)`;
+    context.shadowBlur = 15;
+    context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.12 + strength * 0.2})`;
+    context.lineWidth = 10;
     context.beginPath();
     context.moveTo(from.x, from.y);
     context.lineTo(to.x, to.y);
     context.stroke();
-    context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.5 + strength * 0.4})`;
-    context.lineWidth = 1.7;
-    context.setLineDash([8, 8]);
-    context.lineDashOffset = -time * 0.045;
+    context.shadowBlur = 0;
+    context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.62 + strength * 0.28})`;
+    context.lineWidth = 3.6;
     context.beginPath();
     context.moveTo(from.x, from.y);
     context.lineTo(to.x, to.y);
     context.stroke();
-    context.setLineDash([]);
-    const progress = (time * 0.00018 + phase) % 1;
-    const x = from.x + (to.x - from.x) * progress;
-    const y = from.y + (to.y - from.y) * progress;
-    context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.95)`;
+    context.strokeStyle = `rgba(255, 255, 244, ${0.34 + strength * 0.45})`;
+    context.lineWidth = 1.1;
     context.beginPath();
-    context.arc(x, y, 2.8, 0, Math.PI * 2);
+    context.moveTo(from.x, from.y);
+    context.lineTo(to.x, to.y);
+    context.stroke();
+    const cycleDuration = 6800;
+    const cycle = (time % cycleDuration) / cycleDuration;
+    const local = (cycle - phase * 0.9 + 1) % 1;
+    if (local <= 0.14) {
+      const linear = local / 0.14;
+      const progress = linear * linear * (3 - 2 * linear);
+      const x = from.x + (to.x - from.x) * progress;
+      const y = from.y + (to.y - from.y) * progress;
+      const glow = context.createRadialGradient(x, y, 0, x, y, 9);
+      glow.addColorStop(0, "rgba(255,255,246,0.98)");
+      glow.addColorStop(0.25, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.95)`);
+      glow.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
+      context.fillStyle = glow;
+      context.beginPath();
+      context.arc(x, y, 8, 0, Math.PI * 2);
+      context.fill();
+    }
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    context.translate(from.x + (to.x - from.x) * 0.58, from.y + (to.y - from.y) * 0.58);
+    context.rotate(angle);
+    context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.72)`;
+    context.beginPath();
+    context.moveTo(7, 0);
+    context.lineTo(-5, -3.4);
+    context.lineTo(-5, 3.4);
+    context.closePath();
     context.fill();
     context.restore();
   }
 
   function drawOpticalPath(context, time, config) {
     const metrics = state.metrics;
-    const color = config.beamColor || [216, 172, 95];
-    (state.preset?.optics || []).forEach((path, pathIndex) => {
-      const devices = path.map(deviceById).filter(Boolean);
-      for (let index = 0; index < devices.length - 1; index += 1) {
-        drawBeam(
-          context,
-          point(devices[index], "right"),
-          point(devices[index + 1], "left"),
-          time,
-          color,
-          metrics.alignment * (0.9 - index * 0.03),
-          (pathIndex * 0.21 + index * 0.13) % 1
-        );
+    const defaultColor = config.beamColor || [216, 172, 95];
+    (state.opticalRoutes || []).forEach((route, routeIndex) => {
+      const fromDevice = deviceById(route.fromId);
+      const toDevice = deviceById(route.toId);
+      if (!fromDevice || !toDevice) return;
+      const from = beamAnchor(fromDevice, toDevice, route.fromPort, route.lane || 0);
+      const to = beamAnchor(toDevice, fromDevice, route.toPort, route.lane || 0);
+      const strength = clamp(metrics.alignment - (route.path || 0) * 0.035, 0.2, 1);
+      const phase = (route.order || 0) * 0.16 + (route.path || 0) * 0.07 + routeIndex * 0.003;
+      const color = beamRoleColor(route.colorRole, defaultColor);
+      drawBeam(context, from, to, time, color, strength, phase);
+      const showLabel = state.presetId === "michelson" && route.label &&
+        (route.fromId === state.selected || route.toId === state.selected);
+      if (showLabel) {
+        context.save();
+        context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.82)`;
+        context.font = '7px "Microsoft YaHei UI", sans-serif';
+        context.textAlign = "center";
+        context.fillText(route.label, (from.x + to.x) / 2, (from.y + to.y) / 2 - 7);
+        context.restore();
       }
     });
   }
@@ -993,6 +1163,144 @@
     context.beginPath();
     context.ellipse(box.x + box.width / 2 - 2, box.y + box.height * 0.43, box.width * 0.06, box.height * 0.2, 0, 0, Math.PI * 2);
     context.stroke();
+  }
+
+  function drawOpticalMount(context, box) {
+    context.fillStyle = "rgba(17, 24, 22, 0.94)";
+    roundRect(context, box.x + box.width * 0.27, box.y + box.height * 0.71, box.width * 0.46, box.height * 0.22, 3);
+    context.fill();
+    context.fillStyle = "rgba(190, 155, 76, 0.9)";
+    roundRect(context, box.x + box.width * 0.46, box.y + box.height * 0.61, box.width * 0.08, box.height * 0.16, 2);
+    context.fill();
+    context.strokeStyle = "rgba(187, 205, 194, 0.34)";
+    context.beginPath();
+    context.moveTo(box.x + box.width * 0.32, box.y + box.height * 0.92);
+    context.lineTo(box.x + box.width * 0.68, box.y + box.height * 0.92);
+    context.stroke();
+  }
+
+  function drawBeamExpander(context, box) {
+    drawOpticalMount(context, box);
+    context.fillStyle = "#0a1110";
+    roundRect(context, box.x + box.width * 0.16, box.y + box.height * 0.31, box.width * 0.68, box.height * 0.35, 5);
+    context.fill();
+    context.strokeStyle = "rgba(182, 199, 190, 0.62)";
+    context.lineWidth = 1;
+    context.stroke();
+    [0.31, 0.66].forEach((ratio, index) => {
+      const radius = index ? box.height * 0.13 : box.height * 0.08;
+      context.fillStyle = "rgba(120, 206, 214, 0.18)";
+      context.beginPath();
+      context.ellipse(box.x + box.width * ratio, box.y + box.height * 0.49, radius * 0.42, radius, 0, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = "rgba(206, 235, 226, 0.62)";
+      context.stroke();
+    });
+    context.strokeStyle = "rgba(226, 188, 104, 0.78)";
+    context.beginPath();
+    context.moveTo(box.x + box.width * 0.45, box.y + box.height * 0.28);
+    context.lineTo(box.x + box.width * 0.45, box.y + box.height * 0.69);
+    context.stroke();
+  }
+
+  function drawIris(context, box) {
+    drawOpticalMount(context, box);
+    const cx = box.x + box.width * 0.5;
+    const cy = box.y + box.height * 0.43;
+    const radius = Math.min(box.width, box.height) * 0.29;
+    context.fillStyle = "#111715";
+    context.beginPath();
+    context.arc(cx, cy, radius, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(209, 184, 121, 0.75)";
+    context.lineWidth = 1.2;
+    context.stroke();
+    for (let index = 0; index < 8; index += 1) {
+      const angle = index * Math.PI / 4;
+      context.fillStyle = "rgba(93, 106, 100, 0.92)";
+      context.beginPath();
+      context.moveTo(cx + Math.cos(angle) * radius * 0.22, cy + Math.sin(angle) * radius * 0.22);
+      context.lineTo(cx + Math.cos(angle + 0.72) * radius * 0.88, cy + Math.sin(angle + 0.72) * radius * 0.88);
+      context.lineTo(cx + Math.cos(angle + 0.32) * radius * 0.88, cy + Math.sin(angle + 0.32) * radius * 0.88);
+      context.closePath();
+      context.fill();
+    }
+    context.fillStyle = "#020605";
+    context.beginPath();
+    context.arc(cx, cy, radius * 0.25, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(234, 197, 108, 0.86)";
+    context.beginPath();
+    context.moveTo(cx + radius * 0.6, cy);
+    context.lineTo(cx + radius * 1.15, cy - radius * 0.15);
+    context.stroke();
+  }
+
+  function drawCompensator(context, box) {
+    drawOpticalMount(context, box);
+    context.save();
+    context.translate(box.x + box.width * 0.5, box.y + box.height * 0.43);
+    context.rotate(-0.26);
+    const glass = context.createLinearGradient(-box.width * 0.12, 0, box.width * 0.12, 0);
+    glass.addColorStop(0, "rgba(86, 139, 142, 0.22)");
+    glass.addColorStop(0.48, "rgba(220, 237, 222, 0.68)");
+    glass.addColorStop(1, "rgba(89, 145, 142, 0.24)");
+    context.fillStyle = glass;
+    roundRect(context, -box.width * 0.1, -box.height * 0.3, box.width * 0.2, box.height * 0.6, 2);
+    context.fill();
+    context.strokeStyle = "rgba(212, 231, 221, 0.7)";
+    context.stroke();
+    context.restore();
+    context.fillStyle = "rgba(225, 187, 98, 0.9)";
+    context.font = '6px "Cascadia Mono", monospace';
+    context.fillText("λ/4", box.x + box.width * 0.61, box.y + box.height * 0.34);
+  }
+
+  function drawNdFilter(context, box) {
+    drawOpticalMount(context, box);
+    const cx = box.x + box.width * 0.5;
+    const cy = box.y + box.height * 0.43;
+    const radius = Math.min(box.width, box.height) * 0.27;
+    context.fillStyle = "rgba(30, 50, 48, 0.96)";
+    context.beginPath();
+    context.arc(cx, cy, radius + 3, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(219, 185, 109, 0.72)";
+    context.stroke();
+    context.fillStyle = "rgba(8, 17, 16, 0.9)";
+    context.beginPath();
+    context.arc(cx, cy, radius, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "rgba(185, 214, 199, 0.78)";
+    context.font = '7px "Cascadia Mono", monospace';
+    context.textAlign = "center";
+    context.fillText("ND", cx, cy + 2);
+    for (let index = 0; index < 12; index += 1) {
+      const angle = index * Math.PI / 6;
+      context.fillStyle = index % 3 === 0 ? "rgba(231, 194, 103, 0.8)" : "rgba(164, 178, 169, 0.4)";
+      context.fillRect(cx + Math.cos(angle) * (radius + 5), cy + Math.sin(angle) * (radius + 5), 1, 2);
+    }
+    context.textAlign = "left";
+  }
+
+  function drawBeamDump(context, box) {
+    drawOpticalMount(context, box);
+    context.fillStyle = "#070c0b";
+    roundRect(context, box.x + box.width * 0.17, box.y + box.height * 0.23, box.width * 0.66, box.height * 0.45, 5);
+    context.fill();
+    context.strokeStyle = "rgba(130, 143, 133, 0.52)";
+    context.stroke();
+    for (let index = 1; index < 5; index += 1) {
+      context.strokeStyle = "rgba(120, 147, 132, 0.25)";
+      context.beginPath();
+      context.moveTo(box.x + box.width * (0.17 + index * 0.08), box.y + box.height * 0.23);
+      context.lineTo(box.x + box.width * (0.17 + index * 0.08), box.y + box.height * 0.68);
+      context.stroke();
+    }
+    context.fillStyle = "rgba(210, 89, 67, 0.66)";
+    context.beginPath();
+    context.arc(box.x + box.width * 0.5, box.y + box.height * 0.45, 2.4, 0, Math.PI * 2);
+    context.fill();
   }
 
   function drawSample(context, box, time, device) {
@@ -1302,21 +1610,28 @@
     context.shadowColor = "rgba(0,0,0,0.35)";
     context.shadowBlur = 12;
     context.shadowOffsetY = 5;
-    switch (device.type) {
-      case "laser": drawLaser(context, box, time, device); break;
-      case "mirror": drawMirror(context, box); break;
-      case "splitter": drawSplitter(context, box); break;
-      case "lens": drawLens(context, box); break;
-      case "sample": drawSample(context, box, time, device); break;
-      case "screen": drawScreen(context, box, time, config); break;
-      case "detector": drawDetector(context, box, time); break;
-      case "power": drawPower(context, box); break;
-      case "signal": drawSignal(context, box, time); break;
-      case "board": drawBoard(context, box, device); break;
-      case "probe": drawProbe(context, box); break;
-      case "scope": drawScope(context, box, time, state.metrics.frequency); break;
-      case "computer": drawComputer(context, box, time); break;
-      default: drawGenericInstrument(context, box, device, time); break;
+    if (device.id === "beam-expander") drawBeamExpander(context, box);
+    else if (device.id === "iris") drawIris(context, box);
+    else if (device.id === "compensator") drawCompensator(context, box);
+    else if (device.id === "nd-filter") drawNdFilter(context, box);
+    else if (device.id === "beam-dump") drawBeamDump(context, box);
+    else {
+      switch (device.type) {
+        case "laser": drawLaser(context, box, time, device); break;
+        case "mirror": drawMirror(context, box); break;
+        case "splitter": drawSplitter(context, box); break;
+        case "lens": drawLens(context, box); break;
+        case "sample": drawSample(context, box, time, device); break;
+        case "screen": drawScreen(context, box, time, config); break;
+        case "detector": drawDetector(context, box, time); break;
+        case "power": drawPower(context, box); break;
+        case "signal": drawSignal(context, box, time); break;
+        case "board": drawBoard(context, box, device); break;
+        case "probe": drawProbe(context, box); break;
+        case "scope": drawScope(context, box, time, state.metrics.frequency); break;
+        case "computer": drawComputer(context, box, time); break;
+        default: drawGenericInstrument(context, box, device, time); break;
+      }
     }
     context.restore();
     if (device.id === state.selected) {
@@ -1509,7 +1824,8 @@
       id: state.presetId,
       name: state.preset.name,
       experimentId: state.experimentId,
-      devices: [...state.preset.devices],
+      devices: state.devices.map((device) => ({ ...device })),
+      routes: state.opticalRoutes.map((route) => ({ ...route })),
       standards: state.standardSummary,
       equipmentTraits: [...state.equipmentTraits],
       connections: state.connectionSpecs.map((item) => ({ ...item }))
@@ -1521,7 +1837,9 @@
       });
       const preset = PRESETS[presetId] || PRESETS.measurement;
       const seed = hashString(experiment.id || experiment.name || presetId);
-      const devices = arrangeDevices(preset.devices, seed);
+      const expandedDevices = completePresetDevices(presetId, preset.devices);
+      const devices = arrangeDevices(expandedDevices, seed, presetId);
+      const opticalRoutes = createOpticalRoutes(preset, presetId);
       const connections = createConnectionSpecs(preset, presetId, seed);
       const equipmentTraits = decorateExperimentDevices(devices, {
         experimentId: experiment.id,
@@ -1535,6 +1853,7 @@
         id: presetId,
         name: preset.name,
         devices: devices.map((device) => ({ ...device })),
+        routes: opticalRoutes.map((route) => ({ ...route })),
         optics: preset.optics.map((path) => [...path]),
         cables: preset.cables.map((path) => [...path]),
         standards: connections.summary,
