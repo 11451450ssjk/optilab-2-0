@@ -2840,6 +2840,15 @@ function filteredCatalog() {
     .filter((semester) => semester.experiments.length);
 }
 
+function semesterDisplayCode(semester) {
+  const direct = semester.officialCode || semester.catalogCode || semester.code;
+  if (direct) return String(direct);
+  if (semester.scope === "hust-exact") return `HUST-${String(semester.year || 0).padStart(2, "0")}`;
+  if (semester.scope === "electrical") return "HUST-EE";
+  if (semester.scope === "graduate") return `GR-${String(semester.degreeYear || 1).padStart(2, "0")}`;
+  return String((semester.year - 1) * 2 + semester.term).padStart(2, "0");
+}
+
 function renderCatalog() {
   const container = document.getElementById("semester-list");
   const catalog = filteredCatalog();
@@ -2871,11 +2880,12 @@ function renderCatalog() {
         : semester.scope === "graduate"
           ? `研究生 · 研${semester.degreeYear === 2 ? "二" : "一"} · `
           : "";
+    const displayedCode = semesterDisplayCode(semester);
     return `
     <section class="semester-group ${semester.scope === "hust" ? "hust-course-group" : ""} ${semester.scope === "hust-exact" ? "hust-exact-course-group" : ""} ${semester.scope === "electrical" ? "electrical-course-group" : ""} ${semester.scope === "graduate" ? "graduate-course-group" : ""}">
       <div class="semester-header">
         <div>
-          <span class="semester-number">${officialCourse ? semester.officialCode : String((semester.year - 1) * 2 + semester.term).padStart(2, "0")}</span>
+          <span class="semester-number">${displayedCode}</span>
           <div>
             <h3>${coursePrefix || `大${["一", "二", "三", "四"][semester.year - 1]} · ${semester.term === 1 ? "上学期" : "下学期"} · `}${semester.title}</h3>
             <p>${semester.focus}${officialCourse ? ` · ${semester.officialCredits} 学分 / ${semester.officialHours}` : ""}${semester.location ? ` · ${semester.location}` : ""}</p>
@@ -2889,7 +2899,7 @@ function renderCatalog() {
       <div class="experiment-card-grid ${openByDefault ? "" : "collapsed"}" data-group-grid="${semester.id}">
         ${semester.experiments.map((experiment, index) => `
           <button class="experiment-card ${experiment.id === state.experimentId ? "selected" : ""} ${semester.scope === "hust" ? "hust-experiment-card" : ""} ${semester.scope === "hust-exact" ? "hust-exact-experiment-card" : ""} ${semester.scope === "electrical" ? "electrical-experiment-card" : ""} ${semester.scope === "graduate" ? "graduate-experiment-card" : ""}" data-experiment-id="${experiment.id}">
-            <span class="experiment-card-index">${officialCourse ? semester.officialCode : "EXP"} ${String(index + 1).padStart(2, "0")}</span>
+            <span class="experiment-card-index">${displayedCode} ${String(index + 1).padStart(2, "0")}</span>
             <h4>${escapeHtml(experiment.name)}</h4>
             <p>${escapeHtml(experiment.description)}</p>
             <span class="experiment-card-formula">${escapeHtml(experiment.formula)}</span>

@@ -1,0 +1,246 @@
+.advanced-body .catalog-toolbar {
+  position: relative;
+  z-index: 8;
+  gap: 10px;
+  border-color: rgba(109, 126, 116, 0.32);
+  background:
+    linear-gradient(180deg, rgba(24, 31, 33, 0.97), rgba(17, 23, 25, 0.97));
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.advanced-body .catalog-search {
+  min-height: 38px;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.advanced-body .catalog-search:focus-within {
+  border-color: rgba(212, 173, 104, 0.46);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.catalog-search-clear {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: none;
+  place-items: center;
+  border: 1px solid rgba(151, 166, 157, 0.22);
+  border-radius: 50%;
+  color: #9ba59f;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.catalog-search-clear.is-visible {
+  display: grid;
+}
+
+.advanced-body .year-filter {
+  padding: 4px;
+  gap: 3px;
+  border: 1px solid rgba(125, 140, 132, 0.1);
+}
+
+.advanced-body .year-filter button {
+  min-height: 30px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.advanced-body .year-filter button[aria-pressed="true"] {
+  color: #e3c185;
+  background: rgba(194, 151, 84, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(202, 161, 94, 0.28);
+}
+
+.advanced-body .official-source-banner {
+  min-height: 62px;
+  padding: 11px 14px;
+  border-color: rgba(123, 100, 65, 0.48);
+}
+
+.advanced-body .official-source-banner p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.advanced-body .semester-group {
+  border-color: rgba(66, 76, 73, 0.72);
+}
+
+.advanced-body .semester-header {
+  min-height: 72px;
+  padding: 14px 17px;
+}
+
+.advanced-body .semester-header > div:first-child {
+  min-width: 0;
+}
+
+.advanced-body .semester-number {
+  width: auto;
+  min-width: 48px;
+  height: 34px;
+  padding: 0 9px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(205, 171, 112, 0.14);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.advanced-body .semester-header h3 {
+  overflow: hidden;
+  max-width: min(760px, 62vw);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-body .semester-header p {
+  overflow: hidden;
+  max-width: min(820px, 64vw);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-body .semester-group-actions {
+  flex: 0 0 auto;
+}
+
+.advanced-body .experiment-card-grid {
+  padding: 13px;
+  align-items: stretch;
+}
+
+.advanced-body .experiment-card {
+  min-height: 166px;
+  padding: 15px;
+  overflow: hidden;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.018), transparent 60%),
+    #191f22;
+}
+
+.advanced-body .experiment-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, #8f6a38, #dfba7c, transparent);
+  transition: opacity 160ms ease;
+}
+
+.advanced-body .experiment-card:hover::before,
+.advanced-body .experiment-card.selected::before {
+  opacity: 1;
+}
+
+.advanced-body .experiment-card-index {
+  max-width: calc(100% - 52px);
+  overflow: hidden;
+  color: #9fa8a3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-body .experiment-card h4 {
+  margin: 9px 0 7px;
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 36px;
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.advanced-body .experiment-card p {
+  min-height: 48px;
+  -webkit-line-clamp: 3;
+}
+
+.advanced-body .experiment-card-formula {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-body .experiment-card-tags {
+  margin-top: auto;
+  padding-top: 9px;
+}
+
+@media (min-width: 761px) {
+  .advanced-body .catalog-toolbar {
+    position: sticky;
+    top: 10px;
+    backdrop-filter: blur(16px);
+  }
+
+  .advanced-body .catalog-toolbar:focus-within {
+    border-color: rgba(198, 155, 90, 0.42);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.24);
+  }
+}
+
+@media (max-width: 900px) {
+  .advanced-body .semester-header h3,
+  .advanced-body .semester-header p {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .advanced-body .official-source-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .advanced-body .official-source-banner > i {
+    width: 100%;
+    margin-left: 0;
+    text-align: right;
+  }
+
+  .advanced-body .semester-header {
+    min-height: 0;
+    align-items: flex-start;
+  }
+
+  .advanced-body .semester-header h3 {
+    white-space: normal;
+    line-height: 1.5;
+  }
+
+  .advanced-body .semester-header p {
+    white-space: normal;
+  }
+
+  .advanced-body .semester-group-actions > span {
+    display: none;
+  }
+
+  .advanced-body .experiment-card {
+    min-height: 0;
+  }
+
+  .advanced-body .experiment-card p {
+    min-height: 0;
+  }
+}
+
+html[data-theme="day"] .advanced-body .catalog-toolbar {
+  background: rgba(250, 247, 239, 0.97);
+}
+
+html[data-theme="day"] .advanced-body .experiment-card {
+  background: #fbfaf6;
+}
