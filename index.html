@@ -3,14 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <script>
-    location.replace(`advanced.html${location.search}${location.hash}`);
+    (() => {
+      const target = `advanced.html?entry=root&v=20261128-mesh-wave-sensor${location.search ? `&${location.search.slice(1)}` : ""}${location.hash || ""}`;
+      window.__optilabTarget = target;
+      location.replace(target);
+      window.setTimeout(() => {
+        document.documentElement.dataset.redirectDelayed = "1";
+      }, 2200);
+    })();
   </script>
-  <noscript><meta http-equiv="refresh" content="0;url=advanced.html"></noscript>
+  <noscript><meta http-equiv="refresh" content="0;url=advanced.html?entry=noscript&amp;v=20261128-mesh-wave-sensor"></noscript>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2313231b%22/><circle cx=%2216%22 cy=%2216%22 r=%224%22 fill=%22%23b8f0a0%22/></svg>">
   <title>OptiLab | 光电与电子信息实验与科研助手</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      color: #e7e2d6;
+      background: radial-gradient(circle at 70% 20%, #26342e, #07100f 62%);
+      font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(560px, calc(100% - 32px));
+      padding: 30px;
+      border: 1px solid rgba(216, 177, 109, 0.3);
+      border-radius: 20px;
+      background: rgba(8, 17, 17, 0.9);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+    }
+    strong { display: block; margin-bottom: 9px; font-size: 23px; }
+    p { margin: 0 0 18px; color: #98a59e; line-height: 1.7; }
+    a {
+      min-height: 44px;
+      padding: 0 17px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 10px;
+      color: #1b1e1c;
+      background: #ddba7d;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .retry { margin-top: 12px; color: #829089; font-size: 12px; }
+    [data-redirect-delayed="1"] .waiting { display: none; }
+    .delayed { display: none; }
+    [data-redirect-delayed="1"] .delayed { display: block; }
+  </style>
 </head>
 <body>
-  <p>正在进入 OptiLab，<a href="advanced.html">点击这里继续</a>。</p>
+  <main>
+    <strong>OptiLab</strong>
+    <p class="waiting">正在进入主程序。如果页面没有自动跳转，请点击下方按钮。</p>
+    <p class="delayed">自动跳转没有完成。请使用新入口打开；若仍然失败，可稍后刷新。</p>
+    <a id="direct-entry" href="advanced.html?entry=direct&amp;v=20261128-mesh-wave-sensor">打开 OptiLab 主程序</a>
+    <p class="retry">直接地址：<span id="direct-address">advanced.html</span></p>
+  </main>
+  <script>
+    (() => {
+      const url = new URL(window.__optilabTarget || "advanced.html", location.href);
+      const link = document.getElementById("direct-entry");
+      link.href = url.href;
+      document.getElementById("direct-address").textContent = url.href;
+    })();
+  </script>
 </body>
 </html>
