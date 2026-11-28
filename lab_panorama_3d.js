@@ -40,6 +40,8 @@
     lastMinimapUpdate: 0,
     lastMeshTraceAt: 0,
     meshHitCache: new Map(),
+    dynamicTransmission: 1,
+    dynamicEffects: [],
     waveRaster: null,
     cameraRaster: null,
     lastTrace3D: null,
@@ -3093,6 +3095,58 @@
     };
   }
 
+  function threeDBeamEffect(device) {
+    const kind = deviceKind(device || {});
+    if (kind === "beam-dump") return { effect: "block", transmission: 0, width: 0.3, penalty: 0.24, fan: [] };
+    if (kind === "screen") return { effect: "observe", transmission: 0, width: 0.5, penalty: 0.01, fan: [] };
+    if (kind === "detector") return { effect: "detect", transmission: 0, width: 0.5, penalty: 0.01, fan: [] };
+    if (kind === "iris") return { effect: "iris", transmission: 0.48, width: 0.42, penalty: 0.06, fan: [] };
+    if (kind === "nd-filter") return { effect: "attenuate", transmission: 0.2, width: 0.88, penalty: 0.02, fan: [] };
+    if (kind === "polarizer") return { effect: "polarize", transmission: 0.38, width: 0.9, penalty: 0.04, fan: [] };
+    if (kind === "compensator") return { effect: "phase", transmission: 0.9, width: 0.94, penalty: 0.035, fan: [] };
+    if (kind === "lens" || kind === "beam-expander") return { effect: "lens", transmission: 0.92, width: 0.82, penalty: 0.045, fan: [] };
+    if (kind === "splitter") return { effect: "split", transmission: 0.5, width: 0.9, penalty: 0.055, fan: [-0.52, 0.52] };
+    if (kind === "mirror") return { effect: "reflect", transmission: 0.45, width: 0.9, penalty: 0.075, fan: [Math.PI / 2] };
+    if (kind === "slit") return { effect: "diffract", transmission: 0.62, width: 0.72, penalty: 0.045, fan: [-0.18, 0, 0.18] };
+    if (kind === "grating" || kind === "prism") return { effect: "disperse", transmission: 0.68, width: 0.86, penalty: 0.035, fan: [-0.2, 0, 0.2] };
+    return { effect: "obstruct", transmission: 0.06, width: 0.6, penalty: 0.14, fan: [] };
+  }
+
+  function proximity3DEffects(beamRoutes) {
+    const results = [];
+    beamRoutes.forEach((entry) => {
+      const from = entry.from;
+      const to = entry.to;
+      const dx = to.x - from.x;
+      const dz = to.z - from.z;
+      const lengthSquared = dx * dx + dz * dz || 1;
+      const length = Math.sqrt(lengthSquared);
+      state.presetInfo.devices.forEach((device) => {
+        if (device.id === entry.route.fromId || device.id === entry.route.toId) return;
+        const group = state.deviceGroups.get(device.id);
+        if (!group) return;
+        const t = clamp(((group.position.x - from.x) * dx + (group.position.z - from.z) * dz) / lengthSquared, 0, 1);
+        if (t < 0.05 || t > 0.95) return;
+        const hitX = from.x + dx * t;
+        const hitZ = from.z + dz * t;
+        const distance = Math.hypot(group.position.x - hitX, group.position.z - hitZ);
+        if (distance > Math.max(0.2, Math.min(0.42, length * 0.08))) return;
+        const effect = threeDBeamEffect(device);
+        results.push({
+          deviceId: device.id,
+          deviceLabel: device.label,
+          effect: effect.effect,
+          transmission: effect.transmission,
+          width: effect.width,
+          penalty: effect.penalty,
+          hit: { x: hitX, y: 0.55, z: hitZ },
+          routeIndex: entry.routeIndex
+        });
+      });
+    });
+    return results;
+  }
+
   function rebuildConnections() {
     if (!state.ready || !state.presetInfo) return;
     clearObject(state.beamGroup);
@@ -3171,6 +3225,9 @@
     }
     if (state.traceEnabled && trace?.paths?.length) {
       const surfaceHits = [];
+      const proximityEffects = proximity3DEffects(beamRoutes);
+      const dynamicEffects = [...proximityEffects];
+      let dynamicTransmission = proximityEffects.reduce((value, event) => value * event.transmission, 1);
       const now = performance.now();
       const refreshMeshTrace = now - state.lastMeshTraceAt > 600;
       if (refreshMeshTrace) state.lastMeshTraceAt = now;
@@ -3188,17 +3245,67 @@
             : routeColors[path.colorRole] || colorArrayToHex(state.config?.beamColor)
         );
         const points = path.points.map((point) => new state.three.Vector3(point.x, point.y, point.z));
+        let dynamicWidth = proximityEffects
+          .filter((effect) => effect.routeIndex === path.routeIndex)
+          .reduce((value, effect) => value * effect.width, 1);
         const meshHit = refreshMeshTrace && path.rayIndex === 0
           ? meshHitForPath(points, entry.route.fromId, entry.route.toId)
           : null;
         if (meshHit) {
           surfaceHits.push({ ...meshHit, routeIndex: path.routeIndex, colorRole: path.colorRole });
           if (meshHit.obstruction) {
-            points[points.length - 1].set(meshHit.point.x, meshHit.point.y, meshHit.point.z);
+            const hitDevice = state.presetInfo.devices.find((device) => device.id === meshHit.deviceId);
+            const effect = threeDBeamEffect(hitDevice);
+            dynamicWidth *= effect.width;
+            if (!dynamicEffects.some((item) => item.deviceId === meshHit.deviceId && item.routeIndex === path.routeIndex)) {
+              dynamicTransmission *= effect.transmission;
+              dynamicEffects.push({
+                deviceId: meshHit.deviceId,
+                deviceLabel: hitDevice?.label || meshHit.deviceId,
+                effect: effect.effect,
+                transmission: effect.transmission,
+                penalty: effect.penalty,
+                hit: meshHit.point,
+                routeIndex: path.routeIndex
+              });
+            }
+            if (["block", "observe", "detect"].includes(effect.effect)) {
+              points[points.length - 1].set(meshHit.point.x, meshHit.point.y, meshHit.point.z);
+            }
+            if (effect.fan.length) {
+              const start = points[0];
+              const direction = new state.three.Vector3(
+                meshHit.point.x - start.x,
+                meshHit.point.y - start.y,
+                meshHit.point.z - start.z
+              ).normalize();
+              effect.fan.forEach((angle, fanIndex) => {
+                const perpendicular = new state.three.Vector3(-direction.z, 0, direction.x);
+                const end = new state.three.Vector3(meshHit.point.x, meshHit.point.y, meshHit.point.z)
+                  .addScaledVector(direction, 0.82)
+                  .addScaledVector(perpendicular, Math.tan(angle) * 0.82);
+                const mid = new state.three.Vector3(meshHit.point.x, meshHit.point.y, meshHit.point.z)
+                  .lerp(end, 0.5);
+                mid.y += 0.03;
+                makeBeam(
+                  [
+                    new state.three.Vector3(meshHit.point.x, meshHit.point.y, meshHit.point.z),
+                    mid,
+                    end
+                  ],
+                  effect.effect === "disperse"
+                    ? new state.three.Color().setHSL(0.03 + fanIndex * 0.07, 0.9, 0.56)
+                    : color,
+                  path.routeIndex * 20 + fanIndex,
+                  entry.route,
+                  { width: 0.62, pulse: false, simple: true, powerFactor: 0.65 }
+                );
+              });
+            }
           }
         }
         makeBeam(points, color, path.routeIndex * 10 + path.rayIndex, entry.route, {
-          width: path.rayIndex === 0 ? 1 : 0.58,
+          width: (path.rayIndex === 0 ? 1 : 0.58) * dynamicWidth,
           pulse: path.rayIndex === 0,
           simple: path.rayIndex !== 0,
           powerFactor: path.powerFactor * clamp((state.metrics.power || 1) / 5, 0.25, 1.3)
@@ -3223,6 +3330,11 @@
       if (state.lastTrace3D && refreshMeshTrace) {
         state.lastTrace3D.surfaceHits = surfaceHits;
         state.lastTrace3D.obstructions = surfaceHits.filter((hit) => hit.obstruction).length;
+        state.lastTrace3D.dynamicEffects = dynamicEffects;
+      }
+      if (refreshMeshTrace) {
+        state.dynamicEffects = dynamicEffects;
+        state.dynamicTransmission = dynamicTransmission;
       }
       if (traceStatus) {
         traceStatus.textContent =
@@ -3546,9 +3658,12 @@
           Math.abs(Number(controls.coarseFocus) || 0) / 120;
       }, 0) / optical.length
       : 0;
-    const alignment = optical.length
+    const baseAlignment = optical.length
       ? clamp(0.91 - deviation(optical) * 0.8 - controlPenalty, 0.18, 0.98)
       : 0.84;
+    const dynamicPenalty = (state.dynamicEffects || [])
+      .reduce((total, event) => total + (Number(event.penalty) || 0), 0);
+    const alignment = clamp(baseAlignment - Math.min(0.5, dynamicPenalty), 0.08, 0.98);
     const connectivity = electronic.length ? clamp(0.92 - deviation(electronic) * 0.95, 0.2, 0.98) : 0.74;
     const hasOptics = optical.length >= 2;
     const hasElectronics = electronic.length >= 2;
@@ -3577,11 +3692,13 @@
         .reduce((total, value) => total + value, 0);
       if (Number.isFinite(sourceOutput)) unified.metrics.power *= sourceOutput / 70;
       if (attenuation > 0) unified.metrics.power *= 10 ** (-attenuation / 10);
+      unified.metrics.power *= state.dynamicTransmission;
+      unified.metrics.snr *= state.dynamicTransmission;
       return unified.metrics;
     }
     const sourceDrive = clamp(Math.abs(Number(state.config?.primary) || 1) / 20, 0.18, 1);
     const power = hasOptics
-      ? clamp((0.8 + sourceDrive * 3.8) * alignment, 0.08, 12)
+      ? clamp((0.8 + sourceDrive * 3.8) * alignment * state.dynamicTransmission, 0.001, 12)
       : clamp((0.2 + sourceDrive * 5.2) * connectivity, 0.03, 26);
     const frequency = /Hz|hz/.test(String(state.config?.secondaryUnit || ""))
       ? clamp(Math.abs(Number(state.config?.secondary) || 1000), 10, 250000)
@@ -3632,7 +3749,10 @@
       const score = metrics.hasOptics && metrics.hasElectronics
         ? Math.min(metrics.alignment, metrics.connectivity)
         : metrics.hasOptics ? metrics.alignment : metrics.connectivity;
-      scene.textContent = score > 0.72
+      const dynamicEffect = state.dynamicEffects?.[state.dynamicEffects.length - 1];
+      scene.textContent = dynamicEffect
+        ? `${state.presetInfo.name} · ${dynamicEffect.deviceLabel}进入光路 · ${dynamicEffect.effect} · 透射 ${Math.round(state.dynamicTransmission * 100)}%`
+        : score > 0.72
         ? `${state.presetInfo.name} · 三维器件关系稳定 · 采集在线${state.lastTrace3D ? ` · 截光 ${state.lastTrace3D.clippedRays}/${state.lastTrace3D.rayCount}` : ""}${state.connectionIssues ? ` · ${state.connectionIssues} 处接口待核对` : ""}`
         : score > 0.45
           ? `${state.presetInfo.name} · 装置可用，可继续调整位置`
@@ -5738,7 +5858,9 @@
       minimapVisible: state.minimapVisible,
       cutaway: state.cutaway,
       trace: state.lastTrace3D,
-      connectionIssues: state.connectionIssues
+      connectionIssues: state.connectionIssues,
+      dynamicTransmission: state.dynamicTransmission,
+      dynamicEffects: state.dynamicEffects.map((effect) => ({ ...effect }))
     }),
     setBeamMode(mode) {
       state.beamMode = ["all", "main", "errors"].includes(mode) ? mode : "all";
@@ -5746,6 +5868,16 @@
       return state.beamMode;
     },
     toggleCutaway: (force = null) => toggleCutaway(force),
+    setDevicePosition(id, x, z) {
+      const group = state.deviceGroups.get(id);
+      if (!group) return false;
+      group.position.x = clamp(Number(x), -4.65, 4.65);
+      group.position.z = clamp(Number(z), -2.6, 2.6);
+      state.lastMeshTraceAt = 0;
+      rebuildConnections();
+      updateHud();
+      return true;
+    },
     getSelected: () => state.selectedId,
     getDeviceCount: () => state.deviceGroups.size,
     getProcess: () => ({

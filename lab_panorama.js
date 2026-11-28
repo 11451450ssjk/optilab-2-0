@@ -641,9 +641,15 @@
     const opticalDeviation = averageDeviation(opticalDevices);
     const electronicDeviation = averageDeviation(electronicDevices);
     const mechanicalDeviation = averageDeviation(mechanicalDevices);
-    const alignment = opticalDevices.length
+    const baseAlignment = opticalDevices.length
       ? clamp(0.88 - opticalDeviation * 1.75, 0.16, 0.98)
       : clamp(0.86 - mechanicalDeviation * 1.6, 0.2, 0.97);
+    const dynamicInteraction = analyzeBeamInteractions();
+    state.dynamicInteraction = dynamicInteraction;
+    const dynamicTransmission = dynamicInteraction.events.length
+      ? dynamicInteraction.blocked ? 0.01 : clamp(dynamicInteraction.transmission, 0.02, 1)
+      : 1;
+    const alignment = clamp(baseAlignment - dynamicInteraction.penalty, 0.08, 0.98);
     const connectivity = electronicDevices.length
       ? clamp(0.89 - electronicDeviation * 1.6, 0.2, 0.98)
       : 0.72;
@@ -651,7 +657,7 @@
     const hasOptics = opticalDevices.length >= 2;
     const hasElectronics = electronicDevices.length >= 2;
     const measurementPower = hasOptics
-      ? clamp((0.8 + sourceDrive * 3.6) * alignment, 0.08, 9.9)
+      ? clamp((0.8 + sourceDrive * 3.6) * alignment * dynamicTransmission, 0.001, 9.9)
       : clamp((0.18 + sourceDrive * 4.8) * connectivity, 0.03, 24);
     const baseFrequency = /Hz|hz/.test(String(config.secondaryUnit || ""))
       ? Math.abs(Number(config.secondary) || 1000)
@@ -672,6 +678,8 @@
       hasElectronics
     });
     if (unified?.metrics) {
+      unified.metrics.power *= dynamicTransmission;
+      unified.metrics.snr *= dynamicTransmission;
       return {
         ...unified.metrics,
         opticalDevices: opticalDevices.length,
@@ -742,12 +750,18 @@
     const score = metrics.hasOptics && metrics.hasElectronics
       ? Math.min(metrics.alignment, metrics.connectivity)
       : metrics.hasOptics ? metrics.alignment : metrics.connectivity;
+    const interaction = state.dynamicInteraction;
+    const effectName = interaction?.events?.length
+      ? interaction.events[interaction.events.length - 1].device.label
+      : "";
     $("#panorama-status") && ($("#panorama-status").textContent =
-      score > 0.72
-        ? `${state.preset.name} · 器件关系稳定 · 采集在线`
-        : score > 0.45
-          ? `${state.preset.name} · 装置可用，可继续微调器件`
-          : `${state.preset.name} · 器件偏离，拖动相关装置重新对准`
+      effectName
+        ? `${state.preset.name} · ${effectName}进入光路 · 透射 ${Math.round(interaction.transmission * 100)}%`
+        : score > 0.72
+          ? `${state.preset.name} · 器件关系稳定 · 采集在线`
+          : score > 0.45
+            ? `${state.preset.name} · 装置可用，可继续微调器件`
+            : `${state.preset.name} · 器件偏离，拖动相关装置重新对准`
     );
     const stateClass = score > 0.7 ? "good" : score > 0.4 ? "warn" : "bad";
     const scene = $("#panorama-status");
@@ -943,26 +957,105 @@
     return colors[role] || fallback;
   }
 
-  function drawBeam(context, from, to, time, color, strength = 1, phase = 0) {
+  function beamEffectFor(device) {
+    const id = device?.id || "";
+    const type = device?.type || "";
+    if (id === "beam-dump") return { effect: "block", transmission: 0, penalty: 0.22, width: 0.35, label: "光束被终止器吸收" };
+    if (type === "screen") return { effect: "observe", transmission: 0, penalty: 0.02, width: 0.55, label: "光束落在观察屏" };
+    if (type === "detector") return { effect: "detect", transmission: 0, penalty: 0.01, width: 0.55, label: "光束进入探测器" };
+    if (id === "iris") return { effect: "iris", transmission: 0.48, penalty: 0.06, width: 0.42, label: "光阑收束并截去边缘光" };
+    if (id === "nd-filter") return { effect: "attenuate", transmission: 0.18, penalty: 0.018, width: 0.88, label: "衰减片降低光强" };
+    if (id === "polarizer" || id === "analyzer") return { effect: "polarize", transmission: 0.35, penalty: 0.04, width: 0.9, label: "偏振片改变透射强度" };
+    if (id === "compensator") return { effect: "phase", transmission: 0.9, penalty: 0.035, width: 0.94, label: "补偿板改变光程" };
+    if (type === "lens") return { effect: "lens", transmission: 0.92, penalty: 0.045, width: 0.82, label: "透镜使光束会聚或发散" };
+    if (type === "splitter") return { effect: "split", transmission: 0.5, penalty: 0.055, width: 0.9, label: "分束器产生第二支路" };
+    if (type === "mirror") return { effect: "reflect", transmission: 0.45, penalty: 0.075, width: 0.9, label: "光束被反射到新方向" };
+    if (id === "slit") return { effect: "diffract", transmission: 0.62, penalty: 0.045, width: 0.72, label: "狭缝产生衍射展开" };
+    if (id === "grating" || id === "prism") return { effect: "disperse", transmission: 0.68, penalty: 0.035, width: 0.86, label: "色散元件分离不同方向" };
+    if (device?.zone === "optical" || device?.zone === "mixed") {
+      return { effect: "obstruct", transmission: 0.08, penalty: 0.14, width: 0.65, label: "光学器件阻挡光束" };
+    }
+    return { effect: "obstruct", transmission: 0, penalty: 0.3, width: 0.35, label: "非光学器件挡住光路" };
+  }
+
+  function segmentIntersection(route) {
+    const fromDevice = deviceById(route.fromId);
+    const toDevice = deviceById(route.toId);
+    if (!fromDevice || !toDevice) return [];
+    const from = beamAnchor(fromDevice, toDevice, route.fromPort, route.lane || 0);
+    const to = beamAnchor(toDevice, fromDevice, route.toPort, route.lane || 0);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const lengthSquared = dx * dx + dy * dy || 1;
+    const segmentLength = Math.sqrt(lengthSquared);
+    return state.devices
+      .filter((device) => device.id !== route.fromId && device.id !== route.toId)
+      .map((device) => {
+        const box = bounds(device);
+        const t = clamp(((box.cx - from.x) * dx + (box.cy - from.y) * dy) / lengthSquared, 0, 1);
+        const hitX = from.x + dx * t;
+        const hitY = from.y + dy * t;
+        const distance = Math.hypot(box.cx - hitX, box.cy - hitY);
+        const radius = Math.min(box.width, box.height) * 0.46 + Math.max(3, segmentLength * 0.008);
+        const effect = beamEffectFor(device);
+        return {
+          device,
+          effect,
+          from,
+          to,
+          hit: { x: hitX, y: hitY },
+          t,
+          length: segmentLength,
+          intersects: t > 0.04 && t < 0.96 && distance <= radius
+        };
+      })
+      .filter((item) => item.intersects)
+      .sort((a, b) => a.t - b.t);
+  }
+
+  function analyzeBeamInteractions() {
+    const events = [];
+    (state.opticalRoutes || []).forEach((route, routeIndex) => {
+      const hits = segmentIntersection(route);
+      hits.forEach((hit) => events.push({ ...hit, route, routeIndex }));
+    });
+    const unique = [];
+    const seen = new Set();
+    events.forEach((event) => {
+      const key = `${event.device.id}:${event.routeIndex}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      unique.push(event);
+    });
+    const transmission = unique.reduce((value, event) =>
+      event.effect.effect === "observe" || event.effect.effect === "detect"
+        ? value
+        : value * event.effect.transmission, 1);
+    const penalty = Math.min(0.55, unique.reduce((total, event) => total + event.effect.penalty, 0));
+    const blocked = unique.some((event) => event.effect.effect === "block");
+    return { events: unique, transmission: clamp(transmission, 0, 1), penalty, blocked };
+  }
+
+  function drawBeam(context, from, to, time, color, strength = 1, phase = 0, widthScale = 1) {
     context.save();
     context.lineCap = "round";
     context.shadowColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.8)`;
     context.shadowBlur = 15;
     context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.12 + strength * 0.2})`;
-    context.lineWidth = 10;
+    context.lineWidth = 10 * widthScale;
     context.beginPath();
     context.moveTo(from.x, from.y);
     context.lineTo(to.x, to.y);
     context.stroke();
     context.shadowBlur = 0;
     context.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.62 + strength * 0.28})`;
-    context.lineWidth = 3.6;
+    context.lineWidth = 3.6 * widthScale;
     context.beginPath();
     context.moveTo(from.x, from.y);
     context.lineTo(to.x, to.y);
     context.stroke();
     context.strokeStyle = `rgba(255, 255, 244, ${0.34 + strength * 0.45})`;
-    context.lineWidth = 1.1;
+    context.lineWidth = 1.1 * Math.max(0.72, widthScale);
     context.beginPath();
     context.moveTo(from.x, from.y);
     context.lineTo(to.x, to.y);
@@ -1009,7 +1102,76 @@
       const strength = clamp(metrics.alignment - (route.path || 0) * 0.035, 0.2, 1);
       const phase = (route.order || 0) * 0.16 + (route.path || 0) * 0.07 + routeIndex * 0.003;
       const color = beamRoleColor(route.colorRole, defaultColor);
-      drawBeam(context, from, to, time, color, strength, phase);
+      const hits = segmentIntersection(route);
+      let cursor = from;
+      let cumulativeStrength = strength;
+      let cumulativeWidth = 1;
+      hits.forEach((hit) => {
+        drawBeam(context, cursor, hit.hit, time, color, cumulativeStrength, phase, cumulativeWidth);
+        cumulativeStrength *= hit.effect.transmission;
+        cumulativeWidth *= hit.effect.width;
+        if (hit.effect.effect === "block" || hit.effect.effect === "observe" || hit.effect.effect === "detect") {
+          context.save();
+          const pulse = 5 + state.metrics.alignment * 5;
+          const glow = context.createRadialGradient(hit.hit.x, hit.hit.y, 0, hit.hit.x, hit.hit.y, pulse * 2);
+          glow.addColorStop(0, "rgba(255,255,238,0.95)");
+          glow.addColorStop(0.35, `rgba(${color.join(",")},0.72)`);
+          glow.addColorStop(1, `rgba(${color.join(",")},0)`);
+          context.fillStyle = glow;
+          context.beginPath();
+          context.arc(hit.hit.x, hit.hit.y, pulse * 2, 0, Math.PI * 2);
+          context.fill();
+          context.restore();
+          cursor = hit.hit;
+        } else {
+          cursor = hit.hit;
+          if (["split", "reflect", "disperse", "diffract"].includes(hit.effect.effect)) {
+            const baseAngle = Math.atan2(to.y - from.y, to.x - from.x);
+            const fan = hit.effect.effect === "reflect" ? [Math.PI / 2] :
+              hit.effect.effect === "split" ? [-0.52, 0.52] : [-0.24, 0, 0.24];
+            fan.forEach((offset, index) => {
+              const length = Math.min(170, hit.length * 0.5);
+              const end = {
+                x: hit.hit.x + Math.cos(baseAngle + offset) * length,
+                y: hit.hit.y + Math.sin(baseAngle + offset) * length
+              };
+              drawBeam(
+                context,
+                hit.hit,
+                end,
+                time,
+                hit.effect.effect === "disperse" ? [255, 150 + index * 35, 82 + index * 45] : color,
+                cumulativeStrength * (hit.effect.effect === "reflect" ? 1 : 0.7),
+                phase + index * 0.04,
+                Math.max(0.45, cumulativeWidth)
+              );
+            });
+          }
+          if (hit.effect.effect === "iris") {
+            context.save();
+            context.strokeStyle = `rgba(${color.join(",")},0.7)`;
+            context.lineWidth = 1.2;
+            context.beginPath();
+            context.arc(hit.hit.x, hit.hit.y, cumulativeWidth * 16, 0, Math.PI * 2);
+            context.stroke();
+            context.restore();
+          }
+          if (hit.effect.effect === "lens") {
+            context.save();
+            context.strokeStyle = "rgba(132, 213, 223, 0.45)";
+            context.setLineDash([2, 3]);
+            context.beginPath();
+            context.moveTo(hit.hit.x, hit.hit.y);
+            context.lineTo((hit.hit.x + to.x) / 2, hit.hit.y + (to.y - hit.hit.y) * 0.18);
+            context.lineTo(to.x, to.y);
+            context.stroke();
+            context.restore();
+          }
+        }
+      });
+      if (cursor !== to && !hits.some((hit) => ["block", "observe", "detect"].includes(hit.effect.effect))) {
+        drawBeam(context, cursor, to, time, color, cumulativeStrength, phase, cumulativeWidth);
+      }
       const showLabel = state.presetId === "michelson" && route.label &&
         (route.fromId === state.selected || route.toId === state.selected);
       if (showLabel) {
@@ -1021,6 +1183,22 @@
         context.restore();
       }
     });
+    const interaction = state.dynamicInteraction;
+    if (interaction?.events.length) {
+      const latest = interaction.events[interaction.events.length - 1];
+      context.save();
+      context.fillStyle = "rgba(5, 12, 10, 0.78)";
+      roundRect(context, 14, state.height - 45, Math.min(state.width - 28, 300), 28, 7);
+      context.fill();
+      context.fillStyle = "#e0bb78";
+      context.font = '9px "Microsoft YaHei UI", sans-serif';
+      context.fillText(
+        `${latest.device.label}：${latest.effect.label} · 透射 ${Math.round(interaction.transmission * 100)}%`,
+        24,
+        state.height - 27
+      );
+      context.restore();
+    }
   }
 
   function bodyGradient(context, box) {
@@ -1815,6 +1993,23 @@
     },
     getMetrics: () => ({ ...state.metrics }),
     getLayout: () => state.devices.map((device) => ({ ...device })),
+    getDynamicEffects: () => ({
+      events: state.dynamicInteraction?.events?.map((event) => ({
+        deviceId: event.device.id,
+        deviceLabel: event.device.label,
+        effect: event.effect.effect,
+        label: event.effect.label,
+        transmission: event.effect.transmission,
+        routeIndex: event.routeIndex
+      })) || [],
+      transmission: state.dynamicInteraction?.transmission ?? 1,
+      blocked: Boolean(state.dynamicInteraction?.blocked)
+    }),
+    getInteractionRules: () => state.devices.map((device) => ({
+      id: device.id,
+      label: device.label,
+      ...beamEffectFor(device)
+    })),
     getSelected: () => state.selected,
     getPorts(deviceId) {
       const device = deviceById(deviceId);
