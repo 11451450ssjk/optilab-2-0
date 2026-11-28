@@ -2901,23 +2901,10 @@ function renderCatalog() {
   `;
   }).join("");
   const noLabContainer = document.getElementById("hust-no-lab-terms");
-  const visibleNoLabTerms = (window.HUST_EXACT_NO_LAB_TERMS || []).filter((item) =>
-    state.filterYear === "all" ||
-    state.filterYear === "hust" ||
-    state.filterYear === "hust-exact" ||
-    (yearNames[state.filterYear] && item.term.includes(yearNames[state.filterYear]))
-  );
-  const showNoLabTerms = !state.search && visibleNoLabTerms.length;
-  const dedupeReport = window.OPTILAB_DEDUPE_REPORT;
-  const noLabHtml = showNoLabTerms
-    ? `<div class="hust-no-lab-heading"><strong>清单中的无实验学期</strong><span>这些行保留在源表中，不作为可点击实验项目。</span></div>
-      ${visibleNoLabTerms.map((item) => `<div class="hust-no-lab-row"><b>${escapeHtml(item.term)}</b><span>${escapeHtml(item.note)}</span><i>${escapeHtml(item.evidence)}</i></div>`).join("")}`
-    : "";
-  const dedupeHtml = !state.search && dedupeReport?.removedCount
-    ? `<div class="hust-no-lab-heading"><strong>重复项清理</strong><span>相同实验只保留资料更明确的一份。</span></div>
-      <div class="hust-no-lab-row"><b>已清理 ${dedupeReport.removedCount} 项</b><span>旧版华科目录、原光电目录和电学扩展中的同名或同公式项目已去重。</span><i>专业认知 ${dedupeReport.protectedCount} 项全部保留</i></div>`
-    : "";
-  noLabContainer.innerHTML = noLabHtml + dedupeHtml;
+  if (noLabContainer) {
+    noLabContainer.replaceChildren();
+    noLabContainer.hidden = true;
+  }
   container.querySelectorAll("[data-experiment-id]").forEach((button) => {
     button.addEventListener("click", () => selectExperiment(button.dataset.experimentId, true));
   });
