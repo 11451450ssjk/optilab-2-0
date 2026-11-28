@@ -22,6 +22,7 @@
     deviceControls: new Map(),
     controlTargets: new Map(),
     initialPositions: new Map(),
+    sceneLayoutCache: null,
     dynamicTextures: [],
     selectionHelper: null,
     cableGroup: null,
@@ -250,18 +251,18 @@
     const shelf = new THREE.Group();
     shelf.visible = false;
     const shelfBase = new THREE.Mesh(
-      beveledBoxGeometry(9.6, 0.12, 0.56, 0.035),
+      beveledBoxGeometry(9.7, 0.12, 1.72, 0.035),
       new THREE.MeshStandardMaterial({ color: 0x1d2723, metalness: 0.56, roughness: 0.36 })
     );
-    shelfBase.position.set(0, 0.08, -2.52);
+    shelfBase.position.set(0, 0.08, -2.09);
     shelfBase.receiveShadow = true;
     shelf.add(shelfBase);
-    [-0.18, 0.18].forEach((zOffset) => {
+    [-0.72, 0, 0.72].forEach((zOffset) => {
       const shelfRail = new THREE.Mesh(
         new THREE.BoxGeometry(9.45, 0.025, 0.035),
         new THREE.MeshStandardMaterial({ color: 0x8d9288, metalness: 0.9, roughness: 0.16 })
       );
-      shelfRail.position.set(0, 0.15, -2.52 + zOffset);
+      shelfRail.position.set(0, 0.15, -2.09 + zOffset);
       shelfRail.castShadow = true;
       shelf.add(shelfRail);
     });
@@ -866,23 +867,23 @@
     return "generic";
   }
 
-  function sceneLayoutPosition(device) {
+  function rawSceneLayoutPosition(device) {
     const info = state.presetInfo;
     const devices = info?.devices || [];
     if (info?.id === "michelson") {
       const michelsonLayout = {
-        laser: [-3.7, -0.35],
-        "beam-expander": [-2.35, -0.35],
-        iris: [-1.45, -0.35],
-        splitter: [0.2, -0.35],
-        "mirror-a": [0.2, -2.2],
-        compensator: [1.65, -0.35],
-        "mirror-b": [3.25, -0.35],
-        "nd-filter": [0.55, 0.95],
-        lens: [0.55, 1.7],
-        screen: [0.55, 2.4],
-        detector: [-1.05, 0.95],
-        scope: [-2.15, 1.75]
+        laser: [-4.15, -0.55],
+        "beam-expander": [-2.7, -0.55],
+        iris: [-1.45, -0.55],
+        splitter: [0.2, -0.55],
+        "mirror-a": [0.2, -2.35],
+        compensator: [1.85, -0.55],
+        "mirror-b": [3.65, -0.55],
+        "nd-filter": [0.4, 1.0],
+        lens: [0.4, 1.85],
+        screen: [0.4, 2.7],
+        detector: [-1.45, 0.95],
+        scope: [-2.9, 1.95]
       };
       const position = michelsonLayout[device.id];
       if (position) return { x: position[0], z: position[1] };
@@ -923,12 +924,75 @@
     const remaining = devices.filter((item) => !pathIds.has(item.id));
     const index = Math.max(0, remaining.findIndex((item) => item.id === device.id));
     const electronic = device.zone === "electronic";
-    const columns = remaining.length <= 4 ? 2 : electronic ? 3 : 3;
+    const columns = remaining.length <= 6
+      ? Math.max(1, remaining.length)
+      : Math.min(6, Math.ceil(remaining.length / 2));
     const row = Math.floor(index / columns);
+    const column = index % columns;
+    const xSpan = columns > 1
+      ? Math.min(electronic ? 8 : 8.2, (columns - 1) * 1.75)
+      : 0;
     return {
-      x: electronic ? -3.15 + (index % columns) * 3.15 : -2.8 + (index % columns) * 2.8,
-      z: electronic ? -1.15 + row * 1.65 : 1.25 + row * 0.72
+      x: columns > 1 ? -xSpan / 2 + column * (xSpan / (columns - 1)) : (electronic ? -1.5 : 0),
+      z: electronic ? -1.1 + row * 1.65 : 0.95 + row * 1.45
     };
+  }
+
+  function sceneLayoutPosition(device) {
+    if (!state.sceneLayoutCache) {
+      const devices = state.presetInfo?.devices || [];
+      const placed = [];
+      const offsets = [
+        [0, 0],
+        [0, -1.12],
+        [0, 1.12],
+        [-1.12, 0],
+        [1.12, 0],
+        [-1.12, -1.12],
+        [1.12, -1.12],
+        [-1.12, 1.12],
+        [1.12, 1.12],
+        [0, -2.24],
+        [0, 2.24],
+        [-2.24, 0],
+        [2.24, 0]
+      ];
+      const cache = new Map();
+      devices.forEach((item) => {
+        const base = rawSceneLayoutPosition(item);
+        if (state.presetInfo?.id === "michelson") {
+          cache.set(item.id, base);
+          return;
+        }
+        const kind = deviceKind(item);
+        const requiredGap = ["computer", "scope", "spectrometer", "printer", "load"].includes(kind)
+          ? 1.18
+          : 0.98;
+        let chosen = null;
+        for (const [offsetX, offsetZ] of offsets) {
+          const candidate = {
+            x: clamp(base.x + offsetX, -4.65, 4.65),
+            z: clamp(base.z + offsetZ, -2.68, 2.68)
+          };
+          const clear = placed.every((entry) =>
+            Math.hypot(candidate.x - entry.position.x, candidate.z - entry.position.z) >=
+              Math.max(requiredGap, entry.requiredGap) - 0.01
+          );
+          if (clear) {
+            chosen = candidate;
+            break;
+          }
+        }
+        const position = chosen || {
+          x: clamp(base.x, -4.65, 4.65),
+          z: clamp(base.z, -2.68, 2.68)
+        };
+        cache.set(item.id, position);
+        placed.push({ position, requiredGap });
+      });
+      state.sceneLayoutCache = cache;
+    }
+    return state.sceneLayoutCache.get(device.id) || rawSceneLayoutPosition(device);
   }
 
   function deviceBaseYaw(device) {
@@ -1748,9 +1812,10 @@
     selectionRing.userData.selectionRing = true;
 
     const label = makeLabelSprite(device.label, device.accent || "#d9b474");
-    label.scale.set(1.32, 0.248, 1);
-    label.position.set(0, 0.02, 0.62);
+    label.scale.set(1.02, 0.192, 1);
+    label.position.set(0, 0.92, 0.16);
     label.userData.deviceId = device.id;
+    label.userData.deviceLabel = true;
     group.add(label);
     group.scale.setScalar(1.12);
     const layout = sceneLayoutPosition(device);
@@ -1814,9 +1879,10 @@
     ), device);
     marker.position.set(0, 0.29, 0.251);
     const label = makeLabelSprite(device.label, device.accent || "#d9b474");
-    label.scale.set(1.3, 0.245, 1);
-    label.position.set(0, 0.02, 0.58);
+    label.scale.set(1.02, 0.192, 1);
+    label.position.set(0, 0.92, 0.16);
     label.userData.deviceId = device.id;
+    label.userData.deviceLabel = true;
     proxy.add(label);
     return proxy;
   }
@@ -1933,9 +1999,10 @@
       const model = normalizeImportedModel(gltf.scene, device);
       wrapper.add(model);
       const label = makeLabelSprite(device.label, device.accent || "#d9b474");
-      label.scale.set(1.3, 0.245, 1);
-      label.position.set(0, 0.02, 0.58);
+      label.scale.set(1.02, 0.192, 1);
+      label.position.set(0, 0.92, 0.16);
       label.userData.deviceId = device.id;
+      label.userData.deviceLabel = true;
       wrapper.add(label);
       const detail = state.proceduralGroups.get(device.id);
       const detailLevel = lod.levels.find((entry) => entry.object === detail);
@@ -2058,6 +2125,7 @@
     if (autoTuneHud) autoTuneHud.hidden = true;
     hideExperimentResult();
     state.initialPositions.clear();
+    state.sceneLayoutCache = null;
     state.dynamicTextures = [];
     state.animatedObjects = [];
     state.presetInfo.devices.forEach((device) => {
@@ -2616,53 +2684,95 @@
   function makeBeam(points, color, index, route = {}) {
     const THREE = state.three;
     const curve = new THREE.CatmullRomCurve3(points);
+    const segments = Math.max(30, points.length * 16);
+    const darkBed = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, segments, 0.038, 8, false),
+      new THREE.MeshBasicMaterial({
+        color: 0x020504,
+        transparent: true,
+        opacity: 0.62,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
     const core = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.014, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.024, 10, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.96,
+        opacity: 1,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    const whiteCore = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, segments, 0.008, 8, false),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.72,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        toneMapped: false
       })
     );
     const halo = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.052, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.072, 10, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.16,
+        opacity: 0.24,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        toneMapped: false
       })
     );
     const outerGlow = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), 0.105, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.13, 8, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.055,
+        opacity: 0.085,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        toneMapped: false
       })
     );
-    core.userData.connectionType = halo.userData.connectionType = outerGlow.userData.connectionType = "optical";
-    core.userData.baseOpacity = 0.96;
-    halo.userData.baseOpacity = 0.16;
-    outerGlow.userData.baseOpacity = 0.055;
-    state.beamGroup.add(core, halo, outerGlow);
-    const pulse = new THREE.Mesh(
-      new THREE.SphereGeometry(0.046, 14, 14),
+    [darkBed, core, whiteCore, halo, outerGlow].forEach((node, layer) => {
+      node.userData.connectionType = "optical";
+      node.userData.baseOpacity = [0.62, 1, 0.72, 0.24, 0.085][layer];
+      node.renderOrder = 3 + layer;
+    });
+    state.beamGroup.add(darkBed, core, whiteCore, halo, outerGlow);
+    const pulse = new THREE.Group();
+    const pulseHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.062, 16, 16),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.86,
+        opacity: 0.62,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        toneMapped: false
       })
     );
+    const pulseCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.024, 14, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    pulseHalo.userData.baseOpacity = 0.62;
+    pulseCore.userData.baseOpacity = 0.95;
+    pulse.add(pulseHalo, pulseCore);
     pulse.userData.connectionType = "optical";
-    pulse.userData.baseOpacity = 0.86;
+    pulse.userData.beamPulseGroup = true;
+    pulse.userData.baseOpacity = 1;
     state.beamGroup.add(pulse);
     state.animatedObjects.push({
       type: "beamPulse",
@@ -2684,15 +2794,15 @@
     const assemblyActive = Boolean(state.autoTune?.mode === "assembly");
     const assemblyReady = (id) => !assemblyActive || state.autoTune.placedIds?.has(id);
     const routeColors = {
-      source: 0xff545c,
-      "arm-a": 0x45d5ed,
-      "arm-a-return": 0x68a8ff,
-      "arm-b": 0xffbd55,
-      "arm-b-return": 0xff7558,
-      recombined: 0xffe1a4,
-      observation: 0xfff2c4,
-      detector: 0x68e69c,
-      branch: 0xffad57
+      source: 0xff2838,
+      "arm-a": 0x00d5ff,
+      "arm-a-return": 0x3978ff,
+      "arm-b": 0xffa000,
+      "arm-b-return": 0xff4f24,
+      recombined: 0xffcf58,
+      observation: 0xffebb0,
+      detector: 0x15e678,
+      branch: 0xff8b1a
     };
     const routes = state.presetInfo.routes?.length
       ? state.presetInfo.routes
@@ -2784,7 +2894,15 @@
       entry.object.position.copy(entry.curve.getPointAt(eased));
       const pulseScale = 0.82 + Math.sin(time * 0.008 + local * 8) * 0.18;
       entry.object.scale.setScalar(pulseScale);
-      entry.object.material.opacity = entry.object.userData.baseOpacity * beamFactor;
+      if (entry.object.userData.beamPulseGroup) {
+        entry.object.children.forEach((child) => {
+          if (child.material && child.userData.baseOpacity != null) {
+            child.material.opacity = child.userData.baseOpacity * beamFactor;
+          }
+        });
+      } else {
+        entry.object.material.opacity = entry.object.userData.baseOpacity * beamFactor;
+      }
     });
     [state.beamGroup, state.cableGroup].forEach((group, index) => {
       if (!group) return;
@@ -3638,9 +3756,13 @@
     });
     const stagingTargets = new Map();
     orderedIds.forEach((id, index) => {
+      const columns = Math.min(6, Math.max(3, orderedIds.length));
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const xStep = columns > 1 ? 8.7 / (columns - 1) : 0;
       stagingTargets.set(id, {
-        x: -4.05 + (index % 6) * 1.62,
-        z: -2.32 - Math.floor(index / 6) * 0.24
+        x: -4.35 + column * xStep,
+        z: -2.55 + row * 1.18
       });
     });
     state.autoTune = {
@@ -3649,13 +3771,13 @@
       batchIndex: 0,
       phase: "staging",
       stagingStartedAt: performance.now(),
-      stagingDuration: 720,
+      stagingDuration: 1150,
       stagingFrom,
       stagingTargets,
       placedIds: new Set(),
       nextBatchAt: 0,
       batchStartedAt: 0,
-      batchDuration: 1250,
+      batchDuration: 1680,
       lastLinkUpdate: 0,
       activeIds: [],
       fromStates: new Map(),
@@ -3665,6 +3787,7 @@
     state.dragGroup = null;
     state.orbit = null;
     setViewPreset("overview");
+    state.cameraState.radius = 9.4;
     if (state.assemblyShelf) state.assemblyShelf.visible = true;
     const hud = $("#lab-3d-autotune-hud");
     if (hud) hud.hidden = false;
@@ -3942,7 +4065,7 @@
       state.selectionHelper?.update();
       if (raw < 1) return;
       tuning.phase = "gap";
-      tuning.nextBatchAt = time + 220;
+      tuning.nextBatchAt = time + 420;
       return;
     }
     if (tuning.phase === "gap") {
@@ -3958,12 +4081,18 @@
       const targetControls = tuning.targetControls.get(id);
       if (!origin || !start) return;
       const group = state.deviceGroups.get(id);
-      group.position.x = start.position.x + (origin.x - start.position.x) * progress;
-      group.position.y = start.position.y + (origin.y - start.position.y) * progress;
-      group.position.z = start.position.z + (origin.z - start.position.z) * progress;
-      group.rotation.x = start.rotation.x * (1 - progress);
-      group.rotation.y = start.rotation.y * (1 - progress);
-      group.rotation.z = start.rotation.z * (1 - progress);
+      const pickup = clamp(progress / 0.16, 0, 1);
+      const carryRaw = clamp((progress - 0.12) / 0.68, 0, 1);
+      const carry = carryRaw * carryRaw * (3 - 2 * carryRaw);
+      const dropRaw = clamp((progress - 0.82) / 0.18, 0, 1);
+      const drop = dropRaw * dropRaw * (3 - 2 * dropRaw);
+      const carryHeight = pickup * pickup * (3 - 2 * pickup) * (1 - drop) * 1.12;
+      group.position.x = start.position.x + (origin.x - start.position.x) * carry;
+      group.position.y = start.position.y + (origin.y - start.position.y) * drop + carryHeight;
+      group.position.z = start.position.z + (origin.z - start.position.z) * carry;
+      group.rotation.x = start.rotation.x * (1 - carry);
+      group.rotation.y = start.rotation.y * (1 - carry);
+      group.rotation.z = start.rotation.z * (1 - carry);
       const detail = state.proceduralGroups.get(id);
       const device = state.presetInfo.devices.find((item) => item.id === id);
       if (detail && start.detailPosition && start.detailRotation) {
@@ -4018,7 +4147,7 @@
       finishAutoTune("自动调试完成：所有器件已按批次恢复目标状态");
     } else {
       tuning.phase = "gap";
-      tuning.nextBatchAt = time + 260;
+      tuning.nextBatchAt = time + 360;
     }
   }
 
