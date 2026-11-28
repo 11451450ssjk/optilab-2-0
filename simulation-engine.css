@@ -1,0 +1,251 @@
+.simulation-engine-panel {
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid rgba(116, 152, 132, 0.24);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 92% 0, rgba(200, 156, 90, 0.08), transparent 20rem),
+    linear-gradient(145deg, rgba(17, 28, 29, 0.96), rgba(11, 18, 20, 0.98));
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.16);
+}
+
+.simulation-engine-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.simulation-engine-heading h3 {
+  margin: 7px 0 6px;
+  color: #edf1e9;
+  font-size: 21px;
+}
+
+.simulation-engine-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: #8c9992;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.simulation-engine-version {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid rgba(208, 171, 107, 0.28);
+  border-radius: 7px;
+  color: #d6b477;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.simulation-engine-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.simulation-card {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid rgba(139, 158, 147, 0.17);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.simulation-generator-card {
+  background:
+    linear-gradient(135deg, rgba(198, 157, 94, 0.08), transparent 64%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.simulation-card-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.simulation-card-heading > span {
+  color: #c79f64;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.simulation-card-heading strong {
+  color: #9eaaa3;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.simulation-generator-fields {
+  margin-top: 13px;
+  display: grid;
+  gap: 8px;
+}
+
+.simulation-generator-fields label {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 48px;
+  gap: 9px;
+  align-items: center;
+  color: #9ba69f;
+  font-size: 9px;
+}
+
+.simulation-generator-fields input {
+  width: 100%;
+  accent-color: #c79f64;
+}
+
+.simulation-generator-fields output {
+  color: #e2ceb0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 9px;
+  text-align: right;
+}
+
+.simulation-generate-button {
+  width: 100%;
+  margin-top: 13px;
+}
+
+.simulation-status {
+  min-height: 16px;
+  margin: 8px 0 0;
+  color: #7f8d85;
+  font-size: 9px;
+}
+
+.simulation-diagnostic-value {
+  margin-top: 15px;
+  color: #f0e3ca;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.simulation-mini-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.simulation-mini-grid > div,
+.simulation-reading {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(139, 158, 147, 0.12);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.simulation-mini-grid span,
+.simulation-reading span {
+  display: block;
+  color: #718078;
+  font-size: 8px;
+}
+
+.simulation-mini-grid strong,
+.simulation-reading strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #bfcac3;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-readings {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.simulation-warning {
+  min-height: 28px;
+  margin: 10px 0 0;
+  color: #9a8875;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.simulation-uncertainty-chart {
+  width: 100%;
+  height: 96px;
+  margin-top: 10px;
+  border: 1px solid rgba(118, 183, 145, 0.12);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.simulation-uncertainty-card {
+  border-color: rgba(118, 183, 145, 0.22);
+  background:
+    radial-gradient(circle at 100% 0, rgba(89, 173, 123, 0.08), transparent 15rem),
+    rgba(255, 255, 255, 0.025);
+}
+
+html[data-theme="day"] .simulation-engine-panel {
+  border-color: rgba(79, 104, 91, 0.2);
+  background:
+    radial-gradient(circle at 92% 0, rgba(174, 129, 63, 0.09), transparent 20rem),
+    linear-gradient(145deg, #f5f2ea, #efede5);
+}
+
+html[data-theme="day"] .simulation-engine-heading h3,
+html[data-theme="day"] .simulation-diagnostic-value {
+  color: #2d332f;
+}
+
+html[data-theme="day"] .simulation-card {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+html[data-theme="day"] .simulation-mini-grid > div,
+html[data-theme="day"] .simulation-reading,
+html[data-theme="day"] .simulation-uncertainty-chart {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+html[data-theme="day"] .simulation-mini-grid strong,
+html[data-theme="day"] .simulation-reading strong {
+  color: #3b443f;
+}
+
+@media (max-width: 900px) {
+  .simulation-engine-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .simulation-engine-panel {
+    padding: 17px;
+  }
+
+  .simulation-engine-heading {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .simulation-engine-heading h3 {
+    font-size: 18px;
+  }
+
+  .simulation-generator-fields label {
+    grid-template-columns: 68px minmax(0, 1fr) 44px;
+  }
+}

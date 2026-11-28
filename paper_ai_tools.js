@@ -101,7 +101,7 @@
       ? `| R1 | 实验报告 | ${pack.report.id} · ${pack.report.experimentName} · ${pack.report.analysis?.n || 0} 点 |`
       : "| R1 | 实验报告 | 未选择报告 |";
     const physicsRow = pack.physics
-      ? `| P1 | 统一计算 | ${pack.physics.engineVersion} · ${pack.physics.derived?.value || "无推演值"} · 输入哈希 ${pack.physics.inputHash} |`
+      ? `| P1 | 统一计算 | ${pack.physics.engineVersion} · ${pack.physics.derived?.value || "无推演值"} · ${pack.physics.uncertainty?.available ? `U95 ${pack.physics.uncertainty.expanded} ${pack.physics.uncertainty.unit}` : "无自动不确定度"} · 输入哈希 ${pack.physics.inputHash} |`
       : "| P1 | 统一计算 | 历史报告未包含计算快照 |";
     const citationRows = pack.citations.slice(0, 20).map((item, index) =>
       `| C${index + 1} | 文献题录 | ${item.title} · ${item.journal || "未标注期刊"} · ${item.year || "n.d."}${item.doi ? ` · DOI ${item.doi}` : ""} |`

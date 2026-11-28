@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
   <link rel="stylesheet" href="experience.css?v=20261128-clear-optical-routing">
+  <link rel="stylesheet" href="simulation-engine.css?v=20261128-simulation-engine">
   <link rel="stylesheet" href="polish.css?v=20261128-comprehensive-polish">
   <script>
     try {
@@ -1354,6 +1355,92 @@
           </div>
         </div>
 
+        <section class="simulation-engine-panel" id="simulation-engine-panel" aria-labelledby="simulation-engine-title">
+          <div class="simulation-engine-heading">
+            <div>
+              <span class="eyebrow">物理仿真 · 数据可信度</span>
+              <h3 id="simulation-engine-title">真实感数据、光路追迹与统一不确定度</h3>
+              <p>同一个计算快照会同步用于演示读数、报告和论文证据包；生成的仿真数据会包含噪声、漂移、量化与离群点。</p>
+            </div>
+            <span class="simulation-engine-version" id="simulation-engine-version">SIM ENGINE</span>
+          </div>
+          <div class="simulation-engine-grid">
+            <article class="simulation-card simulation-generator-card">
+              <div class="simulation-card-heading">
+                <span>01 · 数据生成器</span>
+                <strong id="simulation-generator-model">当前实验模型</strong>
+              </div>
+              <div class="simulation-generator-fields">
+                <label>
+                  <span>采样点</span>
+                  <input id="simulation-sample-count" type="range" min="24" max="120" step="2" value="42">
+                  <output id="simulation-sample-count-value">42</output>
+                </label>
+                <label>
+                  <span>随机噪声</span>
+                  <input id="simulation-noise" type="range" min="0" max="5" step="0.1" value="1.1">
+                  <output id="simulation-noise-value">1.1%</output>
+                </label>
+                <label>
+                  <span>系统漂移</span>
+                  <input id="simulation-drift" type="range" min="0" max="3" step="0.1" value="0.35">
+                  <output id="simulation-drift-value">0.35%</output>
+                </label>
+                <label>
+                  <span>离群点比例</span>
+                  <input id="simulation-outliers" type="range" min="0" max="8" step="0.1" value="0.5">
+                  <output id="simulation-outliers-value">0.5%</output>
+                </label>
+              </div>
+              <button class="primary-button compact simulation-generate-button" id="simulation-generate-data" type="button">
+                生成真实感数据并写入报告
+              </button>
+              <p class="simulation-status" id="simulation-status" role="status" aria-live="polite">等待生成</p>
+            </article>
+
+            <article class="simulation-card">
+              <div class="simulation-card-heading">
+                <span>02 · 光线追迹</span>
+                <strong id="simulation-optical-model">等待光路</strong>
+              </div>
+              <div class="simulation-diagnostic-value" id="simulation-optical-value">—</div>
+              <div class="simulation-mini-grid">
+                <div><span>RMS 光斑</span><strong id="simulation-spot-rms">—</strong></div>
+                <div><span>衍射极限</span><strong id="simulation-diffraction-limit">—</strong></div>
+                <div><span>光程差</span><strong id="simulation-opd">—</strong></div>
+                <div><span>条纹可见度</span><strong id="simulation-visibility">—</strong></div>
+              </div>
+              <p class="simulation-warning" id="simulation-optical-warning"></p>
+            </article>
+
+            <article class="simulation-card">
+              <div class="simulation-card-heading">
+                <span>03 · 电路求解</span>
+                <strong id="simulation-electrical-model">等待电路</strong>
+              </div>
+              <div class="simulation-diagnostic-value" id="simulation-electrical-value">—</div>
+              <div class="simulation-readings" id="simulation-electrical-readings"></div>
+              <p class="simulation-warning" id="simulation-electrical-warning"></p>
+            </article>
+
+            <article class="simulation-card simulation-uncertainty-card">
+              <div class="simulation-card-heading">
+                <span>04 · 统一不确定度</span>
+                <strong id="simulation-uncertainty-method">蒙特卡洛</strong>
+              </div>
+              <div class="simulation-diagnostic-value" id="simulation-uncertainty-value">—</div>
+              <div class="simulation-mini-grid">
+                <div><span>标准不确定度</span><strong id="simulation-standard-u">—</strong></div>
+                <div><span>扩展不确定度 U95</span><strong id="simulation-expanded-u">—</strong></div>
+                <div><span>相对不确定度</span><strong id="simulation-relative-u">—</strong></div>
+                <div><span>传播样本</span><strong id="simulation-uncertainty-trials">—</strong></div>
+              </div>
+              <canvas id="simulation-uncertainty-chart" class="simulation-uncertainty-chart" aria-label="蒙特卡洛结果分布直方图"></canvas>
+              <p class="simulation-warning">不确定度根据输入分辨率、校准和环境漂移估算，真实报告仍需替换为仪器证书参数。</p>
+            </article>
+          </div>
+        </section>
+
         <div class="support-cards">
           <article class="support-card">
             <span class="support-index">+</span>
@@ -1763,12 +1850,13 @@
   <script src="graduate.js?v=20261128-smooth-autotune"></script>
   <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
   <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
+  <script src="simulation_engine.js?v=20261128-simulation-engine"></script>
   <script src="lab_panorama.js?v=20261128-optical-depth-spacing-v3"></script>
   <script src="lab_panorama_3d.js?v=20261128-optical-depth-spacing-v3"></script>
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="advanced.js?v=20261128-comprehensive-polish"></script>
+  <script src="advanced.js?v=20261128-simulation-engine"></script>
   <script src="research.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js?v=20261128-smooth-autotune"></script>
@@ -1776,6 +1864,7 @@
   <script src="paper_ai_tools.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_library.js?v=20261128-smooth-autotune"></script>
   <script src="experience_enhancements.js?v=20261128-smooth-autotune"></script>
+  <script src="simulation_ui.js?v=20261128-simulation-engine"></script>
   <script src="polish.js?v=20261128-comprehensive-polish"></script>
 </body>
 </html>

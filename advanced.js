@@ -2998,6 +2998,9 @@ function selectExperiment(experimentId, scrollToLab = false) {
   });
   drawLabFrame(performance.now());
   pulseMotion(labCanvas, "canvas-switch");
+  window.dispatchEvent(new CustomEvent("optilab:experiment-changed", {
+    detail: { experimentId: experiment.id }
+  }));
   if (scrollToLab) {
     document.getElementById("lab-section").scrollIntoView({ behavior: "smooth", block: "start" });
     showToast(`已切换到 ${experiment.name}`);
@@ -3016,6 +3019,9 @@ function updateControlReadouts() {
   document.getElementById("derived-note").textContent =
     `${derived.note} · 统一计算引擎 ${derived.engineVersion || "local"}`;
   updateSimulationStory();
+  window.dispatchEvent(new CustomEvent("optilab:parameters-changed", {
+    detail: { primary: state.primary, secondary: state.secondary }
+  }));
 }
 
 function calculateDerivedReading(experiment = currentExperiment()) {
@@ -3184,9 +3190,9 @@ function parseTable(text) {
   return { headers, body, numericColumns };
 }
 
-function prepareParsedData(text, sourceName) {
+function prepareParsedData(text, sourceName, simulationMetadata = null) {
   const parsed = parseTable(text);
-  state.parsed = { ...parsed, sourceName };
+  state.parsed = { ...parsed, sourceName, simulationMetadata };
   const xSelect = document.getElementById("x-column-select");
   const ySelect = document.getElementById("y-column-select");
   xSelect.innerHTML = parsed.numericColumns
@@ -3223,6 +3229,7 @@ function mapAndAnalyzeData() {
     xHeader: state.parsed.headers[xColumn] || "横轴",
     yHeader: state.parsed.headers[yColumn] || "纵轴",
     sourceName: state.parsed.sourceName,
+    simulationMetadata: state.parsed.simulationMetadata || null,
     rawText: null
   };
   updateAnalysisUI();
@@ -3411,6 +3418,19 @@ function drawAdvancedChart() {
 function createSampleCsv(experiment) {
   const info = simInfo(experiment);
   const config = controlConfig(experiment);
+  if (window.OptilabSimulation?.generateDataset) {
+    return window.OptilabSimulation.generateDataset(experiment, {
+      primary: state.primary,
+      secondary: state.secondary,
+      count: 42,
+      noisePercent: 1.1,
+      driftPercent: 0.35,
+      outlierRate: 0.025,
+      xHeader: info.xLabel,
+      yHeader: info.yLabel,
+      seed: `${experiment.id}-${Date.now()}`
+    });
+  }
   const n = 42;
   const sim = experiment.sim;
   const xHeader = info.xLabel;
@@ -3494,16 +3514,16 @@ function createSampleCsv(experiment) {
   };
 }
 
-function ingestData(text, sourceName) {
-  prepareParsedData(text, sourceName);
+function ingestData(text, sourceName, simulationMetadata = null) {
+  prepareParsedData(text, sourceName, simulationMetadata);
   if (!state.data) return;
   createReportRecord(true);
 }
 
 function loadSmartSample() {
   const sample = createSampleCsv(currentExperiment());
-  ingestData(sample.csv, `示例_${currentExperiment().name}.csv`);
-  showToast(`已生成 ${currentExperiment().name} 示例数据和新报告`);
+  ingestData(sample.csv, `真实感示例_${currentExperiment().name}.csv`, sample.metadata || null);
+  showToast(`已生成 ${currentExperiment().name} 真实感示例数据和新报告`);
 }
 
 function createUniqueReportId() {
@@ -3537,6 +3557,7 @@ function createReportRecord(auto = false) {
     year: experiment.year,
     term: experiment.term,
     sourceName: state.data.sourceName,
+    simulationMetadata: state.data.simulationMetadata || null,
     batchName,
     xHeader: state.data.xHeader,
     yHeader: state.data.yHeader,
@@ -3659,9 +3680,21 @@ ${record.parameters.secondaryLabel}：${formatNumber(record.parameters.secondary
 模型：${record.physicsSnapshot.sim}
 基础关系：${record.physicsSnapshot.formula}
 当前推演：${record.physicsSnapshot.derived?.value || "不适用"}
+模型诊断：${record.physicsSnapshot.derived?.diagnosticSummary || "未启用光路或电路诊断"}
+统一不确定度：${record.physicsSnapshot.uncertainty?.available
+  ? `${formatNumber(record.physicsSnapshot.uncertainty.standard, 6)} ${record.physicsSnapshot.uncertainty.unit}（k = 1）；U95 = ${formatNumber(record.physicsSnapshot.uncertainty.expanded, 6)} ${record.physicsSnapshot.uncertainty.unit}`
+  : "当前理论关系没有连续数值输出"}
 模型假设：${(record.physicsSnapshot.derived?.assumptions || []).join("；") || "以课程指导书为准"}
 输入哈希：${record.physicsSnapshot.inputHash}`
     : "该历史报告未保存统一计算链快照，请重新生成报告以补齐来源记录。";
+  const simulationBlock = record.simulationMetadata
+    ? `数据生成器：${record.simulationMetadata.engineVersion}
+噪声比例：${formatNumber(record.simulationMetadata.noisePercent, 2)}%
+系统漂移：${formatNumber(record.simulationMetadata.driftPercent, 2)}%
+离群点设置：${formatNumber(record.simulationMetadata.outlierRate * 100, 2)}%
+量化步长：${compactNumber(record.simulationMetadata.quantization)}
+随机种子：${record.simulationMetadata.seed}`
+    : "本次数据不是由内置真实感生成器创建；未记录随机种子和噪声参数。";
   let citationItems = [];
   try {
     const storedCitations = JSON.parse(localStorage.getItem("optilab_citation_library_v1") || "[]");
@@ -3732,6 +3765,9 @@ ${principle.apparatus}
 ### 4.1 统一计算链记录
 ${physicsBlock}
 
+### 4.2 数据生成条件
+${simulationBlock}
+
 做真实实验时，还应补上仪器编号、量程、环境温度、湿度、光源功率、采集软件版本和校准日期。
 
 ## 五、实验步骤
@@ -3785,6 +3821,10 @@ ${outlierText}
 
 ## 九、不确定度与误差讨论
 基于当前样本，均值的 A 类标准误差估计为 ${compactNumber(analysis.standardError)}，近似 95% 置信区间为 ${compactNumber(analysis.mean)} ± ${compactNumber(analysis.confidence95)}。该估计假设样本相对独立且主要误差为随机误差。
+
+统一理论计算链给出的蒙特卡洛传播结果为：${record.physicsSnapshot?.uncertainty?.available
+  ? `标准不确定度 ${compactNumber(record.physicsSnapshot.uncertainty.standard)} ${record.physicsSnapshot.uncertainty.unit}，扩展不确定度 U95 = ${compactNumber(record.physicsSnapshot.uncertainty.expanded)} ${record.physicsSnapshot.uncertainty.unit}，相对不确定度 ${formatNumber(record.physicsSnapshot.uncertainty.relativePercent, 3)}%。`
+  : "当前理论关系没有可连续传播的数值输出，不能自动给出模型不确定度。"}
 
 如果仪器说明书给出了 B 类不确定度、分辨率或校准证书，还要把它与 A 类不确定度合成。这里没有读取真实仪器证书，因此标准误差不能代替完整的测量不确定度评定。
 
@@ -4474,7 +4514,8 @@ window.OptilabBridge = {
       sourceName: state.data?.sourceName || "interactive-model"
     }) || null;
   },
-  loadExternalData: (text, sourceName = "仪器直采数据") => prepareParsedData(text, sourceName),
+  loadExternalData: (text, sourceName = "仪器直采数据", simulationMetadata = null) =>
+    prepareParsedData(text, sourceName, simulationMetadata),
   getReports: () => state.reports,
   getActiveReport: () => activeReport(),
   showToast,
