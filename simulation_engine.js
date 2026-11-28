@@ -374,6 +374,203 @@
     };
   }
 
+  function computeWavefront(experiment, primaryValue, secondaryValue, options = {}) {
+    const sim = experiment?.sim || "measurement";
+    const size = clamp(Math.round(options.size || 64), 32, 128);
+    const wavelengthNm = /nm/i.test(experiment?.primaryUnit || "") ? Math.max(200, Number(primaryValue) || 632) : 632;
+    const wavelengthMm = wavelengthNm * 1e-6;
+    const secondary = Number(secondaryValue) || 1;
+    const available = opticalSims.has(sim) || /干涉|衍射|光栅|棱镜/.test(experiment?.name || "");
+    if (!available) {
+      return {
+        engineVersion: ENGINE_VERSION,
+        model: "当前实验未启用波前传播",
+        available: false,
+        size: 0,
+        wavelengthNm,
+        opdUm: 0,
+        coherence: 0,
+        phaseOffset: 0,
+        visibility: 0,
+        intensity: new Float32Array(0),
+        centerIntensity: 0
+      };
+    }
+    const controls = options.controls || {};
+    const tilt = Number(controls.pitch || controls.azimuth || 0) * Math.PI / 180;
+    const opdUm = sim === "michelson" ? Math.abs(2 * secondary) : 0;
+    const coherenceLengthUm = wavelengthNm ** 2 / (Math.max(0.001, Number(options.bandwidthNm) || 0.5) * 1000);
+    const coherence = Math.exp(-opdUm / Math.max(1e-9, coherenceLengthUm));
+    const phaseOffset = opdUm ? 2 * Math.PI * opdUm / (wavelengthNm * 1e-3) : secondary * 0.7;
+    const intensity = new Float32Array(size * size);
+    let maximum = 0;
+    for (let row = 0; row < size; row += 1) {
+      for (let column = 0; column < size; column += 1) {
+        const x = (column / (size - 1) - 0.5) * 12;
+        const y = (row / (size - 1) - 0.5) * 12;
+        let value = 0;
+        if (["michelson", "newton", "interference"].includes(sim)) {
+          const radius2 = x * x + y * y;
+          const scale = sim === "newton" ? 0.75 : 0.42;
+          const phase = radius2 * scale + phaseOffset + tilt * x * 2.8;
+          value = 0.5 + 0.5 * Math.cos(phase);
+          value = 0.5 + (value - 0.5) * coherence;
+        } else if (sim === "double-slit") {
+          const spacing = Math.max(0.02, secondary);
+          const fringe = wavelengthMm * 1000 / spacing;
+          value = Math.cos(Math.PI * x / Math.max(0.05, fringe / 10)) ** 2;
+          value *= Math.exp(-(x * x + y * y) / 68);
+        } else if (sim === "diffraction") {
+          const argument = x * Math.max(0.05, 1 / Math.max(1, secondary));
+          value = x === 0 ? 1 : (Math.sin(argument) / argument) ** 2;
+          value *= Math.exp(-y * y / 60);
+        } else if (sim === "grating") {
+          value = Math.exp(-((x - 0) ** 2) / 0.8) +
+            0.7 * Math.exp(-((x - 5.5) ** 2) / 0.6) +
+            0.7 * Math.exp(-((x + 5.5) ** 2) / 0.6);
+          value *= Math.exp(-y * y / 65);
+        } else {
+          const radius = Math.sqrt(x * x + y * y);
+          const airy = radius === 0 ? 1 : (2 * j1Approx(radius * 1.7) / Math.max(0.001, radius * 1.7)) ** 2;
+          value = airy;
+        }
+        intensity[row * size + column] = clamp(value, 0, 4);
+        maximum = Math.max(maximum, value);
+      }
+    }
+    let minimumVisible = 1;
+    let maximumVisible = 0;
+    for (let index = 0; index < intensity.length; index += 1) {
+      intensity[index] /= Math.max(maximum, 1e-9);
+      minimumVisible = Math.min(minimumVisible, intensity[index]);
+      maximumVisible = Math.max(maximumVisible, intensity[index]);
+    }
+    const visibility = (maximumVisible - minimumVisible) / Math.max(1e-9, maximumVisible + minimumVisible);
+    return {
+      engineVersion: ENGINE_VERSION,
+      model: "波前强度传播 + 相干性衰减 + 倾差错位",
+      available,
+      size,
+      wavelengthNm,
+      opdUm,
+      coherence,
+      phaseOffset,
+      visibility,
+      intensity,
+      centerIntensity: intensity[Math.floor(intensity.length / 2)] || 0
+    };
+  }
+
+  function j1Approx(value) {
+    const x = Math.abs(value);
+    if (x < 1e-6) return 0.5 * x;
+    return Math.sqrt(2 / (Math.PI * Math.max(x, 1e-6))) * Math.cos(x - 2.35619449);
+  }
+
+  function simulateDetector(experiment, primaryValue, secondaryValue, options = {}) {
+    const wave = options.wavefront || computeWavefront(experiment, primaryValue, secondaryValue, options);
+    const inputPowerMw = clamp(Number(options.powerMw) || 3, 0, 100);
+    const responsivity = 0.42 + Math.min(0.18, (wave.wavelengthNm - 400) / 3000);
+    const opticalTransmission = clamp(0.3 + wave.centerIntensity * 0.65, 0.05, 1);
+    const opticalPowerMw = inputPowerMw * opticalTransmission;
+    const photocurrentA = opticalPowerMw * 1e-3 * responsivity;
+    const bandwidthHz = clamp(Number(options.bandwidthHz) || 1e6, 1, 1e9);
+    const shotNoiseA = Math.sqrt(2 * 1.602176634e-19 * Math.max(0, photocurrentA) * bandwidthHz);
+    const readNoiseA = 2e-9;
+    const totalNoiseA = Math.hypot(shotNoiseA, readNoiseA);
+    const snr = photocurrentA > 0 ? 20 * Math.log10(photocurrentA / Math.max(totalNoiseA, 1e-15)) : -Infinity;
+    const saturationCurrentA = Number(options.saturationCurrentA) || 1e-3;
+    return {
+      engineVersion: ENGINE_VERSION,
+      inputPowerMw,
+      opticalPowerMw,
+      photocurrentUa: photocurrentA * 1e6,
+      responsivity,
+      shotNoisePa: shotNoiseA * 1e12,
+      readNoisePa: readNoiseA * 1e12,
+      snrDb: snr,
+      saturated: photocurrentA >= saturationCurrentA,
+      saturationLimitUa: saturationCurrentA * 1e6
+    };
+  }
+
+  function simulateOscilloscope(experiment, primaryValue, secondaryValue, options = {}) {
+    const random = randomGenerator(options.seed || `scope-${experiment?.id || "experiment"}`);
+    const frequency = clamp(Number(options.frequencyHz) || Number(primaryValue) * 1000 || 5000, 0.1, 1e9);
+    const amplitude = clamp(Number(options.amplitudeV) || Number(secondaryValue) || 2, 1e-6, 100);
+    const points = clamp(Math.round(options.points || 240), 80, 600);
+    const cycles = clamp(Number(options.cycles) || 4, 1, 12);
+    const phaseOffset = Number(options.phase || 0);
+    const sampleRate = frequency * points / cycles;
+    const bandwidth = clamp(Number(options.bandwidthHz) || 1e8, 1, 1e10);
+    const bandwidthFactor = 1 / Math.sqrt(1 + (frequency / bandwidth) ** 2);
+    const noiseRms = 0.0015 + amplitude * 0.0015;
+    const verticalRange = Number(options.verticalRangeV) || 5;
+    const waveform = [];
+    for (let index = 0; index < points; index += 1) {
+      const time = index / sampleRate;
+      const phase = 2 * Math.PI * frequency * time + phaseOffset;
+      const noise = gaussian(random) * noiseRms;
+      const quantization = verticalRange * 2 / 4096;
+      const voltage = Math.round((Math.sin(phase) * amplitude * bandwidthFactor + noise) / quantization) * quantization;
+      waveform.push({
+        time,
+        voltage,
+        clipped: Math.abs(voltage) > verticalRange
+      });
+    }
+    const rms = Math.sqrt(waveform.reduce((total, point) => total + point.voltage ** 2, 0) / points);
+    return {
+      engineVersion: ENGINE_VERSION,
+      frequencyHz: frequency,
+      amplitudeV: amplitude * bandwidthFactor,
+      rmsV: rms,
+      sampleRate,
+      noiseRms,
+      quantizationV: verticalRange * 2 / 4096,
+      bandwidthHz: bandwidth,
+      clippedSamples: waveform.filter((point) => point.clipped).length,
+      waveform
+    };
+  }
+
+  function simulateCameraFrame(experiment, primaryValue, secondaryValue, options = {}) {
+    const wave = options.wavefront || computeWavefront(experiment, primaryValue, secondaryValue, options);
+    const random = randomGenerator(options.seed || `camera-${experiment?.id || "experiment"}`);
+    const width = 48;
+    const height = 36;
+    const exposureMs = clamp(Number(options.exposureMs) || 10, 0.01, 1000);
+    const gain = clamp(Number(options.gain) || 1, 0.1, 64);
+    const readNoise = 3;
+    const fullWell = 12000;
+    const pixels = new Float32Array(width * height);
+    let saturatedPixels = 0;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const sourceX = Math.min(wave.size - 1, Math.floor(x / width * wave.size));
+        const sourceY = Math.min(wave.size - 1, Math.floor(y / height * wave.size));
+        const signal = wave.intensity[sourceY * wave.size + sourceX] * exposureMs * gain * 58;
+        const shot = gaussian(random) * Math.sqrt(Math.max(1, signal));
+        const value = clamp(signal + shot + gaussian(random) * readNoise, 0, fullWell);
+        if (value >= fullWell) saturatedPixels += 1;
+        pixels[y * width + x] = value / fullWell;
+      }
+    }
+    return {
+      engineVersion: ENGINE_VERSION,
+      width,
+      height,
+      pixels,
+      exposureMs,
+      gain,
+      readNoise,
+      fullWell,
+      saturatedPixels,
+      saturatedRatio: saturatedPixels / pixels.length,
+      mean: pixels.reduce((total, value) => total + value, 0) / pixels.length
+    };
+  }
+
   function percentile(sorted, fraction) {
     if (!sorted.length) return null;
     const index = clamp((sorted.length - 1) * fraction, 0, sorted.length - 1);
@@ -470,11 +667,36 @@
     if (calculationCache.has(cacheKey)) return calculationCache.get(cacheKey);
     const nominal = base.calculate(experiment, primaryValue, secondaryValue);
     const uncertainty = propagateUncertainty(experiment, primaryValue, secondaryValue);
+    const wavefront = computeWavefront(experiment, primaryValue, secondaryValue, { size: 36 });
+    const detector = isOpticalExperiment(experiment)
+      ? simulateDetector(experiment, primaryValue, secondaryValue, {
+        wavefront,
+        powerMw: clamp(1 + Math.abs(Number(primaryValue) || 1) / 120, 0.1, 20)
+      })
+      : null;
+    const oscilloscope = /oscilloscope|示波/i.test(`${experiment?.sim || ""} ${experiment?.name || ""}`)
+      ? simulateOscilloscope(experiment, primaryValue, secondaryValue, { points: 120 })
+      : null;
     const diagnostics = {
       rayTrace: rayTrace(experiment, primaryValue, secondaryValue),
       circuit: isElectricalExperiment(experiment)
         ? circuitDiagnostics(experiment, primaryValue, secondaryValue)
-        : { active: false, reason: "当前实验没有启用电路求解器。" }
+        : { active: false, reason: "当前实验没有启用电路求解器。" },
+      wavefront: wavefront.available ? {
+        model: wavefront.model,
+        wavelengthNm: wavefront.wavelengthNm,
+        opdUm: wavefront.opdUm,
+        coherence: wavefront.coherence,
+        visibility: wavefront.visibility
+      } : null,
+      detector,
+      oscilloscope: oscilloscope ? {
+        frequencyHz: oscilloscope.frequencyHz,
+        amplitudeV: oscilloscope.amplitudeV,
+        rmsV: oscilloscope.rmsV,
+        noiseRms: oscilloscope.noiseRms,
+        clippedSamples: oscilloscope.clippedSamples
+      } : null
     };
     const uncertaintyText = uncertainty.available
       ? `蒙特卡洛标准不确定度 ${base.formatNumber(uncertainty.standard, 4)} ${uncertainty.unit}，U95 ${base.formatNumber(uncertainty.expanded, 4)} ${uncertainty.unit}`
@@ -667,6 +889,10 @@
     circuitDiagnostics,
     propagateUncertainty,
     generateDataset,
+    computeWavefront,
+    simulateDetector,
+    simulateOscilloscope,
+    simulateCameraFrame,
     trace3DScene,
     isElectricalExperiment,
     isOpticalExperiment

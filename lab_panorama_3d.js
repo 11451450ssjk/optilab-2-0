@@ -13,6 +13,7 @@
     scene: null,
     camera: null,
     raycaster: null,
+    meshRaycaster: null,
     pointer: null,
     dragPlane: null,
     dragGroup: null,
@@ -37,6 +38,10 @@
     cutawayTarget: "",
     minimapVisible: true,
     lastMinimapUpdate: 0,
+    lastMeshTraceAt: 0,
+    meshHitCache: new Map(),
+    waveRaster: null,
+    cameraRaster: null,
     lastTrace3D: null,
     connectionIssues: 0,
     autoTunePaused: false,
@@ -128,6 +133,7 @@
     state.scene.fog = new THREE.Fog(0x07100f, 9, 22);
     state.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
     state.raycaster = new THREE.Raycaster();
+    state.meshRaycaster = new THREE.Raycaster();
     state.pointer = new THREE.Vector2();
     state.dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.32);
     buildEnvironment();
@@ -476,6 +482,8 @@
       currentText: unitText(supplyCurrent, "A", supplyCurrent < 1 ? 3 : 2),
       supplyVoltage,
       supplyCurrent,
+      scopeFrequency,
+      scopeAmplitude,
       scopeFrequencyText: unitText(scopeFrequency, "Hz", 1),
       scopeTimebase,
       scopeAmplitudeText: unitText(scopeAmplitude, "Vpp", 2),
@@ -491,10 +499,48 @@
     };
   }
 
+  function paintWavefront(context, wave, x, y, width, height, color = [228, 188, 112]) {
+    if (!wave?.intensity?.length) return;
+    if (!state.waveRaster) {
+      state.waveRaster = document.createElement("canvas");
+      state.waveRaster.width = wave.size;
+      state.waveRaster.height = wave.size;
+    }
+    if (state.waveRaster.width !== wave.size || state.waveRaster.height !== wave.size) {
+      state.waveRaster.width = wave.size;
+      state.waveRaster.height = wave.size;
+    }
+    const rasterContext = state.waveRaster.getContext("2d");
+    const image = rasterContext.createImageData(wave.size, wave.size);
+    for (let index = 0; index < wave.intensity.length; index += 1) {
+      const intensity = clamp(wave.intensity[index], 0, 1);
+      const pixel = index * 4;
+      image.data[pixel] = color[0] * intensity;
+      image.data[pixel + 1] = color[1] * intensity;
+      image.data[pixel + 2] = color[2] * intensity;
+      image.data[pixel + 3] = 255;
+    }
+    rasterContext.putImageData(image, 0, 0);
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.drawImage(state.waveRaster, x, y, width, height);
+    context.restore();
+  }
+
   function drawPanelTexture(entry, time, config) {
     const { canvas, context, device } = entry;
     const kind = deviceKind(device);
     const display = liveDisplayData(device, config);
+    const issuedControls = state.deviceControls.get(device.id) || {};
+    const scopeSignal = kind === "scope"
+      ? window.OptilabSimulation?.simulateOscilloscope(state.config?.experiment || {}, display.scopeFrequency, display.scopeAmplitude, {
+        frequencyHz: display.scopeFrequency,
+        amplitudeV: display.scopeAmplitude,
+        points: 260,
+        verticalRangeV: 5,
+        phase: time * 0.0018
+      })
+      : null;
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#07110e";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -510,14 +556,24 @@
       context.strokeStyle = "#6de2a0";
       context.lineWidth = 3;
       context.beginPath();
-      const cycles = clamp(display.scopeFrequency / 300, 1, 7);
-      for (let x = 12; x < canvas.width - 12; x += 2) {
-        const phase = ((x - 12) / (canvas.width - 24)) * Math.PI * 2 * cycles;
-        const y = 128 + Math.sin(phase + time * 0.002) * 60 * state.metrics.connectivity;
-        if (x === 12) context.moveTo(x, y);
+      const waveform = scopeSignal?.waveform || [];
+      for (let index = 0; index < waveform.length; index += 1) {
+        const point = waveform[index];
+        const x = 12 + index / Math.max(1, waveform.length - 1) * (canvas.width - 24);
+        const y = 128 - point.voltage / 5 * 88;
+        if (index === 0) context.moveTo(x, y);
         else context.lineTo(x, y);
       }
       context.stroke();
+      if (scopeSignal) {
+        context.fillStyle = scopeSignal.clippedSamples ? "#f2a171" : "#78dca3";
+        context.font = '16px "Cascadia Mono", monospace';
+        context.fillText(
+          `${formatNumber(scopeSignal.frequencyHz, 1)} Hz  ${formatNumber(scopeSignal.amplitudeV, 3)} V  RMS ${formatNumber(scopeSignal.rmsV, 3)} V`,
+          14,
+          46
+        );
+      }
       if (kind === "logic-analyzer") {
         const traces = ["#79aef2", "#e4be76", "#de8b83", "#99d7a4"];
         traces.forEach((color, channel) => {
@@ -546,21 +602,47 @@
         context.fillText(display.scopeTimebase, 370, 244);
       }
     } else if (kind === "screen") {
-      const phase = Math.abs(Number(config.secondary) || 0) * 2.4;
-      for (let row = 0; row < 6; row += 1) {
-        context.strokeStyle = `rgba(238, 196, 119, ${0.35 + state.metrics.alignment * 0.5})`;
-        context.lineWidth = 4;
-        context.beginPath();
-        const y0 = 30 + row * 38;
-        for (let x = 8; x < canvas.width - 8; x += 3) {
-          const local = (x - 8) / (canvas.width - 16);
-          const intensity = 0.5 + 0.5 * Math.cos(local * Math.PI * 10 + phase);
-          const y = y0 + Math.sin(local * Math.PI * 2 + time * 0.001) * intensity * 4;
-          if (x === 8) context.moveTo(x, y);
-          else context.lineTo(x, y);
-        }
-        context.stroke();
-      }
+      const controls = Object.fromEntries(state.deviceControls);
+      const wave = window.OptilabSimulation?.computeWavefront(
+        state.config?.experiment || {},
+        config.primary,
+        config.secondary,
+        { size: 48, controls, bandwidthNm: 0.5 }
+      );
+      paintWavefront(context, wave, 8, 18, canvas.width - 16, canvas.height - 42, config.beamColor || [232, 190, 116]);
+      context.strokeStyle = "rgba(220, 199, 152, 0.45)";
+      context.strokeRect(8, 18, canvas.width - 16, canvas.height - 42);
+      context.fillStyle = "#b6c2ba";
+      context.font = '17px "Cascadia Mono", monospace';
+      context.fillText(
+        wave ? `WAVE OPTICS · OPD ${formatNumber(wave.opdUm, 2)} μm · V ${formatNumber(wave.visibility * 100, 1)}%` : "WAVE OPTICS",
+        14,
+        canvas.height - 10
+      );
+    } else if (kind === "detector") {
+      const wave = window.OptilabSimulation?.computeWavefront(
+        state.config?.experiment || {},
+        config.primary,
+        config.secondary,
+        { size: 32, controls: Object.fromEntries(state.deviceControls) }
+      );
+      const detector = window.OptilabSimulation?.simulateDetector(
+        state.config?.experiment || {},
+        config.primary,
+        config.secondary,
+        { wavefront: wave, powerMw: state.metrics.power, bandwidthHz: 1e6 }
+      );
+      paintWavefront(context, wave, 18, 34, 190, 190, [108, 224, 159]);
+      context.fillStyle = detector?.saturated ? "#f29b72" : "#8be3b2";
+      context.textAlign = "right";
+      context.font = 'bold 32px "Cascadia Mono", monospace';
+      context.fillText(`${formatNumber(detector?.photocurrentUa, 3)} μA`, 486, 92);
+      context.textAlign = "left";
+      context.font = '16px "Cascadia Mono", monospace';
+      context.fillText(`SNR ${formatNumber(detector?.snrDb, 1)} dB`, 232, 132);
+      context.fillText(`P ${formatNumber(detector?.opticalPowerMw, 3)} mW`, 232, 160);
+      context.fillText(`SHOT ${formatNumber(detector?.shotNoisePa, 2)} pA`, 232, 188);
+      context.fillText(detector?.saturated ? "SATURATED" : "LINEAR", 232, 216);
     } else if (kind === "laser") {
       context.fillStyle = colorArrayToHex(config.beamColor);
       context.font = 'bold 48px "Cascadia Mono", monospace';
@@ -650,22 +732,63 @@
       context.fillText(`${display.primaryLabel}: ${display.primaryText}`, 22, 220);
       context.fillText(`${display.secondaryLabel}: ${display.secondaryText}`, 22, 244);
     } else if (kind === "camera" || kind === "thermal-camera") {
-      for (let row = 0; row < 5; row += 1) {
-        for (let column = 0; column < 8; column += 1) {
-          const level = kind === "thermal-camera"
-            ? 90 + ((row * 37 + column * 23) % 130)
-            : 130 + ((row + column) % 2) * 70;
-          context.fillStyle = kind === "thermal-camera"
-            ? `rgb(${level + 80},${Math.max(25, level - 60)},40)`
-            : `rgb(${level},${level},${level})`;
-          context.fillRect(38 + column * 55, 38 + row * 40, 52, 37);
+      const wave = window.OptilabSimulation?.computeWavefront(
+        state.config?.experiment || {},
+        config.primary,
+        config.secondary,
+        { size: 48, controls: Object.fromEntries(state.deviceControls) }
+      );
+      const frame = window.OptilabSimulation?.simulateCameraFrame(
+        state.config?.experiment || {},
+        config.primary,
+        config.secondary,
+        {
+          wavefront: wave,
+          exposureMs: Number(issuedControls.exposure) || 10,
+          gain: Number(issuedControls.gain) || 1
         }
+      );
+      if (!state.cameraRaster) {
+        state.cameraRaster = document.createElement("canvas");
+        state.cameraRaster.width = frame?.width || 1;
+        state.cameraRaster.height = frame?.height || 1;
+      }
+      if (frame && (state.cameraRaster.width !== frame.width || state.cameraRaster.height !== frame.height)) {
+        state.cameraRaster.width = frame.width;
+        state.cameraRaster.height = frame.height;
+      }
+      if (frame) {
+        const raster = state.cameraRaster.getContext("2d");
+        const image = raster.createImageData(frame.width, frame.height);
+        frame.pixels.forEach((value, index) => {
+          const pixel = index * 4;
+          if (kind === "thermal-camera") {
+            image.data[pixel] = clamp(value * 255 + 80, 0, 255);
+            image.data[pixel + 1] = clamp(value * 120, 0, 255);
+            image.data[pixel + 2] = clamp(value * 35, 0, 255);
+          } else {
+            image.data[pixel] = clamp(value * 255, 0, 255);
+            image.data[pixel + 1] = clamp(value * 255, 0, 255);
+            image.data[pixel + 2] = clamp(value * 245, 0, 255);
+          }
+          image.data[pixel + 3] = 255;
+        });
+        raster.putImageData(image, 0, 0);
+        context.drawImage(state.cameraRaster, 28, 30, canvas.width - 56, 176);
       }
       context.fillStyle = "#e5d2a6";
       context.font = '20px "Cascadia Mono", monospace';
       context.fillText(kind === "thermal-camera"
         ? `${display.temperatureText}  ·  ε 0.95`
         : `${display.exposureText}  ·  GAIN ${display.gainText}`, 20, 238);
+      if (frame) {
+        context.font = '14px "Cascadia Mono", monospace';
+        context.fillText(
+          `SHOT+READ NOISE · SAT ${formatNumber(frame.saturatedRatio * 100, 2)}%`,
+          260,
+          238
+        );
+      }
     } else if (kind === "bioamp") {
       context.strokeStyle = "#7ce0a2";
       context.lineWidth = 3;
@@ -751,6 +874,52 @@
       curveSegments: 5
     });
     geometry.center();
+    return geometry;
+  }
+
+  function biconvexLensGeometry(radius = 0.2, thickness = 0.075, curvatureRadius = 0.32) {
+    const THREE = state.three;
+    const rings = 24;
+    const segments = 40;
+    const positions = [];
+    const indices = [];
+    const uvs = [];
+    const ringsPerSide = Math.floor(rings / 2);
+    for (let side = 0; side < 2; side += 1) {
+      for (let ring = 0; ring <= ringsPerSide; ring += 1) {
+        const local = ring / ringsPerSide;
+        const x = side === 0
+          ? -thickness / 2 + local * thickness / 2
+          : thickness / 2 - local * thickness / 2;
+        const centerOffset = side === 0 ? -thickness / 2 + curvatureRadius : thickness / 2 - curvatureRadius;
+        const radial = Math.sqrt(Math.max(0, curvatureRadius ** 2 - (x - centerOffset) ** 2));
+        const rho = radius * radial / curvatureRadius;
+        for (let segment = 0; segment < segments; segment += 1) {
+          const angle = segment / segments * Math.PI * 2;
+          positions.push(x, Math.cos(angle) * rho, Math.sin(angle) * rho);
+          uvs.push(segment / segments, ring / ringsPerSide);
+        }
+      }
+    }
+    const sideRings = ringsPerSide + 1;
+    for (let side = 0; side < 2; side += 1) {
+      const base = side * sideRings * segments;
+      for (let ring = 0; ring < ringsPerSide; ring += 1) {
+        for (let segment = 0; segment < segments; segment += 1) {
+          const next = (segment + 1) % segments;
+          const a = base + ring * segments + segment;
+          const b = base + ring * segments + next;
+          const c = base + (ring + 1) * segments + segment;
+          const d = base + (ring + 1) * segments + next;
+          indices.push(a, c, b, b, c, d);
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
     return geometry;
   }
 
@@ -1160,9 +1329,14 @@
     } else if (kind === "lens") {
       addPart(group, device, new THREE.CylinderGeometry(0.035, 0.035, 0.46, 16), blackMetal, [0, 0.29, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.22, 0.035, 12, 32), blackMetal, [0, 0.53, 0], [0, Math.PI / 2, 0]);
-      const lensElement = addPart(group, device, new THREE.SphereGeometry(0.205, 32, 20), glassMaterial, [0, 0.53, 0]);
-      lensElement.scale.set(0.28, 1, 1);
-      lensElement.rotation.y = Math.PI / 2;
+      const lensElement = addPart(
+        group,
+        device,
+        biconvexLensGeometry(0.2, 0.072, 0.3),
+        glassMaterial,
+        [0, 0.53, 0]
+      );
+      lensElement.userData.opticalSurface = "biconvex-spherical";
       addPart(group, device, new THREE.TorusGeometry(0.16, 0.006, 6, 32), accentMaterial, [-0.018, 0.53, 0], [0, Math.PI / 2, 0]);
       addPart(group, device, new THREE.TorusGeometry(0.202, 0.012, 8, 32), new THREE.MeshBasicMaterial({
         color: 0x93d7e5,
@@ -2190,6 +2364,8 @@
     hideExperimentResult();
     state.initialPositions.clear();
     state.sceneLayoutCache = null;
+    state.lastMeshTraceAt = 0;
+    state.meshHitCache.clear();
     state.dynamicTextures = [];
     state.animatedObjects = [];
     state.presetInfo.devices.forEach((device) => {
@@ -2885,6 +3061,38 @@
     });
   }
 
+  function meshHitForPath(points, sourceId, targetId) {
+    if (!state.meshRaycaster || points.length < 2) return null;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const direction = end.clone().sub(start);
+    const distance = direction.length();
+    if (distance < 0.03) return null;
+    direction.normalize();
+    state.meshRaycaster.set(start.clone().addScaledVector(direction, 0.008), direction);
+    state.meshRaycaster.camera = state.camera;
+    state.meshRaycaster.near = 0;
+    state.meshRaycaster.far = distance * 0.995;
+    const hits = state.meshRaycaster
+      .intersectObjects([...state.deviceGroups.values()], true)
+      .filter((hit) => hit.object?.isMesh && hit.distance > 0.015);
+    const hit = hits[0];
+    if (!hit) return null;
+    const hitId = deviceIdFromObject(hit.object);
+    return {
+      deviceId: hitId,
+      point: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
+      normal: hit.face?.normal ? {
+        x: hit.face.normal.x,
+        y: hit.face.normal.y,
+        z: hit.face.normal.z
+      } : null,
+      distance: hit.distance,
+      targetHit: hitId === targetId,
+      obstruction: hitId && hitId !== sourceId && hitId !== targetId
+    };
+  }
+
   function rebuildConnections() {
     if (!state.ready || !state.presetInfo) return;
     clearObject(state.beamGroup);
@@ -2962,6 +3170,10 @@
         : "真实光线已关闭 · 显示教学示意光路";
     }
     if (state.traceEnabled && trace?.paths?.length) {
+      const surfaceHits = [];
+      const now = performance.now();
+      const refreshMeshTrace = now - state.lastMeshTraceAt > 600;
+      if (refreshMeshTrace) state.lastMeshTraceAt = now;
       const visiblePaths = trace.paths.filter((path) => {
         if (state.beamMode === "main") return path.rayIndex === 0;
         if (state.beamMode === "errors") return path.clipped || path.rayIndex === 0;
@@ -2976,6 +3188,15 @@
             : routeColors[path.colorRole] || colorArrayToHex(state.config?.beamColor)
         );
         const points = path.points.map((point) => new state.three.Vector3(point.x, point.y, point.z));
+        const meshHit = refreshMeshTrace && path.rayIndex === 0
+          ? meshHitForPath(points, entry.route.fromId, entry.route.toId)
+          : null;
+        if (meshHit) {
+          surfaceHits.push({ ...meshHit, routeIndex: path.routeIndex, colorRole: path.colorRole });
+          if (meshHit.obstruction) {
+            points[points.length - 1].set(meshHit.point.x, meshHit.point.y, meshHit.point.z);
+          }
+        }
         makeBeam(points, color, path.routeIndex * 10 + path.rayIndex, entry.route, {
           width: path.rayIndex === 0 ? 1 : 0.58,
           pulse: path.rayIndex === 0,
@@ -2999,6 +3220,14 @@
           state.beamGroup.add(marker);
         }
       });
+      if (state.lastTrace3D && refreshMeshTrace) {
+        state.lastTrace3D.surfaceHits = surfaceHits;
+        state.lastTrace3D.obstructions = surfaceHits.filter((hit) => hit.obstruction).length;
+      }
+      if (traceStatus) {
+        traceStatus.textContent =
+          `${trace.rayCount} rays · ${trace.clippedRays} clipped · ${state.lastTrace3D?.surfaceHits?.length || 0} mesh hits${state.lastTrace3D?.obstructions ? ` · ${state.lastTrace3D.obstructions} blocked` : ""}${trace.geometryOpdUm ? ` · OPD ${formatNumber(trace.geometryOpdUm, 2)} μm` : ""}`;
+      }
     } else {
       beamRoutes.forEach((entry) => {
         const color = new state.three.Color(routeColors[entry.route.colorRole] || colorArrayToHex(state.config?.beamColor));
@@ -3144,6 +3373,8 @@
     const rect = state.canvas.getBoundingClientRect();
     state.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     state.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    state.raycaster.near = 0;
+    state.raycaster.far = Infinity;
     state.raycaster.setFromCamera(state.pointer, state.camera);
   }
 
@@ -3603,6 +3834,14 @@
     const bottom = height - 34;
     const plotWidth = right - left;
     const plotHeight = bottom - top;
+    const wavefrontEligible = ["michelson", "newton", "interference", "double-slit", "diffraction", "grating"].includes(sim);
+    const wavefront = wavefrontEligible
+      ? window.OptilabSimulation?.computeWavefront(experiment, primary, secondary, {
+        size: 76,
+        controls: Object.fromEntries(state.deviceControls),
+        bandwidthNm: 0.5
+      })
+      : null;
     drawResultBackdrop(context, width, height);
     context.save();
     context.font = '11px "Cascadia Mono", monospace';
@@ -3612,7 +3851,30 @@
     context.fillText(`${state.metrics.alignment * 100 >= 70 ? "STABLE" : "CHECK ALIGNMENT"} · ${state.metrics.frequency.toFixed(0)} Hz`, width - 18, 18);
     context.restore();
 
-    if (["michelson", "newton", "interference"].includes(sim) || sim === "polarization") {
+    if (wavefront?.available) {
+      const imageWidth = plotWidth * 0.62;
+      paintWavefront(context, wavefront, left, top, imageWidth, plotHeight, state.config?.beamColor || [233, 194, 122]);
+      context.strokeStyle = "rgba(219, 195, 145, 0.42)";
+      context.strokeRect(left, top, imageWidth, plotHeight);
+      const profileLeft = left + imageWidth + 26;
+      const centerRow = Math.floor(wavefront.size / 2);
+      context.strokeStyle = "#e5c27d";
+      context.lineWidth = 2;
+      context.beginPath();
+      for (let column = 0; column < wavefront.size; column += 1) {
+        const intensity = wavefront.intensity[centerRow * wavefront.size + column];
+        const x = profileLeft + column / (wavefront.size - 1) * (right - profileLeft);
+        const y = bottom - intensity * plotHeight * 0.78;
+        if (column === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+      context.fillStyle = "#8ea49a";
+      context.font = '10px "Cascadia Mono", monospace';
+      context.fillText(`VISIBILITY ${formatNumber(wavefront.visibility * 100, 1)}%`, profileLeft, top + 12);
+      context.fillText(`OPD ${formatNumber(wavefront.opdUm, 3)} μm`, profileLeft, top + 28);
+      context.fillText(`λ ${formatNumber(wavefront.wavelengthNm, 1)} nm`, profileLeft, top + 44);
+    } else if (["michelson", "newton", "interference"].includes(sim) || sim === "polarization") {
       if (sim === "polarization") {
         context.save();
         context.translate(width * 0.38, height * 0.52);
@@ -3797,7 +4059,7 @@
     );
     $("#lab-3d-result-snr") && ($("#lab-3d-result-snr").textContent = `${formatNumber(state.metrics.snr, 1)} dB`);
     $("#lab-3d-result-note") && ($("#lab-3d-result-note").textContent =
-      "现象根据当前 3D 器材位置、单体参数和统一计算链实时生成；原始数据仍需人工复核。"
+      "现象由波前强度、网格表面光线命中、传感器噪声和统一计算快照共同生成；原始数据仍需人工复核。"
     );
     drawExperimentPhenomenon(performance.now());
   }
@@ -5199,7 +5461,7 @@
     if (state.autoTour && time >= state.autoTourAt) {
       setProcessStep(state.processStep + 1);
     }
-    if (time - state.lastTextureUpdate > 120) {
+    if (time - state.lastTextureUpdate > 600) {
       state.lastTextureUpdate = time;
       state.dynamicTextures.forEach((entry) => {
         drawPanelTexture(entry, time, state.config || {});
