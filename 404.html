@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>OptiLab · 正在恢复入口</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      color: #e9e4d8;
+      background: radial-gradient(circle at 70% 20%, #26352f, #07100f 62%);
+      font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(600px, calc(100% - 32px));
+      padding: 30px;
+      border: 1px solid rgba(216, 177, 109, 0.34);
+      border-radius: 20px;
+      background: rgba(8, 17, 17, 0.92);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+    }
+    h1 { margin: 0 0 10px; font-size: 23px; }
+    p { color: #98a59e; line-height: 1.7; }
+    a {
+      min-height: 44px;
+      padding: 0 17px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 10px;
+      color: #1b1e1c;
+      background: #ddba7d;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    code { color: #cbb487; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>正在恢复 OptiLab 入口</h1>
+    <p>当前路径没有加载成功，系统正在自动返回主程序。</p>
+    <a id="recovery-link" href="/optilab-2-0/advanced.html">打开 OptiLab 主程序</a>
+    <p>当前地址：<code id="current-address"></code></p>
+  </main>
+  <script>
+    (() => {
+      const target = "/optilab-2-0/advanced.html?entry=recovery&v=20261128-dynamic-beam-interactions";
+      document.getElementById("current-address").textContent = location.href;
+      document.getElementById("recovery-link").href = target;
+      setTimeout(() => location.replace(target), 700);
+    })();
+  </script>
+</body>
+</html>
