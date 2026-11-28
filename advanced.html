@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
-  <link rel="stylesheet" href="experience.css?v=20261128-clear-optical-routing">
+  <link rel="stylesheet" href="experience.css?v=20261128-3d-p0-p1">
   <link rel="stylesheet" href="simulation-engine.css?v=20261128-simulation-engine">
   <link rel="stylesheet" href="polish.css?v=20261128-comprehensive-polish">
   <script>
@@ -921,6 +921,15 @@
                   <button type="button" data-3d-view="top">俯视</button>
                   <button type="button" data-3d-view="focus">器材特写</button>
                 </div>
+                <div class="lab-3d-science-tools" aria-label="科学可视化控制">
+                  <button type="button" id="lab-3d-trace-toggle" class="active" aria-pressed="true">真实光线</button>
+                  <button type="button" id="lab-3d-beam-mode">全部光路</button>
+                  <button type="button" id="lab-3d-camera-director" aria-pressed="false">镜头导演</button>
+                  <button type="button" id="lab-3d-minimap-toggle" class="active" aria-pressed="true">小地图</button>
+                  <button type="button" id="lab-3d-cutaway">剖视</button>
+                  <span id="lab-3d-trace-status">128 rays · 0 clipped</span>
+                </div>
+                <canvas class="lab-3d-minimap" id="lab-3d-minimap" width="210" height="150" aria-label="三维实验台小地图"></canvas>
                 <div class="lab-3d-live-monitor" id="lab-3d-live-monitor">
                   <div class="lab-3d-live-head">
                     <div>
@@ -977,6 +986,7 @@
                   </div>
                   <div class="lab-3d-inspector-actions">
                     <button type="button" id="lab-3d-inspector-focus">查看器材特写</button>
+                    <button type="button" id="lab-3d-inspector-cutaway">剖视 / 内部结构</button>
                   </div>
                   <div class="lab-3d-model-asset">
                     <div>
@@ -1019,6 +1029,7 @@
                   <div class="lab-3d-progress" aria-hidden="true"><i></i></div>
                   <div class="lab-3d-process-actions">
                     <button type="button" id="lab-3d-step-prev">上一步</button>
+                    <button type="button" id="lab-3d-step-replay">重播本步</button>
                     <button type="button" id="lab-3d-step-next">下一步</button>
                   </div>
                 </div>
@@ -1045,7 +1056,10 @@
                   <span id="lab-3d-autotune-phase">自动调试 · 批次 1 / 3</span>
                   <strong id="lab-3d-autotune-headline">正在同步器材位置与工作参数</strong>
                 </div>
-                <button type="button" id="lab-3d-autotune-stop">停止</button>
+                <span class="lab-3d-autotune-hud-actions">
+                  <button type="button" id="lab-3d-autotune-pause">暂停</button>
+                  <button type="button" id="lab-3d-autotune-stop">停止</button>
+                </span>
               </div>
               <div class="lab-3d-autotune-devices" id="lab-3d-autotune-devices"></div>
               <div class="lab-3d-autotune-progress" aria-hidden="true"><i id="lab-3d-autotune-progress-bar"></i></div>
@@ -1851,8 +1865,9 @@
   <script src="dedupe_catalog.js?v=20261128-smooth-autotune"></script>
   <script src="optilab_physics.js?v=20261128-smooth-autotune"></script>
   <script src="simulation_engine.js?v=20261128-simulation-engine"></script>
+  <script src="scene_definitions.js?v=20261128-3d-p0-p1"></script>
   <script src="lab_panorama.js?v=20261128-optical-depth-spacing-v3"></script>
-  <script src="lab_panorama_3d.js?v=20261128-optical-depth-spacing-v3"></script>
+  <script src="lab_panorama_3d.js?v=20261128-3d-p0-p1"></script>
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>

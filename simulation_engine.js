@@ -306,6 +306,74 @@
     };
   }
 
+  function trace3DScene(options = {}) {
+    const routes = Array.isArray(options.routes) ? options.routes : [];
+    const controls = options.controls || {};
+    const apertures = options.apertures || {};
+    const offsets = [-1, 0, 1];
+    const paths = [];
+    let clippedRays = 0;
+    let totalRays = 0;
+    let armA = 0;
+    let armB = 0;
+    routes.forEach((route, routeIndex) => {
+      const from = route.from;
+      const to = route.to;
+      if (!from || !to) return;
+      const dx = to.x - from.x;
+      const dz = to.z - from.z;
+      const span = Math.max(0.001, Math.hypot(dx, dz));
+      const perpendicularX = -dz / span;
+      const perpendicularZ = dx / span;
+      const destinationControl = controls[route.toId] || {};
+      const pitch = Number(destinationControl.pitch || 0) * Math.PI / 180;
+      const azimuth = Number(destinationControl.azimuth || 0) * Math.PI / 180;
+      const errorWorld = Math.tan(pitch) * span * 0.08 + Math.tan(azimuth) * span * 0.06;
+      const apertureMm = Number(apertures[route.toId] || 25.4);
+      const apertureWorld = Math.max(0.004, apertureMm / 25.4 * 0.07);
+      if (route.colorRole === "arm-a" || route.colorRole === "arm-a-return") armA += span;
+      if (route.colorRole === "arm-b" || route.colorRole === "arm-b-return") armB += span;
+      offsets.forEach((offsetIndex) => {
+        totalRays += 1;
+        const offset = offsetIndex * 0.009 + errorWorld;
+        const clipped = Math.abs(offset) > apertureWorld;
+        if (clipped) clippedRays += 1;
+        const endOffset = clipped ? Math.sign(offset || 1) * apertureWorld : offset;
+        const points = [
+          { x: from.x + perpendicularX * offset, y: from.y, z: from.z + perpendicularZ * offset },
+          {
+            x: (from.x + to.x) / 2 + perpendicularX * offset,
+            y: (from.y + to.y) / 2 + 0.018,
+            z: (from.z + to.z) / 2 + perpendicularZ * offset
+          },
+          { x: to.x + perpendicularX * endOffset, y: to.y, z: to.z + perpendicularZ * endOffset }
+        ];
+        paths.push({
+          routeIndex,
+          rayIndex: offsetIndex,
+          colorRole: route.colorRole,
+          points,
+          clipped,
+          apertureMm,
+          errorWorld,
+          powerFactor: clipped ? 0.12 : clamp(1 - Math.abs(offset) / Math.max(apertureWorld, 1e-9) * 0.55, 0.2, 1)
+        });
+      });
+    });
+    const geometryOpdUm = armA || armB ? Math.abs(armA - armB) * 1000 : null;
+    return {
+      engineVersion: ENGINE_VERSION,
+      available: paths.length > 0,
+      pathCount: routes.length,
+      rayCount: totalRays,
+      clippedRays,
+      clippingRatio: totalRays ? clippedRays / totalRays : 0,
+      geometryOpdUm,
+      paths,
+      valid: totalRays > 0 && clippedRays <= totalRays * 0.5
+    };
+  }
+
   function percentile(sorted, fraction) {
     if (!sorted.length) return null;
     const index = clamp((sorted.length - 1) * fraction, 0, sorted.length - 1);
@@ -599,6 +667,7 @@
     circuitDiagnostics,
     propagateUncertainty,
     generateDataset,
+    trace3DScene,
     isElectricalExperiment,
     isOpticalExperiment
   };

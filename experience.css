@@ -160,6 +160,79 @@ html[data-entered="1"] body.advanced-body {
   cursor: progress;
 }
 
+.lab-3d-science-tools {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 560px;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.lab-3d-science-tools button {
+  padding: 5px 8px;
+  border: 1px solid rgba(113, 151, 131, 0.34);
+  border-radius: 7px;
+  color: #98a79f;
+  background: rgba(7, 15, 14, 0.82);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.lab-3d-science-tools button:hover,
+.lab-3d-science-tools button.active {
+  border-color: rgba(218, 181, 115, 0.7);
+  color: #efd29a;
+  background: rgba(112, 81, 39, 0.35);
+}
+
+.lab-3d-science-tools > span {
+  flex-basis: 100%;
+  color: #789088;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 7px;
+}
+
+.lab-3d-minimap {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: 56px;
+  width: 210px;
+  height: 150px;
+  border: 1px solid rgba(120, 158, 137, 0.32);
+  border-radius: 12px;
+  background: rgba(5, 13, 12, 0.83);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+.lab-3d-minimap[hidden] {
+  display: none;
+}
+
+.lab-3d-process-actions #lab-3d-step-replay {
+  color: #aeb9b2;
+}
+
+.lab-3d-inspector-actions #lab-3d-inspector-cutaway {
+  color: #96a69d;
+}
+
+.lab-3d-autotune-hud-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.lab-3d[data-cutaway="true"] .lab-3d-inspector {
+  box-shadow: 0 0 0 1px rgba(218, 181, 115, 0.28), 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
 .lab-3d-autotune-hud {
   position: relative;
   z-index: 2;
@@ -2759,6 +2832,26 @@ html[data-theme="day"] .welcome-notebook {
   .lab-3d-view-tools {
     top: 43px;
     right: 10px;
+  }
+
+  .lab-3d-science-tools {
+    top: 76px;
+    left: 10px;
+    transform: none;
+    left: 10px;
+    max-width: calc(100% - 20px);
+  }
+
+  .lab-3d-science-tools button:nth-of-type(3),
+  .lab-3d-science-tools button:nth-of-type(5) {
+    display: none;
+  }
+
+  .lab-3d-minimap {
+    right: 10px;
+    bottom: 116px;
+    width: 150px;
+    height: 112px;
   }
 
   .lab-3d-process {

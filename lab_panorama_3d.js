@@ -29,6 +29,17 @@
     beamGroup: null,
     config: null,
     presetInfo: null,
+    sceneDescriptor: null,
+    traceEnabled: true,
+    beamMode: "all",
+    cameraDirector: false,
+    cutaway: false,
+    cutawayTarget: "",
+    minimapVisible: true,
+    lastMinimapUpdate: 0,
+    lastTrace3D: null,
+    connectionIssues: 0,
+    autoTunePaused: false,
     experimentId: "",
     selectedId: "",
     hoveredId: "",
@@ -867,6 +878,13 @@
     return "generic";
   }
 
+  function devicePorts(device) {
+    const kind = deviceKind(device);
+    return state.sceneDescriptor?.ports?.[kind] ||
+      window.OptilabPanorama?.getPorts(device.id) ||
+      ["MEASURE", "GND"];
+  }
+
   function rawSceneLayoutPosition(device) {
     const info = state.presetInfo;
     const devices = info?.devices || [];
@@ -1028,10 +1046,25 @@
     const kind = deviceKind(device);
     group.userData.kind = kind;
     const accent = new THREE.Color(device.accent || "#d9b474");
+    const materialProfile = state.sceneDescriptor?.material || "instrument-metal";
+    const bodyColors = {
+      "blackened-aluminum": 0x27322f,
+      "precision-optics": 0x1c2523,
+      "polarization-optics": 0x263036,
+      "high-power-optics": 0x2e2422,
+      "fiber-metal": 0x283532,
+      "mixed-instrument": 0x2b3634,
+      "camera-metal": 0x242d31,
+      "instrument-polymer": 0x303431,
+      "pcb-antistatic": 0x1f3030,
+      "heat-resistant": 0x352d27,
+      "machined-metal": 0x3a3a36,
+      "instrument-metal": 0x35433f
+    };
     const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x35433f,
-      metalness: 0.55,
-      roughness: 0.38
+      color: bodyColors[materialProfile] || 0x35433f,
+      metalness: /metal|aluminum|precision/.test(materialProfile) ? 0.68 : 0.42,
+      roughness: /polymer|antistatic|heat/.test(materialProfile) ? 0.52 : 0.34
     });
     const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x080f0e, roughness: 0.72 });
     const blackMetal = new THREE.MeshStandardMaterial({ color: 0x101715, metalness: 0.72, roughness: 0.3 });
@@ -1783,7 +1816,7 @@
       addPart(group, device, new THREE.CylinderGeometry(0.014, 0.014, 0.018, 10), steelMaterial, [x, y, z]);
     });
 
-    const ports = window.OptilabPanorama?.getPorts(device.id) || ["MEASURE", "GND"];
+    const ports = devicePorts(device);
     ports.slice(0, 3).forEach((port, index) => {
       addPart(
         group,
@@ -1810,6 +1843,16 @@
       [-Math.PI / 2, 0, 0]
     );
     selectionRing.userData.selectionRing = true;
+    const pickupHeight = state.sceneDescriptor?.pickup?.height || (optical ? 0.72 : 0.34);
+    const pickupHandle = addPart(
+      group,
+      device,
+      new THREE.CylinderGeometry(0.045, 0.045, 0.09, 16),
+      new THREE.MeshBasicMaterial({ color: 0xe4c17e, transparent: true, opacity: 0.72 }),
+      [0, pickupHeight, optical ? 0.11 : 0.27],
+      [Math.PI / 2, 0, 0]
+    );
+    pickupHandle.userData.pickupHandle = true;
 
     const label = makeLabelSprite(device.label, device.accent || "#d9b474");
     label.scale.set(1.02, 0.192, 1);
@@ -2107,9 +2150,30 @@
     if (status) status.textContent = state.modelAssetStatus;
   }
 
+  function applySceneEnvironment() {
+    if (!state.scene || !state.sceneDescriptor) return;
+    const colors = {
+      "optical-bench": [0x07100f, 0x26352f],
+      "vibration-isolated-bench": [0x061012, 0x20353a],
+      "dark-optical-bench": [0x050b0d, 0x182a2e],
+      "laser-bench": [0x100b09, 0x3b2a1d],
+      "fiber-test-bench": [0x07100e, 0x21382f],
+      "electronics-bench": [0x0a0e0d, 0x29342f],
+      "digital-bench": [0x071013, 0x1d3437],
+      "imaging-bench": [0x090d10, 0x25313a],
+      "thermal-bench": [0x120c09, 0x3a2921],
+      "mechanical-bench": [0x0d0f0e, 0x343834]
+    };
+    const [background, fog] = colors[state.sceneDescriptor.environment] || colors["optical-bench"];
+    state.scene.background = new state.three.Color(background);
+    state.scene.fog = new state.three.Fog(fog, 10, 24);
+    state.renderer?.setClearColor(background, 1);
+  }
+
   function buildScene() {
     if (!state.ready || !state.presetInfo) return;
     const THREE = state.three;
+    applySceneEnvironment();
     state.deviceGroups.forEach((group) => {
       state.scene.remove(group);
       disposeObject(group);
@@ -2591,8 +2655,14 @@
       state.selectedId = targetId;
       updateSelectionHelper();
       updateHud();
-      if (state.cameraState.viewMode === "focus") setViewPreset("focus");
+      if (state.cameraDirector) {
+        setViewPreset(state.processSteps[state.processStep]?.mode === "verify" ? "optical" : "focus");
+      } else if (state.cameraState.viewMode === "focus") {
+        setViewPreset("focus");
+      }
       if (state.inspectorId) populateInspector(targetId);
+    } else if (state.cameraDirector) {
+      setViewPreset(state.processSteps[state.processStep]?.mode === "prepare" ? "overview" : "optical");
     }
     updateProcessUI();
   }
@@ -2681,58 +2751,88 @@
     return new THREE.Mesh(geometry, material);
   }
 
-  function makeBeam(points, color, index, route = {}) {
+  function makeBeam(points, color, index, route = {}, style = {}) {
     const THREE = state.three;
     const curve = new THREE.CatmullRomCurve3(points);
     const segments = Math.max(30, points.length * 16);
+    const width = Number(style.width || 1);
+    const power = clamp(Number(style.powerFactor ?? 1), 0.08, 1.3);
+    if (style.simple) {
+      const sideCore = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, segments, 0.012 * width, 6, false),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.72 * power,
+          depthWrite: false,
+          toneMapped: false
+        })
+      );
+      const sideGlow = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, segments, 0.038 * width, 6, false),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.12 * power,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false
+        })
+      );
+      sideCore.userData.connectionType = sideGlow.userData.connectionType = "optical";
+      sideCore.userData.baseOpacity = 0.72 * power;
+      sideGlow.userData.baseOpacity = 0.12 * power;
+      state.beamGroup.add(sideCore, sideGlow);
+      return;
+    }
     const darkBed = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, segments, 0.038, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.038 * width, 8, false),
       new THREE.MeshBasicMaterial({
         color: 0x020504,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.62 * power,
         depthWrite: false,
         toneMapped: false
       })
     );
     const core = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, segments, 0.024, 10, false),
+      new THREE.TubeGeometry(curve, segments, 0.024 * width, 10, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 1,
+        opacity: clamp(0.82 + power * 0.22, 0.1, 1),
         depthWrite: false,
         toneMapped: false
       })
     );
     const whiteCore = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, segments, 0.008, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.008 * width, 8, false),
       new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.72 * power,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         toneMapped: false
       })
     );
     const halo = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, segments, 0.072, 10, false),
+      new THREE.TubeGeometry(curve, segments, 0.072 * width, 10, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.24,
+        opacity: 0.24 * power,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         toneMapped: false
       })
     );
     const outerGlow = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, segments, 0.13, 8, false),
+      new THREE.TubeGeometry(curve, segments, 0.13 * width, 8, false),
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.085,
+        opacity: 0.085 * power,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         toneMapped: false
@@ -2740,10 +2840,11 @@
     );
     [darkBed, core, whiteCore, halo, outerGlow].forEach((node, layer) => {
       node.userData.connectionType = "optical";
-      node.userData.baseOpacity = [0.62, 1, 0.72, 0.24, 0.085][layer];
+      node.userData.baseOpacity = [0.62 * power, clamp(0.82 + power * 0.22, 0.1, 1), 0.72 * power, 0.24 * power, 0.085 * power][layer];
       node.renderOrder = 3 + layer;
     });
     state.beamGroup.add(darkBed, core, whiteCore, halo, outerGlow);
+    if (style.pulse === false) return;
     const pulse = new THREE.Group();
     const pulseHalo = new THREE.Mesh(
       new THREE.SphereGeometry(0.062, 16, 16),
@@ -2818,6 +2919,7 @@
           lane: pathIndex % 2 === 0 ? -0.012 : 0.012
         }))
       );
+    const beamRoutes = [];
     routes.forEach((route, routeIndex) => {
       if (!route.fromId || !route.toId) return;
       if (!state.deviceGroups.has(route.fromId) || !state.deviceGroups.has(route.toId)) return;
@@ -2832,9 +2934,77 @@
       const span = from.distanceTo(to);
       mid.y += 0.045 + Math.tan(pitch) * span * 0.32;
       mid.z += Math.tan(azimuth) * span * 0.32;
-      const color = new state.three.Color(routeColors[route.colorRole] || colorArrayToHex(state.config?.beamColor));
-      makeBeam([from, mid, to], color, routeIndex, route);
+      beamRoutes.push({ route, routeIndex, from, to, mid });
     });
+    const trace = window.OptilabSimulation?.trace3DScene?.({
+      routes: beamRoutes.map((entry) => ({
+        ...entry.route,
+        from: entry.from,
+        to: entry.to
+      })),
+      controls: Object.fromEntries(state.deviceControls),
+      apertures: Object.fromEntries((state.presetInfo.devices || []).map((device) => {
+        const kind = deviceKind(device);
+        const controls = state.deviceControls.get(device.id) || {};
+        const configured = kind === "iris" && controls.aperture != null
+          ? Number(controls.aperture)
+          : kind === "beam-expander" && controls.aperture != null
+            ? 35 * clamp(Number(controls.aperture) / 100, 0.1, 1)
+            : state.sceneDescriptor?.apertures?.[kind] || 25.4;
+        return [device.id, configured];
+      }))
+    });
+    state.lastTrace3D = trace || null;
+    const traceStatus = $("#lab-3d-trace-status");
+    if (traceStatus) {
+      traceStatus.textContent = state.traceEnabled
+        ? `${trace?.rayCount || 0} rays · ${trace?.clippedRays || 0} clipped · ${formatNumber((trace?.clippingRatio || 0) * 100, 1)}%${trace?.geometryOpdUm ? ` · OPD ${formatNumber(trace.geometryOpdUm, 2)} μm` : ""}`
+        : "真实光线已关闭 · 显示教学示意光路";
+    }
+    if (state.traceEnabled && trace?.paths?.length) {
+      const visiblePaths = trace.paths.filter((path) => {
+        if (state.beamMode === "main") return path.rayIndex === 0;
+        if (state.beamMode === "errors") return path.clipped || path.rayIndex === 0;
+        return true;
+      });
+      visiblePaths.forEach((path) => {
+        const entry = beamRoutes[path.routeIndex];
+        if (!entry) return;
+        const color = new state.three.Color(
+          path.clipped
+            ? 0xff3f42
+            : routeColors[path.colorRole] || colorArrayToHex(state.config?.beamColor)
+        );
+        const points = path.points.map((point) => new state.three.Vector3(point.x, point.y, point.z));
+        makeBeam(points, color, path.routeIndex * 10 + path.rayIndex, entry.route, {
+          width: path.rayIndex === 0 ? 1 : 0.58,
+          pulse: path.rayIndex === 0,
+          simple: path.rayIndex !== 0,
+          powerFactor: path.powerFactor * clamp((state.metrics.power || 1) / 5, 0.25, 1.3)
+        });
+        if (path.clipped) {
+          const marker = new state.three.Mesh(
+            new state.three.SphereGeometry(0.035, 10, 10),
+            new state.three.MeshBasicMaterial({
+              color: 0xff544c,
+              transparent: true,
+              opacity: 0.72,
+              toneMapped: false,
+              depthWrite: false
+            })
+          );
+          marker.position.copy(points[points.length - 1]);
+          marker.userData.connectionType = "optical";
+          marker.userData.baseOpacity = 0.72;
+          state.beamGroup.add(marker);
+        }
+      });
+    } else {
+      beamRoutes.forEach((entry) => {
+        const color = new state.three.Color(routeColors[entry.route.colorRole] || colorArrayToHex(state.config?.beamColor));
+        makeBeam([entry.from, entry.mid, entry.to], color, entry.routeIndex, entry.route);
+      });
+    }
     const cableColors = {
       "BNC 50Ω 同轴": 0xd9b473,
       "4 mm 香蕉插头 / DC 5.5 mm": 0xe1a663,
@@ -2843,6 +3013,7 @@
       "FC/APC 单模光纤": 0xe8ba5e,
       "4 mm 表笔 / 测试引线": 0xb79170
     };
+    state.connectionIssues = 0;
     state.presetInfo.connections.forEach((connection) => {
       if (!assemblyReady(connection.fromId) || !assemblyReady(connection.toId)) return;
       const from = deviceWorldPoint(connection.fromId, 0.23);
@@ -2850,10 +3021,21 @@
       if (!from || !to) return;
       const middle = from.clone().lerp(to, 0.5);
       middle.y -= 0.12;
-      const color = cableColors[connection.standard] || 0xb0b6ac;
+      const fromDevice = state.presetInfo.devices.find((device) => device.id === connection.fromId);
+      const toDevice = state.presetInfo.devices.find((device) => device.id === connection.toId);
+      const validation = window.OptilabSceneCatalog?.validateConnection(
+        deviceKind(fromDevice || {}),
+        deviceKind(toDevice || {}),
+        connection.standard
+      ) || { valid: true };
+      if (!validation.valid) state.connectionIssues += 1;
+      const color = validation.valid
+        ? cableColors[connection.standard] || 0xb0b6ac
+        : 0xe04d45;
       const tube = makeTube([from, middle, to], 0.018, new state.three.Color(color), 0.86);
       tube.userData.connectionType = "cable";
       tube.userData.standard = connection.standard;
+      tube.userData.connectionValid = validation.valid;
       tube.userData.baseOpacity = 0.86;
       state.cableGroup.add(tube);
       const stripe = makeTube([from, middle, to], 0.006, new state.three.Color(color).offsetHSL(0, -0.16, 0.2), 0.72);
@@ -2979,7 +3161,7 @@
     state.hoveredId = id;
     const title = document.createElement("strong");
     title.textContent = device.label;
-    const ports = window.OptilabPanorama?.getPorts(id) || ["MEASURE", "GND"];
+    const ports = devicePorts(device);
     const detail = document.createElement("small");
     const modelLabel = DEVICE_KIND_LABELS[deviceKind(device)] || "实验仪器";
     detail.textContent = `${modelLabel} · ${device.variant ? `型号特征 ${device.variant}` : "标准实验室配置"} · 端口 ${ports.join(" / ")} · 单击查看参数`;
@@ -3014,6 +3196,24 @@
     }
   }
 
+  function collisionSafeTarget(id, x, z) {
+    const minimum = 0.62;
+    const others = [...state.deviceGroups.entries()]
+      .filter(([otherId]) => otherId !== id)
+      .map(([, group]) => group.position);
+    const candidates = [
+      [x, z], [x, z - 0.68], [x, z + 0.68], [x - 0.72, z], [x + 0.72, z],
+      [x - 0.55, z - 0.55], [x + 0.55, z - 0.55],
+      [x - 0.55, z + 0.55], [x + 0.55, z + 0.55]
+    ].map(([candidateX, candidateZ]) => ({
+      x: clamp(candidateX, -4.65, 4.65),
+      z: clamp(candidateZ, -2.6, 2.6)
+    }));
+    return candidates.find((candidate) =>
+      others.every((position) => Math.hypot(candidate.x - position.x, candidate.z - position.z) >= minimum)
+    ) || candidates[0];
+  }
+
   function pointerMove(event) {
     if (!state.active || !state.ready) return;
     if (state.dragGroup) {
@@ -3027,10 +3227,10 @@
       updateRayPointer(event);
       const hit = new state.three.Vector3();
       if (state.raycaster.ray.intersectPlane(state.dragPlane, hit)) {
-        state.motionTargets.set(state.selectedId, {
-          x: clamp(hit.x, -4.65, 4.65),
-          z: clamp(hit.z, -2.6, 2.6)
-        });
+        state.motionTargets.set(
+          state.selectedId,
+          collisionSafeTarget(state.selectedId, hit.x, hit.z)
+        );
         state.selectionHelper?.update();
       }
     } else if (state.orbit) {
@@ -3075,6 +3275,10 @@
     if (experimentId !== state.experimentId) {
       state.experimentId = experimentId;
       state.presetInfo = window.OptilabPanorama.resolvePreset(payload.experiment);
+      state.sceneDescriptor = window.OptilabSceneCatalog?.descriptorFor(
+        payload.experiment,
+        state.presetInfo.id
+      ) || null;
       state.cameraState.theta = Math.PI * (0.36 + ((experimentId.length * 17) % 16) / 100);
       state.cameraState.phi = Math.PI * (0.30 + ((experimentId.length * 11) % 10) / 100);
       if (state.ready) buildScene();
@@ -3174,6 +3378,12 @@
     $("#panorama-power") && ($("#panorama-power").textContent = `${formatNumber(metrics.power)} ${metrics.powerUnit}`);
     $("#panorama-frequency") && ($("#panorama-frequency").textContent = `${formatNumber(metrics.frequency, 1)} Hz`);
     $("#panorama-snr") && ($("#panorama-snr").textContent = `${formatNumber(metrics.snr, 1)} dB`);
+    const legend = $("#lab-legend");
+    if (legend && state.active) {
+      legend.innerHTML = metrics.hasOptics
+        ? '<span><i class="legend-green"></i> 主光源 / 观察</span><span><i class="legend-amber"></i> 参考臂 / 测量臂 / 回程</span>'
+        : '<span><i class="legend-green"></i> 信号与公共地</span><span><i class="legend-amber"></i> 电源与激励</span>';
+    }
     $("#panorama-standard") && ($("#panorama-standard").textContent = `接线标准：${state.presetInfo.standards}`);
     $("#panorama-equipment-traits") && ($("#panorama-equipment-traits").textContent =
       `器材特征：${state.presetInfo.equipmentTraits.join(" · ") || state.presetInfo.name}`
@@ -3184,7 +3394,7 @@
     });
     $("#panorama-selected") && ($("#panorama-selected").textContent = `正在观察：${selected?.label || "实验器件"}`);
     $("#panorama-port-map") && ($("#panorama-port-map").textContent =
-      `端口：${selected ? window.OptilabPanorama.getPorts(selected.id).join(" · ") : "—"}`
+      `端口：${selected ? devicePorts(selected).join(" · ") : "—"}`
     );
     const scene = $("#panorama-status");
     if (scene) {
@@ -3192,7 +3402,7 @@
         ? Math.min(metrics.alignment, metrics.connectivity)
         : metrics.hasOptics ? metrics.alignment : metrics.connectivity;
       scene.textContent = score > 0.72
-        ? `${state.presetInfo.name} · 三维器件关系稳定 · 采集在线`
+        ? `${state.presetInfo.name} · 三维器件关系稳定 · 采集在线${state.lastTrace3D ? ` · 截光 ${state.lastTrace3D.clippedRays}/${state.lastTrace3D.rayCount}` : ""}${state.connectionIssues ? ` · ${state.connectionIssues} 处接口待核对` : ""}`
         : score > 0.45
           ? `${state.presetInfo.name} · 装置可用，可继续调整位置`
           : `${state.presetInfo.name} · 器件偏离，拖动重新对准`;
@@ -3244,6 +3454,65 @@
         return chip;
       }));
     }
+  }
+
+  function drawMinimap() {
+    const canvas = $("#lab-3d-minimap");
+    if (!canvas || !state.minimapVisible) return;
+    const context = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "rgba(4, 11, 10, 0.92)";
+    context.fillRect(0, 0, width, height);
+    const left = 18;
+    const top = 16;
+    const plotWidth = width - 36;
+    const plotHeight = height - 34;
+    const mapX = (x) => left + (x + 5) / 10 * plotWidth;
+    const mapY = (z) => top + (z + 3) / 6 * plotHeight;
+    context.strokeStyle = "rgba(119, 155, 137, 0.22)";
+    context.lineWidth = 1;
+    for (let index = 0; index <= 5; index += 1) {
+      const x = left + plotWidth * index / 5;
+      const y = top + plotHeight * index / 5;
+      context.beginPath();
+      context.moveTo(x, top);
+      context.lineTo(x, top + plotHeight);
+      context.moveTo(left, y);
+      context.lineTo(left + plotWidth, y);
+      context.stroke();
+    }
+    state.presetInfo?.devices.forEach((device) => {
+      const group = state.deviceGroups.get(device.id);
+      if (!group) return;
+      const selected = device.id === state.selectedId;
+      context.fillStyle = selected ? "#e2bd78" : "rgba(119, 174, 143, 0.84)";
+      context.beginPath();
+      context.arc(mapX(group.position.x), mapY(group.position.z), selected ? 4.5 : 3, 0, Math.PI * 2);
+      context.fill();
+      if (selected) {
+        context.strokeStyle = "rgba(226, 189, 120, 0.44)";
+        context.beginPath();
+        context.arc(mapX(group.position.x), mapY(group.position.z), 8, 0, Math.PI * 2);
+        context.stroke();
+      }
+    });
+    const target = state.cameraState.target || { x: 0, z: 0 };
+    context.strokeStyle = "rgba(229, 215, 184, 0.55)";
+    context.beginPath();
+    context.moveTo(mapX(target.x), mapY(target.z));
+    context.lineTo(
+      mapX(target.x + Math.cos(state.cameraState.theta) * 0.9),
+      mapY(target.z + Math.sin(state.cameraState.theta) * 0.9)
+    );
+    context.stroke();
+    context.fillStyle = "#83958c";
+    context.font = "8px 'Cascadia Mono', monospace";
+    context.fillText("BENCH MAP", 12, height - 7);
+    context.textAlign = "right";
+    context.fillText(`${state.presetInfo?.devices.length || 0} DEV`, width - 12, height - 7);
+    context.textAlign = "left";
   }
 
   function phenomenonMeta(sim, experiment) {
@@ -3783,6 +4052,13 @@
       fromStates: new Map(),
       targetControls: new Map()
     };
+    state.autoTunePaused = false;
+    state.autoTunePauseStarted = 0;
+    const pauseButton = $("#lab-3d-autotune-pause");
+    if (pauseButton) {
+      pauseButton.textContent = "暂停";
+      pauseButton.classList.remove("active");
+    }
     enterAssemblyPresentation();
     state.dragGroup = null;
     state.orbit = null;
@@ -3968,7 +4244,9 @@
     });
     const phase = $("#lab-3d-autotune-phase");
     if (phase) {
-      phase.textContent = `器材摆放 ${tuning.batchIndex + 1} / ${tuning.batches.length}`;
+      const stages = state.sceneDescriptor?.assemblyStages || [];
+      const stage = stages[tuning.batchIndex % Math.max(1, stages.length)] || "器材摆放";
+      phase.textContent = `${stage} · 器材 ${tuning.batchIndex + 1} / ${tuning.batches.length}`;
     }
     const headline = $("#lab-3d-autotune-headline");
     if (headline) {
@@ -4000,6 +4278,7 @@
     if (!state.autoTune) return;
     state.presetInfo.devices.forEach((device) => applyDeviceControls(device.id, false));
     state.autoTune = null;
+    state.autoTunePaused = false;
     leaveAssemblyPresentation();
     removeAutoTuneBadges();
     rebuildConnections();
@@ -4037,6 +4316,7 @@
   function updateAutoTune(time) {
     const tuning = state.autoTune;
     if (!tuning) return;
+    if (state.autoTunePaused) return;
     if (tuning.phase === "staging") {
       const raw = clamp((time - tuning.stagingStartedAt) / tuning.stagingDuration, 0, 1);
       const progress = raw * raw * (3 - 2 * raw);
@@ -4075,6 +4355,16 @@
     if (tuning.phase !== "batch") return;
     const rawProgress = clamp((time - tuning.batchStartedAt) / tuning.batchDuration, 0, 1);
     const progress = rawProgress * rawProgress * rawProgress * (rawProgress * (rawProgress * 6 - 15) + 10);
+    const substage = progress < 0.16 ? "抓取与抬升" :
+      progress < 0.68 ? "动态避障搬运" :
+        progress < 0.84 ? "落位固定" : "粗调 · 精调 · 锁定";
+    if (tuning.substage !== substage) {
+      tuning.substage = substage;
+      const phase = $("#lab-3d-autotune-phase");
+      if (phase) phase.textContent = `器材 ${tuning.batchIndex + 1} / ${tuning.batches.length} · ${substage}`;
+      const note = $("#lab-3d-scene-note");
+      if (note) note.textContent = substage;
+    }
     tuning.activeIds.forEach((id) => {
       const origin = state.initialPositions.get(id);
       const start = tuning.fromStates.get(id);
@@ -4629,7 +4919,7 @@
         add("校准周期", "12 个月");
         add("当前读数", `${display.primaryText} · ${display.secondaryText}`);
     }
-    const ports = window.OptilabPanorama?.getPorts(device.id) || ["MEASURE", "GND"];
+    const ports = devicePorts(device);
     const linked = (state.presetInfo?.connections || []).filter((connection) =>
       connection.fromId === device.id || connection.toId === device.id
     );
@@ -4725,6 +5015,58 @@
     state.inspectorId = "";
     const panel = $("#lab-3d-inspector");
     if (panel) panel.hidden = true;
+  }
+
+  function toggleCutaway(force = null) {
+    const targetId = state.selectedId;
+    const next = force == null ? !(state.cutaway && state.cutawayTarget === targetId) : Boolean(force);
+    state.deviceGroups.forEach((group, id) => {
+      group.traverse((node) => {
+        if (!node.isMesh || !node.material) return;
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        materials.forEach((material) => {
+          if (material.userData?.cutawayOriginal) {
+            material.transparent = material.userData.cutawayOriginal.transparent;
+            material.opacity = material.userData.cutawayOriginal.opacity;
+            material.side = material.userData.cutawayOriginal.side;
+            delete material.userData.cutawayOriginal;
+          }
+        });
+      });
+    });
+    state.cutaway = next;
+    state.cutawayTarget = next ? targetId : "";
+    if (next) {
+      const group = state.deviceGroups.get(targetId);
+      group?.traverse((node) => {
+        if (!node.isMesh || !node.material) return;
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        materials.forEach((material) => {
+          material.userData = material.userData || {};
+          if (material.userData.cutawayOriginal) return;
+          material.userData.cutawayOriginal = {
+            transparent: material.transparent,
+            opacity: material.opacity,
+            side: material.side
+          };
+          material.transparent = true;
+          material.opacity = Math.min(0.26, material.opacity);
+          material.side = state.three.DoubleSide;
+          material.needsUpdate = true;
+        });
+      });
+      if (!state.inspectorId) openInspector(targetId);
+      showTooltipPlaceholder(`剖视模式：${state.presetInfo?.devices.find((item) => item.id === targetId)?.label || "器材"}`);
+    } else {
+      showTooltipPlaceholder("已恢复器材外观");
+    }
+    ["#lab-3d-cutaway", "#lab-3d-inspector-cutaway"].forEach((selector) => {
+      const button = $(selector);
+      if (!button) return;
+      button.classList.toggle("active", next);
+      button.setAttribute("aria-pressed", String(next));
+    });
+    return next;
   }
 
   function refreshInspector() {
@@ -4870,6 +5212,10 @@
     }
     updateSceneAnimations(time);
     state.renderer.render(state.scene, state.camera);
+    if (time - state.lastMinimapUpdate > 90) {
+      state.lastMinimapUpdate = time;
+      drawMinimap();
+    }
   }
 
   function setActive(value) {
@@ -5018,6 +5364,61 @@
     $("#lab-3d-inspector-focus")?.addEventListener("click", () => {
       if (state.inspectorId) setViewPreset("focus");
     });
+    $("#lab-3d-inspector-cutaway")?.addEventListener("click", () => toggleCutaway());
+    $("#lab-3d-cutaway")?.addEventListener("click", () => toggleCutaway());
+    $("#lab-3d-trace-toggle")?.addEventListener("click", (event) => {
+      state.traceEnabled = !state.traceEnabled;
+      event.currentTarget.classList.toggle("active", state.traceEnabled);
+      event.currentTarget.setAttribute("aria-pressed", String(state.traceEnabled));
+      rebuildConnections();
+    });
+    $("#lab-3d-beam-mode")?.addEventListener("click", (event) => {
+      const modes = [
+        ["all", "全部光路"],
+        ["main", "主光路"],
+        ["errors", "偏差光线"]
+      ];
+      const index = modes.findIndex(([key]) => key === state.beamMode);
+      const [mode, label] = modes[(index + 1) % modes.length];
+      state.beamMode = mode;
+      event.currentTarget.textContent = label;
+      rebuildConnections();
+    });
+    $("#lab-3d-camera-director")?.addEventListener("click", (event) => {
+      state.cameraDirector = !state.cameraDirector;
+      event.currentTarget.classList.toggle("active", state.cameraDirector);
+      event.currentTarget.setAttribute("aria-pressed", String(state.cameraDirector));
+      if (state.cameraDirector) setProcessStep(state.processStep);
+    });
+    $("#lab-3d-minimap-toggle")?.addEventListener("click", (event) => {
+      state.minimapVisible = !state.minimapVisible;
+      const minimap = $("#lab-3d-minimap");
+      if (minimap) minimap.hidden = !state.minimapVisible;
+      event.currentTarget.classList.toggle("active", state.minimapVisible);
+      event.currentTarget.setAttribute("aria-pressed", String(state.minimapVisible));
+    });
+    $("#lab-3d-step-replay")?.addEventListener("click", () => {
+      if (!state.processSteps.length) return;
+      state.autoTour = false;
+      updateProcessUI();
+      showTooltipPlaceholder(`重播：${state.processSteps[state.processStep]?.title || "当前步骤"}`);
+      if (state.cameraDirector) setViewPreset("focus");
+    });
+    $("#lab-3d-autotune-pause")?.addEventListener("click", (event) => {
+      state.autoTunePaused = !state.autoTunePaused;
+      const now = performance.now();
+      if (state.autoTunePaused) {
+        state.autoTunePauseStarted = now;
+      } else if (state.autoTunePauseStarted && state.autoTune) {
+        const pausedFor = now - state.autoTunePauseStarted;
+        state.autoTune.stagingStartedAt += pausedFor;
+        state.autoTune.batchStartedAt += pausedFor;
+        state.autoTune.nextBatchAt += pausedFor;
+        state.autoTunePauseStarted = 0;
+      }
+      event.currentTarget.textContent = state.autoTunePaused ? "继续" : "暂停";
+      event.currentTarget.classList.toggle("active", state.autoTunePaused);
+    });
     $("#lab-3d-model-import")?.addEventListener("click", () => {
       $("#lab-3d-model-file")?.click();
     });
@@ -5052,6 +5453,11 @@
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && state.inspectorId) closeInspector();
+      if (!state.active || event.ctrlKey || event.metaKey || event.altKey ||
+        /input|textarea|select/i.test(document.activeElement?.tagName || "")) return;
+      if (event.key.toLowerCase() === "t") $("#lab-3d-trace-toggle")?.click();
+      if (event.key.toLowerCase() === "m") $("#lab-3d-minimap-toggle")?.click();
+      if (event.key.toLowerCase() === "c") $("#lab-3d-cutaway")?.click();
     });
   }
 
@@ -5062,6 +5468,22 @@
     resetLayout,
     getMetrics: () => ({ ...state.metrics }),
     getPreset: () => state.presetInfo,
+    getSceneDescriptor: () => state.sceneDescriptor,
+    getScientificState: () => ({
+      traceEnabled: state.traceEnabled,
+      beamMode: state.beamMode,
+      cameraDirector: state.cameraDirector,
+      minimapVisible: state.minimapVisible,
+      cutaway: state.cutaway,
+      trace: state.lastTrace3D,
+      connectionIssues: state.connectionIssues
+    }),
+    setBeamMode(mode) {
+      state.beamMode = ["all", "main", "errors"].includes(mode) ? mode : "all";
+      rebuildConnections();
+      return state.beamMode;
+    },
+    toggleCutaway: (force = null) => toggleCutaway(force),
     getSelected: () => state.selectedId,
     getDeviceCount: () => state.deviceGroups.size,
     getProcess: () => ({
@@ -5097,7 +5519,8 @@
       batchCount: state.autoTune.batches.length,
       activeIds: [...state.autoTune.activeIds],
       phase: state.autoTune.phase,
-      placedCount: state.autoTune.placedIds?.size || 0
+      placedCount: state.autoTune.placedIds?.size || 0,
+      paused: state.autoTunePaused
     } : null,
     getDeviceParameters(id) {
       const device = state.presetInfo?.devices.find((item) => item.id === id);
