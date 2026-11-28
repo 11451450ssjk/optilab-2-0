@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="advanced.css?v=20261128-smooth-autotune">
   <link rel="stylesheet" href="research_suite.css">
   <link rel="stylesheet" href="experience.css?v=20261128-clear-optical-routing">
+  <link rel="stylesheet" href="polish.css?v=20261128-comprehensive-polish">
   <script>
     try {
       const entryParams = new URLSearchParams(location.search);
@@ -832,7 +833,7 @@
             <span class="eyebrow">按课程和实验查找</span>
             <h2>找这周要做的实验</h2>
           </div>
-          <p id="catalog-count">共 64 个实验</p>
+          <p id="catalog-count" aria-live="polite">共 64 个实验</p>
         </div>
         <div class="catalog-toolbar">
           <label class="catalog-search">
@@ -1320,7 +1321,7 @@
                 <span class="panel-index">数据检查</span>
                 <h3>先看看数据有没有问题</h3>
               </div>
-              <span class="panel-tag success" id="record-count">尚未导入</span>
+              <span class="panel-tag success" id="record-count" role="status" aria-live="polite">尚未导入</span>
             </div>
             <div class="data-quality">
               <div class="quality-ring" id="quality-ring" style="--score:0">
@@ -1482,7 +1483,7 @@
               <span class="eyebrow">检索结果</span>
               <h3>检索结果</h3>
             </div>
-            <span id="literature-result-count">等待检索</span>
+            <span id="literature-result-count" role="status" aria-live="polite">等待检索</span>
           </div>
           <div id="literature-results" class="literature-results">
             <div class="results-placeholder">
@@ -1767,7 +1768,7 @@
   <script src="optilab_equipment.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_store.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="advanced.js?v=20261128-damped-auto-entry"></script>
+  <script src="advanced.js?v=20261128-comprehensive-polish"></script>
   <script src="research.js?v=20261128-smooth-autotune"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="research_suite.js?v=20261128-smooth-autotune"></script>
@@ -1775,5 +1776,6 @@
   <script src="paper_ai_tools.js?v=20261128-smooth-autotune"></script>
   <script src="equipment_library.js?v=20261128-smooth-autotune"></script>
   <script src="experience_enhancements.js?v=20261128-smooth-autotune"></script>
+  <script src="polish.js?v=20261128-comprehensive-polish"></script>
 </body>
 </html>

@@ -452,8 +452,11 @@ const state = {
   activeReportId: null,
   photoInfo: null,
   filterYear: "all",
-  search: ""
+  search: "",
+  labInView: true
 };
+
+let catalogSearchTimer = 0;
 
 const labCanvas = document.getElementById("lab-canvas");
 const lab3dCanvas = document.getElementById("lab-3d-canvas");
@@ -3121,6 +3124,10 @@ function animationLoop(time) {
   if (!state.lastFrame) state.lastFrame = time;
   const delta = Math.min(50, time - state.lastFrame);
   state.lastFrame = time;
+  if (document.hidden || !state.labInView) {
+    requestAnimationFrame(animationLoop);
+    return;
+  }
   if (!state.paused) {
     state.phase += delta * 0.0012 * state.speed;
     scanLoop(delta);
@@ -4150,6 +4157,16 @@ function setupNavigation() {
 function setupControls() {
   window.OptilabPanorama?.init(labCanvas);
   window.OptilabPanorama3D?.init(lab3dCanvas);
+  if ("IntersectionObserver" in window) {
+    const labObserver = new IntersectionObserver((entries) => {
+      state.labInView = Boolean(entries[0]?.isIntersecting);
+      if (state.labInView) {
+        state.lastFrame = performance.now();
+        drawLabFrame(performance.now());
+      }
+    }, { rootMargin: "320px 0px", threshold: 0.01 });
+    labObserver.observe(document.getElementById("lab-section"));
+  }
   const guideToggle = document.getElementById("guide-panel-toggle");
   const guidePanel = document.getElementById("lab-guide-panel");
   const labGrid = document.getElementById("lab-stage-card");
@@ -4328,7 +4345,8 @@ async function readExperimentDataFile(file) {
 function setupDataControls() {
   document.getElementById("catalog-search").addEventListener("input", (event) => {
     state.search = event.target.value;
-    renderCatalog();
+    window.clearTimeout(catalogSearchTimer);
+    catalogSearchTimer = window.setTimeout(renderCatalog, 90);
   });
   document.querySelectorAll(".year-filter button").forEach((button) => {
     button.addEventListener("click", () => {
